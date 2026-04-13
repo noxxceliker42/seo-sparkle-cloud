@@ -1,4 +1,4 @@
-import { LayoutDashboard, PlusCircle, Network, Building2, Settings } from "lucide-react";
+import { LayoutDashboard, PlusCircle, Network, Building2, Settings, Users } from "lucide-react";
 import { Link, useLocation } from "@tanstack/react-router";
 import {
   Sidebar,
@@ -12,19 +12,28 @@ import {
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
-
-const items = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Neue Seite", url: "/", icon: PlusCircle },
-  { title: "Cluster-Karte", url: "/cluster", icon: Network },
-  { title: "Firmen", url: "/firmen", icon: Building2 },
-  { title: "Einstellungen", url: "/settings", icon: Settings },
-];
+import { useAuth } from "@/hooks/useAuth";
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { hasMinRole, hasRole } = useAuth();
+
+  const items = [
+    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, minRole: "viewer" as const },
+    { title: "Neue Seite", url: "/", icon: PlusCircle, minRole: "editor" as const },
+    { title: "Cluster-Karte", url: "/cluster", icon: Network, minRole: "viewer" as const },
+    { title: "Firmen", url: "/firmen", icon: Building2, minRole: "editor" as const },
+    { title: "Einstellungen", url: "/settings", icon: Settings, minRole: "viewer" as const },
+  ];
+
+  // Admin-only items
+  if (hasRole("admin")) {
+    items.push({ title: "Benutzer", url: "/benutzer", icon: Users, minRole: "admin" as const });
+  }
+
+  const visibleItems = items.filter((item) => hasMinRole(item.minRole));
 
   return (
     <Sidebar collapsible="icon">
@@ -41,7 +50,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => {
+              {visibleItems.map((item) => {
                 const isActive = location.pathname === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>

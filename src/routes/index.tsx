@@ -727,6 +727,8 @@ function Index() {
         {activeTab === "json" && rawJson && (
           <Textarea readOnly value={rawJson} className="min-h-[500px] font-mono text-xs" />
         )}
+          </>
+        )}
       </main>
     </div>
   );

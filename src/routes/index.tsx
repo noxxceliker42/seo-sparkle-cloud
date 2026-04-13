@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +13,7 @@ import { ClusterPreview } from "@/components/seo/ClusterPreview";
 import { LoadingIndicator, type LoadState } from "@/components/seo/LoadingIndicator";
 import { ModeToggle } from "@/components/seo/ModeToggle";
 import { FirmSelector } from "@/components/seo/FirmSelector";
+import { SeoForm, type SeoFormData } from "@/components/seo/SeoForm";
 
 export const Route = createFileRoute("/")({
   component: Index,

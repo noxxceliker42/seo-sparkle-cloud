@@ -15,6 +15,7 @@ import { ModeToggle } from "@/components/seo/ModeToggle";
 import { FirmSelector } from "@/components/seo/FirmSelector";
 import { SeoForm, type SeoFormData } from "@/components/seo/SeoForm";
 import { OutputPanel, type GeneratedPage } from "@/components/seo/OutputPanel";
+import { QaGate } from "@/components/seo/QaGate";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -103,6 +104,8 @@ function Index() {
 
   // Output panel
   const [showOutput, setShowOutput] = useState(false);
+  const [showQaGate, setShowQaGate] = useState(false);
+  const [qaFormData, setQaFormData] = useState<SeoFormData | null>(null);
   const [generatedPage, setGeneratedPage] = useState<GeneratedPage | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState("");
@@ -402,7 +405,13 @@ function Index() {
     return fields;
   }, [analysis, selectedFirm]);
 
-  const handleFormSubmit = useCallback(async (data: SeoFormData) => {
+  const handleFormSubmit = useCallback((data: SeoFormData) => {
+    setQaFormData(data);
+    setShowForm(false);
+    setShowQaGate(true);
+  }, []);
+
+  const handleGenerate = useCallback(async (data: SeoFormData) => {
     setGenerating(true);
     setGenerateError("");
     try {
@@ -424,7 +433,7 @@ function Index() {
         city: data.city,
         phone: data.phone,
       });
-      setShowForm(false);
+      setShowQaGate(false);
       setShowOutput(true);
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : "Fehler");
@@ -464,16 +473,15 @@ function Index() {
         {showOutput && generatedPage ? (
           <OutputPanel
             page={generatedPage}
-            onBack={() => { setShowOutput(false); setShowForm(true); }}
+            onBack={() => { setShowOutput(false); setShowQaGate(true); }}
             onNewPage={handleNewPage}
           />
-        ) : showForm ? (
+        ) : showQaGate && qaFormData ? (
           <>
-            <SeoForm
-              initialData={formInitialData}
-              autoFilledFields={autoFilledFields}
-              onSubmit={handleFormSubmit}
-              onBack={() => setShowForm(false)}
+            <QaGate
+              formData={qaFormData}
+              onBack={() => { setShowQaGate(false); setShowForm(true); }}
+              onGenerate={handleGenerate}
             />
             {generating && (
               <div className="flex items-center gap-3 rounded-md border border-border bg-card p-4">
@@ -487,6 +495,13 @@ function Index() {
               </div>
             )}
           </>
+        ) : showForm ? (
+          <SeoForm
+            initialData={formInitialData}
+            autoFilledFields={autoFilledFields}
+            onSubmit={handleFormSubmit}
+            onBack={() => setShowForm(false)}
+          />
         ) : (
           <>
 

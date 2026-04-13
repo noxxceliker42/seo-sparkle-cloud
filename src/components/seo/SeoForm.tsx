@@ -601,7 +601,6 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
         ) : (
           <Button
             onClick={() => onSubmit(form)}
-            disabled={seoScore < 50}
             className="min-h-[44px] gap-2 bg-green-600 hover:bg-green-700"
           >
             Weiter zum QA-Gate →

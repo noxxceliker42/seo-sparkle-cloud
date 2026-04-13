@@ -503,34 +503,35 @@ function Index() {
 
         <div className="space-y-3">
           <ModeToggle mode={mode} onModeChange={setMode} />
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3">
             <Input
               type="text"
               placeholder="Keyword eingeben, z.B. Bosch Waschmaschine Fehlercode F18 Berlin"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !isLoading && handleAnalyze()}
-              className="h-12 flex-1"
+              className="h-12 w-full"
             />
-            <Button
-              onClick={handleAnalyze}
-              disabled={!keyword.trim() || isLoading}
-              className="h-12 min-w-[160px] min-h-[44px] text-base font-semibold"
-            >
-              {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Search className="mr-2 h-5 w-5" />}
-              Analysieren
-            </Button>
-            {/* DataForSEO Verify Button */}
-            <Button
-              variant="outline"
-              onClick={handleVerifyDataForSEO}
-              disabled={!keyword.trim() || verifyLoading}
-              className="h-12 min-h-[44px] gap-2"
-              title="SERP + Suchvolumen via DataForSEO laden"
-            >
-              {verifyLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <BarChart3 className="h-5 w-5" />}
-              Verifizieren
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleAnalyze}
+                disabled={!keyword.trim() || isLoading}
+                className="h-12 flex-1 min-h-[44px] text-base font-semibold"
+              >
+                {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Search className="mr-2 h-5 w-5" />}
+                Analysieren
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleVerifyDataForSEO}
+                disabled={!keyword.trim() || verifyLoading}
+                className="h-12 flex-1 min-h-[44px] gap-2"
+                title="SERP + Suchvolumen via DataForSEO laden"
+              >
+                {verifyLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <BarChart3 className="h-5 w-5" />}
+                Verifizieren
+              </Button>
+            </div>
           </div>
           {/* Volume + KD badges inline */}
           {kwVolume && (

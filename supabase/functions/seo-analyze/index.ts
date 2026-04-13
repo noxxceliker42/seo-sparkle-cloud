@@ -63,7 +63,10 @@ Regeln:
 - discover_angle: konkreter Vorschlag (2026 NEU)
 - Nur reines JSON, keine Backticks, kein Markdown`;
 
-    const response = await fetch("https://kieai.erweima.ai/api/v1/chat/completions", {
+    // Kie.AI Claude endpoint uses Anthropic message format
+    // Endpoint: https://api.kie.ai/claude/v1/messages
+    // Response format: Anthropic (data.content[0].text)
+    const response = await fetch("https://api.kie.ai/claude/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -71,10 +74,10 @@ Regeln:
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 1500,
         messages: [
           { role: "user", content: prompt },
         ],
+        stream: false,
       }),
     });
 
@@ -89,8 +92,14 @@ Regeln:
 
     const data = await response.json();
 
-    // OpenAI format: data.choices[0].message.content
-    const rawContent = data?.choices?.[0]?.message?.content;
+    // Anthropic format: data.content[0].text
+    // Content is an array of blocks, find the text block
+    let rawContent: string | undefined;
+    if (data?.content && Array.isArray(data.content)) {
+      const textBlock = data.content.find((block: { type: string; text?: string }) => block.type === "text");
+      rawContent = textBlock?.text;
+    }
+
     if (!rawContent) {
       console.error("Unexpected Kie.AI response structure:", JSON.stringify(data));
       return new Response(
@@ -105,8 +114,8 @@ Regeln:
     let parsed;
     try {
       parsed = JSON.parse(cleaned);
-    } catch (parseErr) {
-      console.error("JSON parse error:", parseErr, "Raw:", cleaned);
+    } catch (_parseErr) {
+      console.error("JSON parse error, raw:", cleaned);
       return new Response(
         JSON.stringify({ error: "JSON-Parsing fehlgeschlagen", raw: cleaned }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -114,13 +123,19 @@ Regeln:
     }
 
     return new Response(
-      JSON.stringify({ success: true, keyword, analysis: parsed }),
+      JSON.stringify({
+        success: true,
+        keyword,
+        analysis: parsed,
+        credits_consumed: data.credits_consumed,
+        model: data.model,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
     console.error("seo-analyze error:", err);
     return new Response(
-      JSON.stringify({ error: `Interner Fehler: ${err.message}` }),
+      JSON.stringify({ error: `Interner Fehler: ${(err as Error).message}` }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

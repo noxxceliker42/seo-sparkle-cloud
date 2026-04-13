@@ -97,6 +97,9 @@ function Index() {
   // DataForSEO separate verification
   const [verifyLoading, setVerifyLoading] = useState(false);
 
+  // Form view
+  const [showForm, setShowForm] = useState(false);
+
   const isLoading = aiState === "loading" || serpState === "loading" || volState === "loading";
 
   const runStandardAnalysis = useCallback((kw: string): AnalysisResult => {

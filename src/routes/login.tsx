@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,11 @@ function LoginForm({ prefillEmail, prefillPassword }: { prefillEmail?: string; p
   const [forgotMode, setForgotMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (prefillEmail) setEmail(prefillEmail);
+    if (prefillPassword) setPassword(prefillPassword);
+  }, [prefillEmail, prefillPassword]);
 
   if (forgotMode) {
     return (

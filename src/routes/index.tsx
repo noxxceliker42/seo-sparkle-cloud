@@ -461,13 +461,32 @@ function Index() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-8 space-y-8">
-        {showForm ? (
-          <SeoForm
-            initialData={formInitialData}
-            autoFilledFields={autoFilledFields}
-            onSubmit={handleFormSubmit}
-            onBack={() => setShowForm(false)}
+        {showOutput && generatedPage ? (
+          <OutputPanel
+            page={generatedPage}
+            onBack={() => { setShowOutput(false); setShowForm(true); }}
+            onNewPage={handleNewPage}
           />
+        ) : showForm ? (
+          <>
+            <SeoForm
+              initialData={formInitialData}
+              autoFilledFields={autoFilledFields}
+              onSubmit={handleFormSubmit}
+              onBack={() => setShowForm(false)}
+            />
+            {generating && (
+              <div className="flex items-center gap-3 rounded-md border border-border bg-card p-4">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="text-sm font-medium text-foreground">Seite wird generiert… (Kie.AI, ~15–30 Sek.)</span>
+              </div>
+            )}
+            {generateError && (
+              <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+                {generateError}
+              </div>
+            )}
+          </>
         ) : (
           <>
 

@@ -20,17 +20,17 @@ export function AppSidebar() {
   const location = useLocation();
   const { hasMinRole, hasRole } = useAuth();
 
-  const items = [
-    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, minRole: "viewer" as const },
-    { title: "Neue Seite", url: "/", icon: PlusCircle, minRole: "editor" as const },
-    { title: "Cluster-Karte", url: "/cluster", icon: Network, minRole: "viewer" as const },
-    { title: "Firmen", url: "/firmen", icon: Building2, minRole: "editor" as const },
-    { title: "Einstellungen", url: "/settings", icon: Settings, minRole: "viewer" as const },
+  type MinRole = "viewer" | "editor" | "admin";
+  const items: Array<{ title: string; url: string; icon: typeof LayoutDashboard; minRole: MinRole }> = [
+    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, minRole: "viewer" },
+    { title: "Neue Seite", url: "/", icon: PlusCircle, minRole: "editor" },
+    { title: "Cluster-Karte", url: "/cluster", icon: Network, minRole: "viewer" },
+    { title: "Firmen", url: "/firmen", icon: Building2, minRole: "editor" },
+    { title: "Einstellungen", url: "/settings", icon: Settings, minRole: "viewer" },
   ];
 
-  // Admin-only items
   if (hasRole("admin")) {
-    items.push({ title: "Benutzer", url: "/benutzer", icon: Users, minRole: "admin" as const });
+    items.push({ title: "Benutzer", url: "/benutzer", icon: Users, minRole: "admin" });
   }
 
   const visibleItems = items.filter((item) => hasMinRole(item.minRole));

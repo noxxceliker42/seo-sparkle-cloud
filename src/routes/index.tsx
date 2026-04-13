@@ -104,6 +104,8 @@ function Index() {
 
   // Output panel
   const [showOutput, setShowOutput] = useState(false);
+  const [showQaGate, setShowQaGate] = useState(false);
+  const [qaFormData, setQaFormData] = useState<SeoFormData | null>(null);
   const [generatedPage, setGeneratedPage] = useState<GeneratedPage | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState("");

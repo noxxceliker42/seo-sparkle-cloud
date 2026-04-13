@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [demoEmail, setDemoEmail] = useState("");
+  const [demoPw, setDemoPw] = useState("");
 
   // Redirect if already logged in
   if (isAuthenticated) {
@@ -26,29 +28,67 @@ function LoginPage() {
     return null;
   }
 
+
+  const fillDemo = (email: string, pw: string) => {
+    setDemoEmail(email);
+    setDemoPw(pw);
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-2 pb-2">
-          <h1 className="text-3xl font-bold text-destructive">SEO-OS</h1>
-          <p className="text-sm text-muted-foreground">v3.1 — Agentur-System</p>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Anmelden</TabsTrigger>
-              <TabsTrigger value="register">Registrieren</TabsTrigger>
-            </TabsList>
-            <TabsContent value="login"><LoginForm /></TabsContent>
-            <TabsContent value="register"><RegisterForm /></TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-8">
+      <div className="w-full max-w-md space-y-4">
+        <Card>
+          <CardHeader className="text-center space-y-2 pb-2">
+            <h1 className="text-3xl font-bold text-destructive">SEO-OS</h1>
+            <p className="text-sm text-muted-foreground">v3.1 — Agentur-System</p>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="login" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login">Anmelden</TabsTrigger>
+                <TabsTrigger value="register">Registrieren</TabsTrigger>
+              </TabsList>
+              <TabsContent value="login"><LoginForm prefillEmail={demoEmail} prefillPassword={demoPw} /></TabsContent>
+              <TabsContent value="register"><RegisterForm /></TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Demo Credentials */}
+        <Card className="border-dashed">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Test-Zugänge</p>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 space-y-2">
+            {[
+              { role: "Admin", email: "admin@seo-os.test", pw: "admin12345!", color: "bg-destructive text-destructive-foreground" },
+              { role: "Editor", email: "editor@seo-os.test", pw: "editor12345!", color: "bg-primary text-primary-foreground" },
+              { role: "Viewer", email: "viewer@seo-os.test", pw: "viewer12345!", color: "bg-muted text-muted-foreground" },
+            ].map((d) => (
+              <button
+                key={d.role}
+                type="button"
+                className="w-full flex items-center justify-between rounded-md border p-3 text-left hover:bg-accent/50 transition-colors"
+                onClick={() => fillDemo(d.email, d.pw)}
+              >
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${d.color}`}>{d.role}</span>
+                    <span className="text-sm font-medium">{d.email}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Passwort: {d.pw}</p>
+                </div>
+                <ArrowLeft className="h-3 w-3 rotate-180 text-muted-foreground" />
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
-function LoginForm() {
+function LoginForm({ prefillEmail, prefillPassword }: { prefillEmail?: string; prefillPassword?: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -57,6 +97,11 @@ function LoginForm() {
   const [forgotMode, setForgotMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (prefillEmail) setEmail(prefillEmail);
+    if (prefillPassword) setPassword(prefillPassword);
+  }, [prefillEmail, prefillPassword]);
 
   if (forgotMode) {
     return (

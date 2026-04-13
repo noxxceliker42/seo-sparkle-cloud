@@ -19,6 +19,8 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [demoEmail, setDemoEmail] = useState("");
+  const [demoPw, setDemoPw] = useState("");
 
   // Redirect if already logged in
   if (isAuthenticated) {
@@ -26,8 +28,6 @@ function LoginPage() {
     return null;
   }
 
-  const [demoEmail, setDemoEmail] = useState("");
-  const [demoPw, setDemoPw] = useState("");
 
   const fillDemo = (email: string, pw: string) => {
     setDemoEmail(email);
@@ -88,7 +88,7 @@ function LoginPage() {
   );
 }
 
-function LoginForm() {
+function LoginForm({ prefillEmail, prefillPassword }: { prefillEmail?: string; prefillPassword?: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);

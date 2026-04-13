@@ -14,6 +14,7 @@ import { LoadingIndicator, type LoadState } from "@/components/seo/LoadingIndica
 import { ModeToggle } from "@/components/seo/ModeToggle";
 import { FirmSelector } from "@/components/seo/FirmSelector";
 import { SeoForm, type SeoFormData } from "@/components/seo/SeoForm";
+import { OutputPanel, type GeneratedPage } from "@/components/seo/OutputPanel";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -99,6 +100,12 @@ function Index() {
 
   // Form view
   const [showForm, setShowForm] = useState(false);
+
+  // Output panel
+  const [showOutput, setShowOutput] = useState(false);
+  const [generatedPage, setGeneratedPage] = useState<GeneratedPage | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState("");
 
   const isLoading = aiState === "loading" || serpState === "loading" || volState === "loading";
 
@@ -395,9 +402,46 @@ function Index() {
     return fields;
   }, [analysis, selectedFirm]);
 
-  const handleFormSubmit = useCallback((data: SeoFormData) => {
-    console.log("Form submitted for QA-Gate:", data);
-    // TODO: proceed to QA-Gate
+  const handleFormSubmit = useCallback(async (data: SeoFormData) => {
+    setGenerating(true);
+    setGenerateError("");
+    try {
+      const { data: result, error } = await supabase.functions.invoke("generate-page", { body: data });
+      if (error || result?.error) {
+        setGenerateError(error?.message || result?.error || "Fehler bei der Seitengenerierung");
+        return;
+      }
+      setGeneratedPage({
+        metaTitle: result.metaTitle || "",
+        metaDesc: result.metaDesc || "",
+        metaKeywords: result.metaKeywords || "",
+        htmlOutput: result.htmlOutput || "",
+        jsonLd: result.jsonLd || "",
+        masterPrompt: result.masterPrompt || "",
+        activeSections: data.activeSections,
+        firmName: data.firmName,
+        street: data.street,
+        city: data.city,
+        phone: data.phone,
+      });
+      setShowForm(false);
+      setShowOutput(true);
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : "Fehler");
+    } finally {
+      setGenerating(false);
+    }
+  }, []);
+
+  const handleNewPage = useCallback(() => {
+    setShowOutput(false);
+    setGeneratedPage(null);
+    setShowForm(false);
+    setAnalysis(null);
+    setSerp(null);
+    setVolume(null);
+    setKeyword("");
+    setRawJson("");
   }, []);
 
   return (
@@ -417,13 +461,32 @@ function Index() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-8 space-y-8">
-        {showForm ? (
-          <SeoForm
-            initialData={formInitialData}
-            autoFilledFields={autoFilledFields}
-            onSubmit={handleFormSubmit}
-            onBack={() => setShowForm(false)}
+        {showOutput && generatedPage ? (
+          <OutputPanel
+            page={generatedPage}
+            onBack={() => { setShowOutput(false); setShowForm(true); }}
+            onNewPage={handleNewPage}
           />
+        ) : showForm ? (
+          <>
+            <SeoForm
+              initialData={formInitialData}
+              autoFilledFields={autoFilledFields}
+              onSubmit={handleFormSubmit}
+              onBack={() => setShowForm(false)}
+            />
+            {generating && (
+              <div className="flex items-center gap-3 rounded-md border border-border bg-card p-4">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="text-sm font-medium text-foreground">Seite wird generiert… (Kie.AI, ~15–30 Sek.)</span>
+              </div>
+            )}
+            {generateError && (
+              <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+                {generateError}
+              </div>
+            )}
+          </>
         ) : (
           <>
 

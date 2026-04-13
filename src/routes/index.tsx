@@ -147,6 +147,47 @@ function Index() {
     };
   }, []);
 
+  const saveAnalysis = useCallback(async (
+    kw: string,
+    analysisMode: string,
+    result: AnalysisResult | null,
+    volData: VolumeResult | null,
+    serpData: SerpResult | null,
+    json: string,
+  ) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const kwVol = volData?.[kw];
+      await supabase.from("seo_analyses").insert({
+        user_id: user.id,
+        keyword: kw,
+        mode: analysisMode,
+        intent: result?.intent || null,
+        intent_detail: result?.intent_detail || null,
+        page_type: result?.page_type || null,
+        page_type_why: result?.page_type_why || null,
+        paa: result?.paa || null,
+        lsi: result?.lsi || null,
+        secondary_keywords: result?.secondary_keywords || null,
+        content_gaps: result?.content_gaps || null,
+        cluster: result?.cluster || null,
+        schema_recommendation: result?.schema_recommendation || null,
+        information_gain_suggestions: result?.information_gain_suggestions || null,
+        discover_angle: result?.discover_angle || null,
+        volume: kwVol?.volume ?? null,
+        difficulty: kwVol?.difficulty ?? null,
+        cpc: kwVol?.cpc ?? null,
+        serp_data: serpData || null,
+        firm_name: selectedFirm?.name || null,
+        city: selectedFirm?.city || null,
+        raw_json: json,
+      });
+    } catch (err) {
+      console.error("Analyse speichern fehlgeschlagen:", err);
+    }
+  }, [selectedFirm]);
+
   const handleAnalyze = useCallback(async () => {
     if (!keyword.trim()) return;
     const kw = keyword.trim();
@@ -170,13 +211,15 @@ function Index() {
       setVolState("idle");
       setAiError("");
 
-      setTimeout(() => {
+      setTimeout(async () => {
         const result = runStandardAnalysis(kw);
         setAnalysis(result);
         setSelectedLsi(new Set(result.lsi || []));
         setAiState("done");
         allResults.seoAnalyze = result;
-        setRawJson(JSON.stringify(allResults, null, 2));
+        const json = JSON.stringify(allResults, null, 2);
+        setRawJson(json);
+        await saveAnalysis(kw, "standard", result, null, null, json);
       }, 200);
       return;
     }
@@ -185,6 +228,10 @@ function Index() {
     setAiState("loading"); setAiError("");
     setSerpState("loading"); setSerpError("");
     setVolState("loading"); setVolError("");
+
+    let finalAnalysis: AnalysisResult | null = null;
+    let finalSerp: SerpResult | null = null;
+    let finalVolume: VolumeResult | null = null;
 
     const aiCall = supabase.functions.invoke("seo-analyze", {
       body: { keyword: kw, firm: selectedFirm?.name, city: selectedFirm?.city },
@@ -196,6 +243,7 @@ function Index() {
         } else {
           const a = data?.analysis || data;
           setAnalysis(a);
+          finalAnalysis = a;
           setSelectedLsi(new Set(a?.lsi || []));
           setAiState("done");
           allResults.seoAnalyze = data;
@@ -210,6 +258,7 @@ function Index() {
           setSerpState("error");
         } else {
           setSerp(data);
+          finalSerp = data;
           setSerpState("done");
           allResults.serpData = data;
         }
@@ -222,7 +271,9 @@ function Index() {
           setVolError(error?.message || data?.error || "Unbekannter Fehler");
           setVolState("error");
         } else {
-          setVolume(data?.data || {});
+          const v = data?.data || {};
+          setVolume(v);
+          finalVolume = v;
           setVolState("done");
           allResults.keywordVolume = data;
         }
@@ -230,8 +281,10 @@ function Index() {
       .catch((e) => { setVolError(e.message); setVolState("error"); });
 
     await Promise.all([aiCall, serpCall, volCall]);
-    setRawJson(JSON.stringify(allResults, null, 2));
-  }, [keyword, mode, selectedFirm, runStandardAnalysis]);
+    const json = JSON.stringify(allResults, null, 2);
+    setRawJson(json);
+    await saveAnalysis(kw, "kieai", finalAnalysis, finalVolume, finalSerp, json);
+  }, [keyword, mode, selectedFirm, runStandardAnalysis, saveAnalysis]);
 
   const handleVerifyDataForSEO = useCallback(async () => {
     if (!keyword.trim()) return;

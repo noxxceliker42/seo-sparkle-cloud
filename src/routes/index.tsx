@@ -15,6 +15,7 @@ import { ModeToggle } from "@/components/seo/ModeToggle";
 import { FirmSelector } from "@/components/seo/FirmSelector";
 import { SeoForm, type SeoFormData } from "@/components/seo/SeoForm";
 import { OutputPanel, type GeneratedPage } from "@/components/seo/OutputPanel";
+import { QaGate } from "@/components/seo/QaGate";
 
 export const Route = createFileRoute("/")({
   component: Index,

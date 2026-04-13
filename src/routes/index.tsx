@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +13,7 @@ import { ClusterPreview } from "@/components/seo/ClusterPreview";
 import { LoadingIndicator, type LoadState } from "@/components/seo/LoadingIndicator";
 import { ModeToggle } from "@/components/seo/ModeToggle";
 import { FirmSelector } from "@/components/seo/FirmSelector";
+import { SeoForm, type SeoFormData } from "@/components/seo/SeoForm";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -95,6 +96,9 @@ function Index() {
 
   // DataForSEO separate verification
   const [verifyLoading, setVerifyLoading] = useState(false);
+
+  // Form view
+  const [showForm, setShowForm] = useState(false);
 
   const isLoading = aiState === "loading" || serpState === "loading" || volState === "loading";
 
@@ -331,6 +335,71 @@ function Index() {
   const kwVolume = volume?.[keyword.trim()];
   const hasResults = analysis || serp || volume;
 
+  // Build auto-fill data for the form
+  const formInitialData = useMemo((): Partial<SeoFormData> => {
+    const data: Partial<SeoFormData> = { keyword: keyword.trim() };
+    if (analysis) {
+      if (analysis.intent) data.intent = analysis.intent;
+      if (analysis.page_type) data.pageType = analysis.page_type;
+      if (analysis.secondary_keywords) data.secondaryKeywords = analysis.secondary_keywords.join(", ");
+      if (analysis.lsi) data.lsiTerms = [...selectedLsi].join(", ");
+      if (analysis.cluster) {
+        const sibs = [...(analysis.cluster.informational || []), ...(analysis.cluster.commercial || [])];
+        data.siblingPages = sibs.join("\n");
+        data.deepPages = (analysis.cluster.deep_pages || []).join("\n");
+      }
+      if (analysis.paa) {
+        const aiQ = analysis.paa.map((p) => p.question);
+        const serpQ = (serp?.paa_verified || []).map((p) => p.question);
+        const allQ = [...new Set([...serpQ, ...aiQ])];
+        data.paaQuestions = allQ.filter((q) => selectedPaa.has(q) || selectedPaa.size === 0).join("\n");
+      }
+      if (analysis.content_gaps) data.contentGap = analysis.content_gaps.join("\n");
+      if (analysis.schema_recommendation) data.schemaBlocks = analysis.schema_recommendation;
+      if (analysis.information_gain_suggestions) data.informationGain = analysis.information_gain_suggestions.join("\n");
+    }
+    if (selectedFirm) {
+      data.firmName = selectedFirm.name;
+      data.city = selectedFirm.city || "";
+      data.street = selectedFirm.street || "";
+      data.zip = selectedFirm.zip || "";
+      data.phone = selectedFirm.phone || "";
+      data.website = selectedFirm.website || "";
+      data.serviceArea = selectedFirm.service_area || "";
+    }
+    return data;
+  }, [analysis, serp, selectedLsi, selectedPaa, selectedFirm, keyword]);
+
+  const autoFilledFields = useMemo(() => {
+    const fields: Record<string, boolean> = {};
+    if (analysis) {
+      fields.keyword = true;
+      if (analysis.intent) fields.intent = true;
+      if (analysis.page_type) fields.pageType = true;
+      if (analysis.secondary_keywords) fields.secondaryKeywords = true;
+      if (analysis.lsi) fields.lsiTerms = true;
+      if (analysis.cluster) { fields.siblingPages = true; fields.deepPages = true; }
+      if (analysis.paa) fields.paaQuestions = true;
+      if (analysis.schema_recommendation) fields.schemaBlocks = true;
+      if (analysis.information_gain_suggestions) fields.informationGain = true;
+    }
+    if (selectedFirm) {
+      fields.firmName = true;
+      if (selectedFirm.city) fields.city = true;
+      if (selectedFirm.street) fields.street = true;
+      if (selectedFirm.zip) fields.zip = true;
+      if (selectedFirm.phone) fields.phone = true;
+      if (selectedFirm.website) fields.website = true;
+      if (selectedFirm.service_area) fields.serviceArea = true;
+    }
+    return fields;
+  }, [analysis, selectedFirm]);
+
+  const handleFormSubmit = useCallback((data: SeoFormData) => {
+    console.log("Form submitted for QA-Gate:", data);
+    // TODO: proceed to QA-Gate
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header with Firm Selector */}
@@ -348,7 +417,16 @@ function Index() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-8 space-y-8">
-        {/* Mode Toggle + Search Bar */}
+        {showForm ? (
+          <SeoForm
+            initialData={formInitialData}
+            autoFilledFields={autoFilledFields}
+            onSubmit={handleFormSubmit}
+            onBack={() => setShowForm(false)}
+          />
+        ) : (
+          <>
+
         <div className="space-y-3">
           <ModeToggle mode={mode} onModeChange={setMode} />
           <div className="flex gap-3">
@@ -585,7 +663,11 @@ function Index() {
 
             {/* Action Button */}
             {analysis && (
-              <Button variant="secondary" className="h-12 min-h-[44px] text-base font-semibold gap-2">
+              <Button
+                variant="secondary"
+                className="h-12 min-h-[44px] text-base font-semibold gap-2"
+                onClick={() => setShowForm(true)}
+              >
                 <ArrowRight className="h-5 w-5" />
                 Vorschläge ins Formular übernehmen
               </Button>
@@ -644,6 +726,8 @@ function Index() {
         {/* JSON Tab */}
         {activeTab === "json" && rawJson && (
           <Textarea readOnly value={rawJson} className="min-h-[500px] font-mono text-xs" />
+        )}
+          </>
         )}
       </main>
     </div>

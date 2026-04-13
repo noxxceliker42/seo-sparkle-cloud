@@ -91,6 +91,87 @@ export type Database = {
           },
         ]
       }
+      seo_analyses: {
+        Row: {
+          city: string | null
+          cluster: Json | null
+          content_gaps: Json | null
+          cpc: number | null
+          created_at: string
+          difficulty: number | null
+          discover_angle: string | null
+          firm_name: string | null
+          id: string
+          information_gain_suggestions: Json | null
+          intent: string | null
+          intent_detail: string | null
+          keyword: string
+          lsi: Json | null
+          mode: string
+          paa: Json | null
+          page_type: string | null
+          page_type_why: string | null
+          raw_json: string | null
+          schema_recommendation: Json | null
+          secondary_keywords: Json | null
+          serp_data: Json | null
+          user_id: string
+          volume: number | null
+        }
+        Insert: {
+          city?: string | null
+          cluster?: Json | null
+          content_gaps?: Json | null
+          cpc?: number | null
+          created_at?: string
+          difficulty?: number | null
+          discover_angle?: string | null
+          firm_name?: string | null
+          id?: string
+          information_gain_suggestions?: Json | null
+          intent?: string | null
+          intent_detail?: string | null
+          keyword: string
+          lsi?: Json | null
+          mode?: string
+          paa?: Json | null
+          page_type?: string | null
+          page_type_why?: string | null
+          raw_json?: string | null
+          schema_recommendation?: Json | null
+          secondary_keywords?: Json | null
+          serp_data?: Json | null
+          user_id: string
+          volume?: number | null
+        }
+        Update: {
+          city?: string | null
+          cluster?: Json | null
+          content_gaps?: Json | null
+          cpc?: number | null
+          created_at?: string
+          difficulty?: number | null
+          discover_angle?: string | null
+          firm_name?: string | null
+          id?: string
+          information_gain_suggestions?: Json | null
+          intent?: string | null
+          intent_detail?: string | null
+          keyword?: string
+          lsi?: Json | null
+          mode?: string
+          paa?: Json | null
+          page_type?: string | null
+          page_type_why?: string | null
+          raw_json?: string | null
+          schema_recommendation?: Json | null
+          secondary_keywords?: Json | null
+          serp_data?: Json | null
+          user_id?: string
+          volume?: number | null
+        }
+        Relationships: []
+      }
       seo_pages: {
         Row: {
           active_sections: Json | null

@@ -3,13 +3,16 @@ import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Image as ImageIcon, Loader2, ArrowRight } from "lucide-react";
+import { Search, Image as ImageIcon, Loader2, ArrowRight, BarChart3 } from "lucide-react";
 import { LsiChips } from "@/components/seo/LsiChips";
 import { SerpPreview } from "@/components/seo/SerpPreview";
 import { PaaList } from "@/components/seo/PaaList";
 import { ClusterPreview } from "@/components/seo/ClusterPreview";
 import { LoadingIndicator, type LoadState } from "@/components/seo/LoadingIndicator";
+import { ModeToggle } from "@/components/seo/ModeToggle";
+import { FirmSelector } from "@/components/seo/FirmSelector";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -46,9 +49,23 @@ interface VolumeResult {
   [keyword: string]: { volume: number; difficulty: number; cpc: number };
 }
 
+interface Firm {
+  id: string;
+  name: string;
+  city: string | null;
+  street: string | null;
+  zip: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  service_area: string | null;
+}
+
 function Index() {
   const [keyword, setKeyword] = useState("");
   const [activeTab, setActiveTab] = useState<"results" | "image" | "json">("results");
+  const [mode, setMode] = useState<"standard" | "kieai">("standard");
+  const [selectedFirm, setSelectedFirm] = useState<Firm | null>(null);
 
   // Loading states
   const [aiState, setAiState] = useState<LoadState>("idle");
@@ -66,13 +83,55 @@ function Index() {
 
   // LSI selection
   const [selectedLsi, setSelectedLsi] = useState<Set<string>>(new Set());
+  const [rejectedLsi, setRejectedLsi] = useState<Set<string>>(new Set());
+
+  // PAA selection
+  const [selectedPaa, setSelectedPaa] = useState<Set<string>>(new Set());
 
   // Image generation
   const [imagePrompt, setImagePrompt] = useState("");
   const [imageLoading, setImageLoading] = useState(false);
   const [imageResult, setImageResult] = useState<{ urls?: string[]; state?: string; error?: string } | null>(null);
 
+  // DataForSEO separate verification
+  const [verifyLoading, setVerifyLoading] = useState(false);
+
   const isLoading = aiState === "loading" || serpState === "loading" || volState === "loading";
+
+  const runStandardAnalysis = useCallback((kw: string): AnalysisResult => {
+    // Local JS-based quick analysis (no API needed)
+    const lower = kw.toLowerCase();
+    const hasCity = /berlin|münchen|hamburg|köln|frankfurt|stuttgart/.test(lower);
+    const hasCommercial = /kaufen|preis|kosten|vergleich|test|erfahrung/.test(lower);
+    const hasTx = /reparatur|service|notdienst|bestellen/.test(lower);
+
+    let intent = "Informational";
+    if (hasTx || hasCity) intent = hasCity ? "Local" : "Transactional";
+    else if (hasCommercial) intent = "Commercial";
+
+    return {
+      intent,
+      intent_detail: `Automatisch erkannt (Standard-Modus)`,
+      page_type: hasCity ? "Transactional/Local" : hasCommercial ? "Supporting Commercial" : "Supporting Info",
+      page_type_why: "Basierend auf Keyword-Muster-Erkennung",
+      paa: [
+        { question: `Was ist ${kw}?`, intent: "Informational" },
+        { question: `Wie funktioniert ${kw}?`, intent: "Informational" },
+        { question: `${kw} Kosten`, intent: "Commercial" },
+        { question: `${kw} Erfahrungen`, intent: "Commercial" },
+      ],
+      lsi: kw.split(/\s+/).filter((w) => w.length > 3).concat(["Anleitung", "Lösung", "Tipps", "Hilfe", "Experte"]),
+      cluster: {
+        informational: [`${kw} erklärt`, `${kw} Anleitung`],
+        commercial: [`${kw} Vergleich`, `${kw} Test`],
+        transactional: hasCity ? [`${kw} Service`] : [],
+        deep_pages: [`${kw} FAQ`],
+      },
+      schema_recommendation: ["FAQPage", "HowTo"],
+      information_gain_suggestions: ["Eigene Erfahrungswerte einbringen", "Aktuelle Daten 2026 nutzen"],
+      discover_angle: `Praxistipp-Artikel zu ${kw} mit aktuellen Zahlen`,
+    };
+  }, []);
 
   const handleAnalyze = useCallback(async () => {
     if (!keyword.trim()) return;
@@ -83,16 +142,39 @@ function Index() {
     setSerp(null);
     setVolume(null);
     setRawJson("");
-    setAiState("loading"); setAiError("");
-    setSerpState("loading"); setSerpError("");
-    setVolState("loading"); setVolError("");
     setSelectedLsi(new Set());
+    setRejectedLsi(new Set());
+    setSelectedPaa(new Set());
     setActiveTab("results");
 
     const allResults: Record<string, unknown> = {};
 
-    // Fire all 3 calls in parallel
-    const aiCall = supabase.functions.invoke("seo-analyze", { body: { keyword: kw } })
+    if (mode === "standard") {
+      // Standard mode: local analysis, no AI call
+      setAiState("loading");
+      setSerpState("idle");
+      setVolState("idle");
+      setAiError("");
+
+      setTimeout(() => {
+        const result = runStandardAnalysis(kw);
+        setAnalysis(result);
+        setSelectedLsi(new Set(result.lsi || []));
+        setAiState("done");
+        allResults.seoAnalyze = result;
+        setRawJson(JSON.stringify(allResults, null, 2));
+      }, 200);
+      return;
+    }
+
+    // Kie.AI Live mode: all 3 calls parallel
+    setAiState("loading"); setAiError("");
+    setSerpState("loading"); setSerpError("");
+    setVolState("loading"); setVolError("");
+
+    const aiCall = supabase.functions.invoke("seo-analyze", {
+      body: { keyword: kw, firm: selectedFirm?.name, city: selectedFirm?.city },
+    })
       .then(({ data, error }) => {
         if (error || data?.error) {
           setAiError(error?.message || data?.error || "Unbekannter Fehler");
@@ -135,13 +217,80 @@ function Index() {
 
     await Promise.all([aiCall, serpCall, volCall]);
     setRawJson(JSON.stringify(allResults, null, 2));
+  }, [keyword, mode, selectedFirm, runStandardAnalysis]);
+
+  const handleVerifyDataForSEO = useCallback(async () => {
+    if (!keyword.trim()) return;
+    const kw = keyword.trim();
+    setVerifyLoading(true);
+    setSerpState("loading"); setSerpError("");
+    setVolState("loading"); setVolError("");
+
+    const allResults: Record<string, unknown> = {};
+
+    const serpCall = supabase.functions.invoke("serp-data", { body: { keyword: kw } })
+      .then(({ data, error }) => {
+        if (error || data?.error) {
+          setSerpError(error?.message || data?.error || "Fehler");
+          setSerpState("error");
+        } else {
+          setSerp(data);
+          setSerpState("done");
+          allResults.serpData = data;
+        }
+      })
+      .catch((e) => { setSerpError(e.message); setSerpState("error"); });
+
+    const volCall = supabase.functions.invoke("keyword-volume", { body: { keywords: [kw] } })
+      .then(({ data, error }) => {
+        if (error || data?.error) {
+          setVolError(error?.message || data?.error || "Fehler");
+          setVolState("error");
+        } else {
+          setVolume(data?.data || {});
+          setVolState("done");
+          allResults.keywordVolume = data;
+        }
+      })
+      .catch((e) => { setVolError(e.message); setVolState("error"); });
+
+    await Promise.all([serpCall, volCall]);
+    setVerifyLoading(false);
   }, [keyword]);
 
   const toggleLsi = useCallback((term: string) => {
     setSelectedLsi((prev) => {
       const next = new Set(prev);
-      if (next.has(term)) next.delete(term);
-      else next.add(term);
+      if (next.has(term)) {
+        next.delete(term);
+        setRejectedLsi((r) => new Set(r).add(term));
+      } else {
+        next.add(term);
+        setRejectedLsi((r) => { const n = new Set(r); n.delete(term); return n; });
+      }
+      return next;
+    });
+  }, []);
+
+  const selectAllLsi = useCallback(() => {
+    if (analysis?.lsi) {
+      setSelectedLsi(new Set(analysis.lsi));
+      setRejectedLsi(new Set());
+    }
+  }, [analysis]);
+
+  const rejectAllLsi = useCallback(() => {
+    if (analysis?.lsi) {
+      setSelectedLsi(new Set());
+      setRejectedLsi(new Set(analysis.lsi));
+    }
+  }, [analysis]);
+
+  const togglePaa = useCallback((question: string) => {
+    setSelectedPaa((prev) => {
+      const next = new Set(prev);
+      if (next.has(question)) next.delete(question);
+      else next.add(question);
       return next;
     });
   }, []);
@@ -184,38 +333,79 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Header with Firm Selector */}
       <header className="border-b border-border bg-card px-6 py-4">
-        <h1 className="text-2xl font-bold text-primary">SEO-OS v3.1</h1>
-        <p className="text-sm text-muted-foreground">Kie.AI + DataForSEO — Parallele Analyse</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-primary">SEO-OS v3.1</h1>
+            <p className="text-sm text-muted-foreground">Kie.AI + DataForSEO — Parallele Analyse</p>
+          </div>
+          <FirmSelector
+            selectedFirmId={selectedFirm?.id || null}
+            onFirmChange={setSelectedFirm}
+          />
+        </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-8 space-y-8">
-        {/* Search Bar */}
-        <div className="flex gap-3">
-          <Input
-            type="text"
-            placeholder="Keyword eingeben, z.B. Bosch Waschmaschine Fehlercode F18 Berlin"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !isLoading && handleAnalyze()}
-            className="h-12 flex-1"
-          />
-          <Button
-            onClick={handleAnalyze}
-            disabled={!keyword.trim() || isLoading}
-            className="h-12 min-w-[160px] min-h-[44px] text-base font-semibold"
-          >
-            {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Search className="mr-2 h-5 w-5" />}
-            Analysieren
-          </Button>
+        {/* Mode Toggle + Search Bar */}
+        <div className="space-y-3">
+          <ModeToggle mode={mode} onModeChange={setMode} />
+          <div className="flex gap-3">
+            <Input
+              type="text"
+              placeholder="Keyword eingeben, z.B. Bosch Waschmaschine Fehlercode F18 Berlin"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !isLoading && handleAnalyze()}
+              className="h-12 flex-1"
+            />
+            <Button
+              onClick={handleAnalyze}
+              disabled={!keyword.trim() || isLoading}
+              className="h-12 min-w-[160px] min-h-[44px] text-base font-semibold"
+            >
+              {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Search className="mr-2 h-5 w-5" />}
+              Analysieren
+            </Button>
+            {/* DataForSEO Verify Button */}
+            <Button
+              variant="outline"
+              onClick={handleVerifyDataForSEO}
+              disabled={!keyword.trim() || verifyLoading}
+              className="h-12 min-h-[44px] gap-2"
+              title="SERP + Suchvolumen via DataForSEO laden"
+            >
+              {verifyLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <BarChart3 className="h-5 w-5" />}
+              Verifizieren
+            </Button>
+          </div>
+          {/* Volume + KD badges inline */}
+          {kwVolume && (
+            <div className="flex gap-2">
+              <Badge className="bg-secondary text-secondary-foreground px-2.5 py-1 text-sm">
+                Vol: {kwVolume.volume.toLocaleString("de-DE")}
+              </Badge>
+              <Badge variant="outline" className="px-2.5 py-1 text-sm">
+                KD: {kwVolume.difficulty}
+              </Badge>
+              <Badge variant="outline" className="px-2.5 py-1 text-sm">
+                CPC: {kwVolume.cpc.toFixed(2)} €
+              </Badge>
+            </div>
+          )}
         </div>
 
         {/* Loading Status */}
         {(aiState !== "idle" || serpState !== "idle" || volState !== "idle") && (
           <div className="flex flex-wrap gap-6 rounded-md border border-border bg-card p-4">
-            <LoadingIndicator label="KI-Analyse (Claude)" state={aiState} error={aiError} />
-            <LoadingIndicator label="SERP-Daten (DataForSEO)" state={serpState} error={serpError} />
-            <LoadingIndicator label="Suchvolumen" state={volState} error={volError} />
+            <LoadingIndicator label={mode === "kieai" ? "KI-Analyse (Claude)" : "Standard-Analyse"} state={aiState} error={aiError} />
+            {mode === "kieai" && (
+              <>
+                <LoadingIndicator label="SERP-Daten (DataForSEO)" state={serpState} error={serpError} />
+                <LoadingIndicator label="Suchvolumen" state={volState} error={volError} />
+              </>
+            )}
           </div>
         )}
 
@@ -241,17 +431,17 @@ function Index() {
         {/* Results Tab */}
         {activeTab === "results" && hasResults && (
           <div className="space-y-8">
-            {/* Intent + Page Type + Volume */}
-            {(analysis || kwVolume) && (
+            {/* Intent + Page Type */}
+            {analysis && (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {analysis?.intent && (
+                {analysis.intent && (
                   <div className="rounded-lg border border-border bg-card p-4">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Intent</p>
                     <p className="mt-1 text-lg font-semibold text-foreground">{analysis.intent}</p>
                     {analysis.intent_detail && <p className="mt-1 text-xs text-muted-foreground">{analysis.intent_detail}</p>}
                   </div>
                 )}
-                {analysis?.page_type && (
+                {analysis.page_type && (
                   <div className="rounded-lg border border-border bg-card p-4">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Seitentyp</p>
                     <p className="mt-1 text-lg font-semibold text-foreground">{analysis.page_type}</p>
@@ -283,10 +473,17 @@ function Index() {
             {/* PAA Section */}
             {(analysis?.paa || serp?.paa_verified) && (
               <section>
-                <h3 className="text-base font-semibold text-foreground mb-3">People Also Ask — verifiziert</h3>
+                <h3 className="text-base font-semibold text-foreground mb-3">
+                  People Also Ask
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    ({selectedPaa.size} ausgewählt)
+                  </span>
+                </h3>
                 <PaaList
                   aiPaa={analysis?.paa || []}
                   serpPaa={serp?.paa_verified || []}
+                  selectedPaa={selectedPaa}
+                  onTogglePaa={togglePaa}
                 />
               </section>
             )}
@@ -302,7 +499,14 @@ function Index() {
                     </span>
                   </h3>
                 </div>
-                <LsiChips terms={analysis.lsi} selected={selectedLsi} onToggle={toggleLsi} />
+                <LsiChips
+                  terms={analysis.lsi}
+                  selected={selectedLsi}
+                  rejected={rejectedLsi}
+                  onToggle={toggleLsi}
+                  onSelectAll={selectAllLsi}
+                  onRejectAll={rejectAllLsi}
+                />
               </section>
             )}
 
@@ -310,7 +514,7 @@ function Index() {
             {analysis?.cluster && (
               <section>
                 <h3 className="text-base font-semibold text-foreground mb-3">Content-Cluster</h3>
-                <ClusterPreview cluster={analysis.cluster} />
+                <ClusterPreview cluster={analysis.cluster} pillarKeyword={keyword.trim()} />
               </section>
             )}
 

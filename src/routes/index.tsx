@@ -14,6 +14,7 @@ import { LoadingIndicator, type LoadState } from "@/components/seo/LoadingIndica
 import { ModeToggle } from "@/components/seo/ModeToggle";
 import { FirmSelector } from "@/components/seo/FirmSelector";
 import { SeoForm, type SeoFormData } from "@/components/seo/SeoForm";
+import { OutputPanel, type GeneratedPage } from "@/components/seo/OutputPanel";
 
 export const Route = createFileRoute("/")({
   component: Index,

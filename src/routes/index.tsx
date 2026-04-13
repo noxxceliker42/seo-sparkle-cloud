@@ -417,7 +417,16 @@ function Index() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-8 space-y-8">
-        {/* Mode Toggle + Search Bar */}
+        {showForm ? (
+          <SeoForm
+            initialData={formInitialData}
+            autoFilledFields={autoFilledFields}
+            onSubmit={handleFormSubmit}
+            onBack={() => setShowForm(false)}
+          />
+        ) : (
+          <>
+
         <div className="space-y-3">
           <ModeToggle mode={mode} onModeChange={setMode} />
           <div className="flex gap-3">

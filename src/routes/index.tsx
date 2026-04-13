@@ -405,7 +405,13 @@ function Index() {
     return fields;
   }, [analysis, selectedFirm]);
 
-  const handleFormSubmit = useCallback(async (data: SeoFormData) => {
+  const handleFormSubmit = useCallback((data: SeoFormData) => {
+    setQaFormData(data);
+    setShowForm(false);
+    setShowQaGate(true);
+  }, []);
+
+  const handleGenerate = useCallback(async (data: SeoFormData) => {
     setGenerating(true);
     setGenerateError("");
     try {
@@ -427,7 +433,7 @@ function Index() {
         city: data.city,
         phone: data.phone,
       });
-      setShowForm(false);
+      setShowQaGate(false);
       setShowOutput(true);
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : "Fehler");

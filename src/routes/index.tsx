@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -17,14 +19,29 @@ export const Route = createFileRoute("/")({
 function Index() {
   const [keyword, setKeyword] = useState("");
   const [output, setOutput] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleAnalyze = () => {
-    setOutput(JSON.stringify({
-      status: "placeholder",
-      message: "Analyse-Funktion noch nicht verbunden.",
-      keyword,
-      timestamp: new Date().toISOString(),
-    }, null, 2));
+  const handleAnalyze = async () => {
+    if (!keyword.trim()) return;
+    setLoading(true);
+    setOutput("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke("seo-analyze", {
+        body: { keyword: keyword.trim() },
+      });
+
+      if (error) {
+        setOutput(JSON.stringify({ error: error.message }, null, 2));
+      } else {
+        setOutput(JSON.stringify(data, null, 2));
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unbekannter Fehler";
+      setOutput(JSON.stringify({ error: message }, null, 2));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -42,19 +59,27 @@ function Index() {
             <Input
               id="keyword"
               type="text"
-              placeholder="z.B. Zahnarzt München"
+              placeholder="z.B. Bosch Waschmaschine Fehlercode F18 Berlin"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !loading && handleAnalyze()}
               className="h-12"
             />
           </div>
 
           <Button
             onClick={handleAnalyze}
-            disabled={!keyword.trim()}
+            disabled={!keyword.trim() || loading}
             className="h-12 w-full min-h-[44px] min-w-[44px] text-base font-semibold"
           >
-            Analysieren
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Analysiere…
+              </>
+            ) : (
+              "Analysieren"
+            )}
           </Button>
 
           <div className="space-y-2">
@@ -66,7 +91,7 @@ function Index() {
               readOnly
               value={output}
               placeholder="Ergebnis erscheint hier…"
-              className="min-h-[240px] font-mono text-sm"
+              className="min-h-[400px] font-mono text-sm"
             />
           </div>
         </div>

@@ -473,16 +473,15 @@ function Index() {
         {showOutput && generatedPage ? (
           <OutputPanel
             page={generatedPage}
-            onBack={() => { setShowOutput(false); setShowForm(true); }}
+            onBack={() => { setShowOutput(false); setShowQaGate(true); }}
             onNewPage={handleNewPage}
           />
-        ) : showForm ? (
+        ) : showQaGate && qaFormData ? (
           <>
-            <SeoForm
-              initialData={formInitialData}
-              autoFilledFields={autoFilledFields}
-              onSubmit={handleFormSubmit}
-              onBack={() => setShowForm(false)}
+            <QaGate
+              formData={qaFormData}
+              onBack={() => { setShowQaGate(false); setShowForm(true); }}
+              onGenerate={handleGenerate}
             />
             {generating && (
               <div className="flex items-center gap-3 rounded-md border border-border bg-card p-4">
@@ -496,6 +495,13 @@ function Index() {
               </div>
             )}
           </>
+        ) : showForm ? (
+          <SeoForm
+            initialData={formInitialData}
+            autoFilledFields={autoFilledFields}
+            onSubmit={handleFormSubmit}
+            onBack={() => setShowForm(false)}
+          />
         ) : (
           <>
 

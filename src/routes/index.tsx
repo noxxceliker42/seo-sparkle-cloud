@@ -654,7 +654,11 @@ function Index() {
 
             {/* Action Button */}
             {analysis && (
-              <Button variant="secondary" className="h-12 min-h-[44px] text-base font-semibold gap-2">
+              <Button
+                variant="secondary"
+                className="h-12 min-h-[44px] text-base font-semibold gap-2"
+                onClick={() => setShowForm(true)}
+              >
                 <ArrowRight className="h-5 w-5" />
                 Vorschläge ins Formular übernehmen
               </Button>

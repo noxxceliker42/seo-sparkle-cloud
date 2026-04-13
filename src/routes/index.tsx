@@ -454,22 +454,18 @@ function Index() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header with Firm Selector */}
-      <header className="border-b border-border bg-card px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-primary">SEO-OS v3.1</h1>
-            <p className="text-sm text-muted-foreground">Kie.AI + DataForSEO — Parallele Analyse</p>
-          </div>
-          <FirmSelector
-            selectedFirmId={selectedFirm?.id || null}
-            onFirmChange={setSelectedFirm}
-          />
+    <div className="space-y-6">
+      {/* Firm Selector */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Neue SEO-Seite</h1>
+          <p className="text-sm text-muted-foreground">Kie.AI + DataForSEO — Parallele Analyse</p>
         </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl px-4 py-8 space-y-8">
+        <FirmSelector
+          selectedFirmId={selectedFirm?.id || null}
+          onFirmChange={setSelectedFirm}
+        />
+      </div>
         {showOutput && generatedPage ? (
           <OutputPanel
             page={generatedPage}

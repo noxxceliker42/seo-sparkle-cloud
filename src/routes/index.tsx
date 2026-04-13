@@ -159,7 +159,7 @@ function Index() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const kwVol = volData?.[kw];
-      await supabase.from("seo_analyses").insert({
+      await (supabase.from("seo_analyses") as any).insert({
         user_id: user.id,
         keyword: kw,
         mode: analysisMode,

@@ -101,6 +101,12 @@ function Index() {
   // Form view
   const [showForm, setShowForm] = useState(false);
 
+  // Output panel
+  const [showOutput, setShowOutput] = useState(false);
+  const [generatedPage, setGeneratedPage] = useState<GeneratedPage | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState("");
+
   const isLoading = aiState === "loading" || serpState === "loading" || volState === "loading";
 
   const runStandardAnalysis = useCallback((kw: string): AnalysisResult => {

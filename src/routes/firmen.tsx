@@ -42,6 +42,8 @@ function FirmenPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyFirm);
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
+  const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => { loadFirms(); }, []);
 
@@ -52,10 +54,20 @@ function FirmenPage() {
     setLoading(false);
   };
 
-  const openNew = () => { setEditId(null); setForm(emptyFirm); setDialogOpen(true); };
+  const validate = () => {
+    const e: { name?: string; phone?: string } = {};
+    if (!form.name.trim() || form.name.trim().length < 2) e.name = "Mind. 2 Zeichen.";
+    if (!form.phone.trim()) e.phone = "Pflichtfeld.";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const openNew = () => { setEditId(null); setForm(emptyFirm); setErrors({}); setApiError(null); setDialogOpen(true); };
 
   const openEdit = (firm: Firm) => {
     setEditId(firm.id);
+    setErrors({});
+    setApiError(null);
     setForm({
       name: firm.name,
       street: firm.street || "",
@@ -70,37 +82,63 @@ function FirmenPage() {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) return;
+    if (!validate()) return;
     setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id || "anonymous";
+    setApiError(null);
 
-    if (editId) {
-      await supabase.from("firms").update({
-        name: form.name, street: form.street || null, city: form.city || null,
-        zip: form.zip || null, phone: form.phone || null, email: form.email || null,
-        website: form.website || null, service_area: form.service_area || null,
-      }).eq("id", editId);
-    } else {
-      await supabase.from("firms").insert({
-        name: form.name, street: form.street || null, city: form.city || null,
-        zip: form.zip || null, phone: form.phone || null, email: form.email || null,
-        website: form.website || null, service_area: form.service_area || null,
-        user_id: userId,
-      });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+
+      if (!userId && !editId) {
+        setApiError("Nicht angemeldet. Bitte zuerst einloggen.");
+        setSaving(false);
+        return;
+      }
+
+      if (editId) {
+        const { error } = await supabase.from("firms").update({
+          name: form.name, street: form.street || null, city: form.city || null,
+          zip: form.zip || null, phone: form.phone || null, email: form.email || null,
+          website: form.website || null, service_area: form.service_area || null,
+        }).eq("id", editId);
+        if (error) { console.error(error); setApiError(error.message); setSaving(false); return; }
+        toast.success(`Firma "${form.name}" aktualisiert`);
+      } else {
+        const { error } = await supabase.from("firms").insert({
+          name: form.name, street: form.street || null, city: form.city || null,
+          zip: form.zip || null, phone: form.phone || null, email: form.email || null,
+          website: form.website || null, service_area: form.service_area || null,
+          user_id: userId!,
+        });
+        if (error) { console.error(error); setApiError(error.message); setSaving(false); return; }
+        toast.success(`Mandant "${form.name}" wurde angelegt`);
+      }
+
+      setSaving(false);
+      setDialogOpen(false);
+      loadFirms();
+    } catch (err) {
+      console.error(err);
+      setApiError("Unerwarteter Fehler.");
+      setSaving(false);
     }
-    setSaving(false);
-    setDialogOpen(false);
-    loadFirms();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Firma wirklich löschen?")) return;
-    await supabase.from("firms").delete().eq("id", id);
+    const { error } = await supabase.from("firms").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
     setFirms((f) => f.filter((x) => x.id !== id));
+    toast.success("Firma gelöscht");
   };
 
-  const setField = (key: string, val: string) => setForm((f) => ({ ...f, [key]: val }));
+  const setField = (key: string, val: string) => {
+    setForm((f) => ({ ...f, [key]: val }));
+    if (key === "name" || key === "phone") setErrors((e) => ({ ...e, [key]: undefined }));
+  };
+
+  const isValid = form.name.trim().length >= 2 && form.phone.trim().length > 0;
 
   return (
     <div className="space-y-6">

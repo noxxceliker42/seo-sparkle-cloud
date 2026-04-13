@@ -402,9 +402,46 @@ function Index() {
     return fields;
   }, [analysis, selectedFirm]);
 
-  const handleFormSubmit = useCallback((data: SeoFormData) => {
-    console.log("Form submitted for QA-Gate:", data);
-    // TODO: proceed to QA-Gate
+  const handleFormSubmit = useCallback(async (data: SeoFormData) => {
+    setGenerating(true);
+    setGenerateError("");
+    try {
+      const { data: result, error } = await supabase.functions.invoke("generate-page", { body: data });
+      if (error || result?.error) {
+        setGenerateError(error?.message || result?.error || "Fehler bei der Seitengenerierung");
+        return;
+      }
+      setGeneratedPage({
+        metaTitle: result.metaTitle || "",
+        metaDesc: result.metaDesc || "",
+        metaKeywords: result.metaKeywords || "",
+        htmlOutput: result.htmlOutput || "",
+        jsonLd: result.jsonLd || "",
+        masterPrompt: result.masterPrompt || "",
+        activeSections: data.activeSections,
+        firmName: data.firmName,
+        street: data.street,
+        city: data.city,
+        phone: data.phone,
+      });
+      setShowForm(false);
+      setShowOutput(true);
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : "Fehler");
+    } finally {
+      setGenerating(false);
+    }
+  }, []);
+
+  const handleNewPage = useCallback(() => {
+    setShowOutput(false);
+    setGeneratedPage(null);
+    setShowForm(false);
+    setAnalysis(null);
+    setSerp(null);
+    setVolume(null);
+    setKeyword("");
+    setRawJson("");
   }, []);
 
   return (

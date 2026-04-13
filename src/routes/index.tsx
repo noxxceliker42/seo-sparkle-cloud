@@ -803,7 +803,6 @@ function Index() {
         )}
           </>
         )}
-      </main>
     </div>
   );
 }

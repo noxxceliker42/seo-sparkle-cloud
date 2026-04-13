@@ -14,7 +14,108 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      firms: {
+        Row: {
+          city: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          service_area: string | null
+          street: string | null
+          user_id: string
+          website: string | null
+          zip: string | null
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          service_area?: string | null
+          street?: string | null
+          user_id: string
+          website?: string | null
+          zip?: string | null
+        }
+        Update: {
+          city?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          service_area?: string | null
+          street?: string | null
+          user_id?: string
+          website?: string | null
+          zip?: string | null
+        }
+        Relationships: []
+      }
+      seo_pages: {
+        Row: {
+          active_sections: Json | null
+          city: string | null
+          created_at: string | null
+          design_preset: string | null
+          firm: string | null
+          html_output: string | null
+          id: string
+          intent: string | null
+          json_ld: string | null
+          keyword: string
+          meta_desc: string | null
+          meta_title: string | null
+          page_type: string | null
+          score: number | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          active_sections?: Json | null
+          city?: string | null
+          created_at?: string | null
+          design_preset?: string | null
+          firm?: string | null
+          html_output?: string | null
+          id?: string
+          intent?: string | null
+          json_ld?: string | null
+          keyword: string
+          meta_desc?: string | null
+          meta_title?: string | null
+          page_type?: string | null
+          score?: number | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          active_sections?: Json | null
+          city?: string | null
+          created_at?: string | null
+          design_preset?: string | null
+          firm?: string | null
+          html_output?: string | null
+          id?: string
+          intent?: string | null
+          json_ld?: string | null
+          keyword?: string
+          meta_desc?: string | null
+          meta_title?: string | null
+          page_type?: string | null
+          score?: number | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

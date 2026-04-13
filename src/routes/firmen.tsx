@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Building2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Building2, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/firmen")({
   component: FirmenPage,
@@ -41,6 +42,8 @@ function FirmenPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyFirm);
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
+  const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => { loadFirms(); }, []);
 
@@ -51,10 +54,20 @@ function FirmenPage() {
     setLoading(false);
   };
 
-  const openNew = () => { setEditId(null); setForm(emptyFirm); setDialogOpen(true); };
+  const validate = () => {
+    const e: { name?: string; phone?: string } = {};
+    if (!form.name.trim() || form.name.trim().length < 2) e.name = "Mind. 2 Zeichen.";
+    if (!form.phone.trim()) e.phone = "Pflichtfeld.";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const openNew = () => { setEditId(null); setForm(emptyFirm); setErrors({}); setApiError(null); setDialogOpen(true); };
 
   const openEdit = (firm: Firm) => {
     setEditId(firm.id);
+    setErrors({});
+    setApiError(null);
     setForm({
       name: firm.name,
       street: firm.street || "",
@@ -69,37 +82,63 @@ function FirmenPage() {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) return;
+    if (!validate()) return;
     setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id || "anonymous";
+    setApiError(null);
 
-    if (editId) {
-      await supabase.from("firms").update({
-        name: form.name, street: form.street || null, city: form.city || null,
-        zip: form.zip || null, phone: form.phone || null, email: form.email || null,
-        website: form.website || null, service_area: form.service_area || null,
-      }).eq("id", editId);
-    } else {
-      await supabase.from("firms").insert({
-        name: form.name, street: form.street || null, city: form.city || null,
-        zip: form.zip || null, phone: form.phone || null, email: form.email || null,
-        website: form.website || null, service_area: form.service_area || null,
-        user_id: userId,
-      });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+
+      if (!userId && !editId) {
+        setApiError("Nicht angemeldet. Bitte zuerst einloggen.");
+        setSaving(false);
+        return;
+      }
+
+      if (editId) {
+        const { error } = await supabase.from("firms").update({
+          name: form.name, street: form.street || null, city: form.city || null,
+          zip: form.zip || null, phone: form.phone || null, email: form.email || null,
+          website: form.website || null, service_area: form.service_area || null,
+        }).eq("id", editId);
+        if (error) { console.error(error); setApiError(error.message); setSaving(false); return; }
+        toast.success(`Firma "${form.name}" aktualisiert`);
+      } else {
+        const { error } = await supabase.from("firms").insert({
+          name: form.name, street: form.street || null, city: form.city || null,
+          zip: form.zip || null, phone: form.phone || null, email: form.email || null,
+          website: form.website || null, service_area: form.service_area || null,
+          user_id: userId!,
+        });
+        if (error) { console.error(error); setApiError(error.message); setSaving(false); return; }
+        toast.success(`Mandant "${form.name}" wurde angelegt`);
+      }
+
+      setSaving(false);
+      setDialogOpen(false);
+      loadFirms();
+    } catch (err) {
+      console.error(err);
+      setApiError("Unerwarteter Fehler.");
+      setSaving(false);
     }
-    setSaving(false);
-    setDialogOpen(false);
-    loadFirms();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Firma wirklich löschen?")) return;
-    await supabase.from("firms").delete().eq("id", id);
+    const { error } = await supabase.from("firms").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
     setFirms((f) => f.filter((x) => x.id !== id));
+    toast.success("Firma gelöscht");
   };
 
-  const setField = (key: string, val: string) => setForm((f) => ({ ...f, [key]: val }));
+  const setField = (key: string, val: string) => {
+    setForm((f) => ({ ...f, [key]: val }));
+    if (key === "name" || key === "phone") setErrors((e) => ({ ...e, [key]: undefined }));
+  };
+
+  const isValid = form.name.trim().length >= 2 && form.phone.trim().length > 0;
 
   return (
     <div className="space-y-6">
@@ -156,28 +195,52 @@ function FirmenPage() {
           <DialogHeader>
             <DialogTitle>{editId ? "Firma bearbeiten" : "Neue Firma"}</DialogTitle>
           </DialogHeader>
+
+          {apiError && (
+            <div className="rounded-md bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
+              {apiError}
+            </div>
+          )}
+
           <div className="grid gap-4 mt-4">
-            {[
-              { key: "name", label: "Firmenname *", required: true },
-              { key: "street", label: "Straße + Nr." },
-              { key: "zip", label: "PLZ" },
-              { key: "city", label: "Stadt" },
-              { key: "phone", label: "Telefon" },
-              { key: "email", label: "E-Mail" },
-              { key: "website", label: "Website" },
-              { key: "service_area", label: "Servicegebiet" },
-            ].map((f) => (
-              <div key={f.key}>
-                <Label className="text-sm">{f.label}</Label>
-                <Input
-                  value={form[f.key as keyof typeof form]}
-                  onChange={(e) => setField(f.key, e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-            ))}
-            <Button onClick={handleSave} disabled={saving || !form.name.trim()} className="w-full mt-2">
-              {saving ? "Speichern…" : editId ? "Aktualisieren" : "Anlegen"}
+            <div>
+              <Label className="text-sm">Firmenname *</Label>
+              <Input value={form.name} onChange={(e) => setField("name", e.target.value)} className={`mt-1 ${errors.name ? "border-destructive" : ""}`} />
+              {errors.name && <p className="text-xs text-destructive mt-1">{errors.name}</p>}
+            </div>
+            <div>
+              <Label className="text-sm">Straße + Nr.</Label>
+              <Input value={form.street} onChange={(e) => setField("street", e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">PLZ</Label>
+              <Input value={form.zip} onChange={(e) => setField("zip", e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Stadt</Label>
+              <Input value={form.city} onChange={(e) => setField("city", e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Telefon *</Label>
+              <Input value={form.phone} onChange={(e) => setField("phone", e.target.value)} className={`mt-1 ${errors.phone ? "border-destructive" : ""}`} />
+              {errors.phone && <p className="text-xs text-destructive mt-1">{errors.phone}</p>}
+            </div>
+            <div>
+              <Label className="text-sm">E-Mail</Label>
+              <Input value={form.email} onChange={(e) => setField("email", e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Website</Label>
+              <Input value={form.website} onChange={(e) => setField("website", e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Servicegebiet</Label>
+              <Input value={form.service_area} onChange={(e) => setField("service_area", e.target.value)} className="mt-1" />
+            </div>
+            <Button onClick={handleSave} disabled={saving || !isValid} className="w-full mt-2 min-h-[44px]">
+              {saving ? (
+                <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Wird gespeichert…</span>
+              ) : editId ? "Aktualisieren" : "Mandant anlegen"}
             </Button>
           </div>
         </DialogContent>

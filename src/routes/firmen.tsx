@@ -195,28 +195,52 @@ function FirmenPage() {
           <DialogHeader>
             <DialogTitle>{editId ? "Firma bearbeiten" : "Neue Firma"}</DialogTitle>
           </DialogHeader>
+
+          {apiError && (
+            <div className="rounded-md bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
+              {apiError}
+            </div>
+          )}
+
           <div className="grid gap-4 mt-4">
-            {[
-              { key: "name", label: "Firmenname *", required: true },
-              { key: "street", label: "Straße + Nr." },
-              { key: "zip", label: "PLZ" },
-              { key: "city", label: "Stadt" },
-              { key: "phone", label: "Telefon" },
-              { key: "email", label: "E-Mail" },
-              { key: "website", label: "Website" },
-              { key: "service_area", label: "Servicegebiet" },
-            ].map((f) => (
-              <div key={f.key}>
-                <Label className="text-sm">{f.label}</Label>
-                <Input
-                  value={form[f.key as keyof typeof form]}
-                  onChange={(e) => setField(f.key, e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-            ))}
-            <Button onClick={handleSave} disabled={saving || !form.name.trim()} className="w-full mt-2">
-              {saving ? "Speichern…" : editId ? "Aktualisieren" : "Anlegen"}
+            <div>
+              <Label className="text-sm">Firmenname *</Label>
+              <Input value={form.name} onChange={(e) => setField("name", e.target.value)} className={`mt-1 ${errors.name ? "border-destructive" : ""}`} />
+              {errors.name && <p className="text-xs text-destructive mt-1">{errors.name}</p>}
+            </div>
+            <div>
+              <Label className="text-sm">Straße + Nr.</Label>
+              <Input value={form.street} onChange={(e) => setField("street", e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">PLZ</Label>
+              <Input value={form.zip} onChange={(e) => setField("zip", e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Stadt</Label>
+              <Input value={form.city} onChange={(e) => setField("city", e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Telefon *</Label>
+              <Input value={form.phone} onChange={(e) => setField("phone", e.target.value)} className={`mt-1 ${errors.phone ? "border-destructive" : ""}`} />
+              {errors.phone && <p className="text-xs text-destructive mt-1">{errors.phone}</p>}
+            </div>
+            <div>
+              <Label className="text-sm">E-Mail</Label>
+              <Input value={form.email} onChange={(e) => setField("email", e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Website</Label>
+              <Input value={form.website} onChange={(e) => setField("website", e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm">Servicegebiet</Label>
+              <Input value={form.service_area} onChange={(e) => setField("service_area", e.target.value)} className="mt-1" />
+            </div>
+            <Button onClick={handleSave} disabled={saving || !isValid} className="w-full mt-2 min-h-[44px]">
+              {saving ? (
+                <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Wird gespeichert…</span>
+              ) : editId ? "Aktualisieren" : "Mandant anlegen"}
             </Button>
           </div>
         </DialogContent>

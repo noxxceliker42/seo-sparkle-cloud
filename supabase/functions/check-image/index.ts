@@ -70,22 +70,34 @@ Deno.serve(async (req) => {
       FAIL_STATUSES.includes(topState) ||
       FAIL_STATUSES.includes(dataState);
 
+    // resultJson ist ein JSON-STRING — muss geparsed werden!
+    let parsedResult: any = null;
+    try {
+      const rj = statusData?.data?.resultJson;
+      if (typeof rj === "string") {
+        parsedResult = JSON.parse(rj);
+      } else if (rj && typeof rj === "object") {
+        parsedResult = rj;
+      }
+    } catch (e) {
+      console.warn("resultJson parse error:", e);
+    }
+    console.log("parsedResult:", JSON.stringify(parsedResult));
+
     // Bild-URL aus ALLEN möglichen Strukturen:
     const imageUrl =
+      // Kie.AI resultJson.resultUrls (HAUPTQUELLE):
+      parsedResult?.resultUrls?.[0] ||
+      // Fallbacks:
       statusData?.data?.output?.[0]?.url ||
       statusData?.data?.output?.[0] ||
       statusData?.data?.images?.[0]?.url ||
       statusData?.data?.images?.[0] ||
       statusData?.data?.url ||
       statusData?.data?.imageUrl ||
-      statusData?.data?.image_url ||
       statusData?.output?.[0]?.url ||
       statusData?.output?.[0] ||
-      statusData?.images?.[0]?.url ||
       statusData?.url ||
-      statusData?.imageUrl ||
-      statusData?.data?.result?.[0]?.url ||
-      statusData?.data?.result?.url ||
       null;
 
     console.log("isDone:", isDone, "imageUrl:", imageUrl);

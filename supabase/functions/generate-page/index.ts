@@ -276,7 +276,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         messages: [{ role: "user", content: masterPrompt }],
-        max_tokens: 8000,
+        max_tokens: 16000,
         stream: false,
       }),
     });
@@ -362,6 +362,16 @@ Deno.serve(async (req) => {
             console.error("DB save error (non-fatal):", saveError);
           }
           pageId = insertData?.id || null;
+
+          // If cluster context: link seo_page to cluster_page
+          if (formData.clusterPageId && pageId) {
+            const { error: clusterErr } = await supabase.from("cluster_pages").update({
+              seo_page_id: pageId,
+              status: "generated",
+              updated_at: new Date().toISOString(),
+            }).eq("id", formData.clusterPageId);
+            if (clusterErr) console.error("Cluster page link error (non-fatal):", clusterErr);
+          }
         }
       } catch (dbErr) {
         console.error("DB save error (non-fatal):", dbErr);

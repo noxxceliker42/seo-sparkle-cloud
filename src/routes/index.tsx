@@ -108,6 +108,7 @@ function Index() {
   const [showQaGate, setShowQaGate] = useState(false);
   const [qaFormData, setQaFormData] = useState<SeoFormData | null>(null);
   const [generatedPage, setGeneratedPage] = useState<GeneratedPage | null>(null);
+  const [htmlWarning, setHtmlWarning] = useState("");
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState("");
 
@@ -505,11 +506,29 @@ function Index() {
         setGenerateError(error?.message || result?.error || "Fehler bei der Seitengenerierung");
         return;
       }
+      const html = result.htmlOutput || "";
+      const isComplete = html.trim().endsWith("</html>");
+      const hasFaq = html.includes('id="faq"');
+      const hasSchema = html.includes("application/ld+json");
+      const hasAutor = html.includes('id="autor"');
+
+      if (html && (!isComplete || !hasFaq || !hasSchema || !hasAutor)) {
+        const missing = [
+          !isComplete && "HTML-Ende fehlt",
+          !hasFaq && "FAQ-Sektion fehlt",
+          !hasSchema && "JSON-LD fehlt",
+          !hasAutor && "Autor-Sektion fehlt",
+        ].filter(Boolean).join(", ");
+        setHtmlWarning(`HTML unvollständig — Token-Limit erreicht. Fehlend: ${missing}`);
+      } else {
+        setHtmlWarning("");
+      }
+
       setGeneratedPage({
         metaTitle: result.metaTitle || "",
         metaDesc: result.metaDesc || "",
         metaKeywords: result.metaKeywords || "",
-        htmlOutput: result.htmlOutput || "",
+        htmlOutput: html,
         jsonLd: result.jsonLd || "",
         masterPrompt: result.masterPrompt || "",
         activeSections: data.activeSections,
@@ -552,11 +571,18 @@ function Index() {
         />
       </div>
         {showOutput && generatedPage ? (
-          <OutputPanel
-            page={generatedPage}
-            onBack={() => { setShowOutput(false); setShowQaGate(true); }}
-            onNewPage={handleNewPage}
-          />
+          <>
+            {htmlWarning && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive mb-4">
+                ⚠ {htmlWarning}
+              </div>
+            )}
+            <OutputPanel
+              page={generatedPage}
+              onBack={() => { setShowOutput(false); setShowQaGate(true); }}
+              onNewPage={handleNewPage}
+            />
+          </>
         ) : showQaGate && qaFormData ? (
           <>
             <QaGate

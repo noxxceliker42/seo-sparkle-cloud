@@ -421,6 +421,13 @@ function extractJsonLd(html: string): string {
 // BUILD PROMPT
 // ═══════════════════════════════════════
 
+function truncateList(value: unknown, max: number): string {
+  if (!value || typeof value !== "string") return "keine";
+  const items = value.split(/[,·|]/).map(s => s.trim()).filter(Boolean);
+  if (items.length <= max) return value;
+  return items.slice(0, max).join(", ") + ` … (${items.length - max} weitere)`;
+}
+
 function buildPrompt(data: Record<string, unknown>): string {
   const ds = DESIGN_SYSTEMS[(data.designPreset as string) || "trust"] || DESIGN_SYSTEMS.trust;
   const isContao = data.contaoMode === true;

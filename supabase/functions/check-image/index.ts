@@ -34,27 +34,43 @@ Deno.serve(async (req) => {
     );
 
     const statusData = await statusRes.json();
-    console.log("recordInfo response:", JSON.stringify(statusData));
 
-    const status =
-      statusData?.data?.status ||
-      statusData?.status ||
-      "";
+    // VOLLSTÄNDIGES LOGGING:
+    console.log("RAW recordInfo:", JSON.stringify(statusData, null, 2));
+
+    // Alle Status-Felder extrahieren:
+    const topStatus = statusData?.status;
+    const dataStatus = statusData?.data?.status;
+    const topState = statusData?.state;
+    const dataState = statusData?.data?.state;
+    console.log("Status fields:", { topStatus, dataStatus, topState, dataState });
+
+    // ALLE bekannten Kie.AI Status-Strings:
+    const DONE_STATUSES: (string | number)[] = [
+      "SUCCESS", "success",
+      "COMPLETED", "completed",
+      "FINISHED", "finished",
+      "DONE", "done",
+      "succeed", "SUCCEED",
+      "2", 2,
+    ];
 
     const isDone =
-      status === "SUCCESS" ||
-      status === "success" ||
-      status === "completed" ||
-      status === "COMPLETED" ||
-      status === "finished";
+      DONE_STATUSES.includes(topStatus) ||
+      DONE_STATUSES.includes(dataStatus) ||
+      DONE_STATUSES.includes(topState) ||
+      DONE_STATUSES.includes(dataState) ||
+      statusData?.data?.code === 200 ||
+      statusData?.code === 200;
 
+    const FAIL_STATUSES = ["FAILED", "failed", "error", "ERROR", "FAIL", "fail"];
     const isFailed =
-      status === "FAILED" ||
-      status === "failed" ||
-      status === "error" ||
-      status === "ERROR";
+      FAIL_STATUSES.includes(topStatus) ||
+      FAIL_STATUSES.includes(dataStatus) ||
+      FAIL_STATUSES.includes(topState) ||
+      FAIL_STATUSES.includes(dataState);
 
-    // Bild-URL aus Response
+    // Bild-URL aus ALLEN möglichen Strukturen:
     const imageUrl =
       statusData?.data?.output?.[0]?.url ||
       statusData?.data?.output?.[0] ||
@@ -62,11 +78,21 @@ Deno.serve(async (req) => {
       statusData?.data?.images?.[0] ||
       statusData?.data?.url ||
       statusData?.data?.imageUrl ||
+      statusData?.data?.image_url ||
       statusData?.output?.[0]?.url ||
       statusData?.output?.[0] ||
+      statusData?.images?.[0]?.url ||
+      statusData?.url ||
+      statusData?.imageUrl ||
+      statusData?.data?.result?.[0]?.url ||
+      statusData?.data?.result?.url ||
       null;
 
-    console.log("Status:", status, "isDone:", isDone, "imageUrl:", imageUrl);
+    console.log("isDone:", isDone, "imageUrl:", imageUrl);
+
+    // Sicherheitsnetz: URL vorhanden = fertig
+    const isActuallyDone = isDone || (imageUrl !== null && imageUrl !== undefined);
+    console.log("isActuallyDone:", isActuallyDone);
 
     if (isFailed) {
       await supabase.from("image_jobs").update({ status: "failed" }).eq("id", jobId);
@@ -76,7 +102,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (isDone && imageUrl) {
+    if (isActuallyDone && imageUrl) {
       // Cloudinary Upload
       const cloudName = Deno.env.get("CLOUDINARY_CLOUD_NAME");
       const uploadPreset = Deno.env.get("CLOUDINARY_UPLOAD_PRESET");

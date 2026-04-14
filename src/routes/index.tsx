@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +16,7 @@ import { FirmSelector } from "@/components/seo/FirmSelector";
 import { SeoForm, type SeoFormData } from "@/components/seo/SeoForm";
 import { OutputPanel, type GeneratedPage } from "@/components/seo/OutputPanel";
 import { QaGate } from "@/components/seo/QaGate";
+import { useAnalysisJob } from "@/hooks/useAnalysisJob";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -112,6 +113,42 @@ function Index() {
 
   const isLoading = aiState === "loading" || serpState === "loading" || volState === "loading";
 
+  // Job persistence hook
+  const {
+    activeJobId,
+    isPolling,
+    resumedResult,
+    resumedKeyword,
+    createJob,
+    completeJob,
+    failJob,
+    clearJob,
+    clearResumedResult,
+  } = useAnalysisJob();
+
+  // Resume from saved job
+  useEffect(() => {
+    if (resumedResult && resumedKeyword) {
+      const r = resumedResult as { analysis?: AnalysisResult; serp?: SerpResult; volume?: VolumeResult; rawJson?: string };
+      if (r.analysis) {
+        setAnalysis(r.analysis);
+        setSelectedLsi(new Set(r.analysis.lsi || []));
+        setAiState("done");
+      }
+      if (r.serp) {
+        setSerp(r.serp);
+        setSerpState("done");
+      }
+      if (r.volume) {
+        setVolume(r.volume);
+        setVolState("done");
+      }
+      if (r.rawJson) setRawJson(r.rawJson);
+      setKeyword(resumedKeyword);
+      clearResumedResult();
+    }
+  }, [resumedResult, resumedKeyword, clearResumedResult]);
+
   const runStandardAnalysis = useCallback((kw: string): AnalysisResult => {
     // Local JS-based quick analysis (no API needed)
     const lower = kw.toLowerCase();
@@ -205,7 +242,6 @@ function Index() {
     const allResults: Record<string, unknown> = {};
 
     if (mode === "standard") {
-      // Standard mode: local analysis, no AI call
       setAiState("loading");
       setSerpState("idle");
       setVolState("idle");
@@ -224,7 +260,9 @@ function Index() {
       return;
     }
 
-    // Kie.AI Live mode: all 3 calls parallel
+    // Kie.AI Live mode: create persistent job first
+    const jobId = await createJob(kw, "kieai");
+
     setAiState("loading"); setAiError("");
     setSerpState("loading"); setSerpError("");
     setVolState("loading"); setVolError("");
@@ -232,6 +270,7 @@ function Index() {
     let finalAnalysis: AnalysisResult | null = null;
     let finalSerp: SerpResult | null = null;
     let finalVolume: VolumeResult | null = null;
+    let hasError = false;
 
     const aiCall = supabase.functions.invoke("seo-analyze", {
       body: { keyword: kw, firm: selectedFirm?.name, city: selectedFirm?.city },
@@ -240,6 +279,7 @@ function Index() {
         if (error || data?.error) {
           setAiError(error?.message || data?.error || "Unbekannter Fehler");
           setAiState("error");
+          hasError = true;
         } else {
           const a = data?.analysis || data;
           setAnalysis(a);
@@ -249,7 +289,7 @@ function Index() {
           allResults.seoAnalyze = data;
         }
       })
-      .catch((e) => { setAiError(e.message); setAiState("error"); });
+      .catch((e) => { setAiError(e.message); setAiState("error"); hasError = true; });
 
     const serpCall = supabase.functions.invoke("serp-data", { body: { keyword: kw } })
       .then(({ data, error }) => {
@@ -283,8 +323,23 @@ function Index() {
     await Promise.all([aiCall, serpCall, volCall]);
     const json = JSON.stringify(allResults, null, 2);
     setRawJson(json);
+
+    // Persist job result
+    if (jobId) {
+      if (hasError && !finalAnalysis) {
+        await failJob(jobId, "Analyse fehlgeschlagen");
+      } else {
+        await completeJob(jobId, {
+          analysis: finalAnalysis,
+          serp: finalSerp,
+          volume: finalVolume,
+          rawJson: json,
+        });
+      }
+    }
+
     await saveAnalysis(kw, "kieai", finalAnalysis, finalVolume, finalSerp, json);
-  }, [keyword, mode, selectedFirm, runStandardAnalysis, saveAnalysis]);
+  }, [keyword, mode, selectedFirm, runStandardAnalysis, saveAnalysis, createJob, completeJob, failJob]);
 
   const handleVerifyDataForSEO = useCallback(async () => {
     if (!keyword.trim()) return;
@@ -553,6 +608,14 @@ function Index() {
           />
         ) : (
           <>
+
+        {/* Active job indicator */}
+        {activeJobId && isPolling && (
+          <div className="flex items-center gap-3 rounded-md border border-primary/30 bg-primary/5 p-4 animate-pulse">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span className="text-sm font-medium text-foreground">Analyse läuft — bitte warten... (Tab-Wechsel möglich)</span>
+          </div>
+        )}
 
         <div className="space-y-3">
           <ModeToggle mode={mode} onModeChange={setMode} />

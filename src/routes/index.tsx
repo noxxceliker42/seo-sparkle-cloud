@@ -620,15 +620,34 @@ function Index() {
             {generating && (
               <div className="flex items-center gap-3 rounded-md border border-primary/30 bg-primary/5 p-4">
                 <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <div>
-                  <span className="text-sm font-medium text-foreground">Seite wird generiert… (Kie.AI, ~2–4 Min.)</span>
-                  <p className="text-xs text-muted-foreground mt-1">Tab-Wechsel ist sicher — der Fortschritt bleibt erhalten.</p>
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-foreground">
+                    {elapsedSeconds < 10
+                      ? "Anthropic Claude verarbeitet den Prompt..."
+                      : elapsedSeconds < 30
+                      ? `${elapsedSeconds}s — HTML wird geschrieben...`
+                      : elapsedSeconds < 60
+                      ? `${elapsedSeconds}s — Sektionen werden ausformuliert...`
+                      : elapsedSeconds < 90
+                      ? `${elapsedSeconds}s — Fast fertig...`
+                      : `${elapsedSeconds}s — Noch ein Moment...`}
+                  </span>
+                  <p className="text-xs text-muted-foreground mt-1">Direkte Generierung — kein Tab-Wechsel nötig.</p>
                 </div>
+                <Badge variant="outline" className="text-xs">{elapsedSeconds}s</Badge>
               </div>
             )}
             {generateError && (
-              <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-                {generateError}
+              <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+                <span className="flex-1">{generateError}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setGenerateError(""); if (qaFormData) handleGenerate(qaFormData); }}
+                  className="text-xs border-destructive/30"
+                >
+                  Erneut versuchen
+                </Button>
               </div>
             )}
           </>

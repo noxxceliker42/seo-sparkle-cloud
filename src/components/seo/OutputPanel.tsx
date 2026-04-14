@@ -48,7 +48,8 @@ function QaCheck({ passed, label }: { passed: boolean; label: string }) {
 }
 
 export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
-  const [tab, setTab] = useState<"html" | "prompt" | "jsonld" | "meta">("html");
+  const [tab, setTab] = useState<"html" | "preview" | "prompt" | "jsonld" | "meta">("html");
+  const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
 
   const qaChecks = useMemo(() => {
     const html = page.htmlOutput.toLowerCase();

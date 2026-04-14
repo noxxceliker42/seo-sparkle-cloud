@@ -485,37 +485,93 @@ function Index() {
     setShowQaGate(true);
   }, []);
 
-  const handleGenerate = useCallback(async (data: SeoFormData) => {
-    await startGeneration(data as unknown as Record<string, unknown>);
-  }, [startGeneration]);
-
-  // When generation completes, build the page object and show output
+  // Timer for elapsed seconds during generation
   useEffect(() => {
-    if (!generationResult) return;
-    setGeneratedPage({
-      metaTitle: generationResult.metaTitle,
-      metaDesc: generationResult.metaDesc,
-      metaKeywords: generationResult.metaKeywords || "",
-      htmlOutput: generationResult.htmlOutput,
-      bodyContent: generationResult.bodyContent || "",
-      cssBlock: generationResult.cssBlock || "",
-      jsonLd: generationResult.jsonLd,
-      masterPrompt: generationResult.promptUsed || "",
-      activeSections: qaFormData?.activeSections || [],
-      firmName: qaFormData?.firmName,
-      street: qaFormData?.street,
-      city: qaFormData?.city,
-      phone: qaFormData?.phone,
-      pageId: generationResult.pageId || undefined,
-      keyword: qaFormData?.keyword || keyword,
-      tokensUsed: generationResult.tokensUsed || 0,
-      duration: generationResult.durationSeconds || 0,
-      stopReason: generationResult.stopReason || "",
-    });
-    setShowQaGate(false);
-    setShowOutput(true);
-    clearGenerationResult();
-  }, [generationResult, qaFormData, keyword, clearGenerationResult]);
+    if (!generating) { setElapsedSeconds(0); return; }
+    const interval = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, [generating]);
+
+  const handleGenerate = useCallback(async (data: SeoFormData) => {
+    setGenerating(true);
+    setGenerateError("");
+    setHtmlWarning("");
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { data: result, error } = await supabase.functions.invoke("generate-page", {
+        body: { ...data, userId: user?.id || null },
+      });
+
+      if (error) {
+        let msg = error.message;
+        try {
+          const ctx = (error as any).context;
+          if (ctx) { const b = await ctx.json(); msg = b.error || b.message || msg; }
+        } catch {}
+        setGenerateError(msg);
+        setGenerating(false);
+        return;
+      }
+
+      if (!result || result.error) {
+        setGenerateError(result?.error || "Keine Antwort von der Edge Function");
+        setGenerating(false);
+        return;
+      }
+
+      if (!result.html || result.html.trim() === "") {
+        setGenerateError("HTML leer — stop_reason: " + (result.stopReason || "unbekannt"));
+        setGenerating(false);
+        return;
+      }
+
+      // Check HTML completeness
+      const html = result.html;
+      const isComplete = html.trim().endsWith("</html>");
+      const hasFaq = html.includes('id="faq"');
+      const hasSchema = html.includes("application/ld+json");
+      const hasAutor = html.includes('id="autor"');
+      if (!(isComplete && hasFaq && hasSchema && hasAutor)) {
+        const missing = [
+          !isComplete && "HTML-Ende fehlt",
+          !hasFaq && "FAQ-Sektion fehlt",
+          !hasSchema && "JSON-LD fehlt",
+          !hasAutor && "Autor-Sektion fehlt",
+        ].filter(Boolean).join(", ");
+        setHtmlWarning(`HTML unvollständig — Token-Limit erreicht. Fehlend: ${missing}`);
+      }
+
+      setGeneratedPage({
+        metaTitle: result.metaTitle || "",
+        metaDesc: result.metaDesc || "",
+        metaKeywords: result.metaKeywords || "",
+        htmlOutput: result.html,
+        bodyContent: result.bodyContent || "",
+        cssBlock: result.cssBlock || "",
+        jsonLd: result.jsonLd || "",
+        masterPrompt: result.prompt || "",
+        activeSections: data.activeSections || [],
+        firmName: data.firmName,
+        street: data.street,
+        city: data.city,
+        phone: data.phone,
+        pageId: result.pageId || undefined,
+        keyword: data.keyword || keyword,
+        tokensUsed: result.tokensUsed || 0,
+        duration: result.duration || 0,
+        stopReason: result.stopReason || "",
+      });
+      setShowQaGate(false);
+      setShowOutput(true);
+      toast.success(`Seite generiert: ${result.tokensUsed} Tokens, ${result.duration}s`);
+    } catch (err: any) {
+      setGenerateError(err.message || "Unbekannter Fehler");
+    } finally {
+      setGenerating(false);
+    }
+  }, [keyword]);
 
   const handleNewPage = useCallback(() => {
     setShowOutput(false);

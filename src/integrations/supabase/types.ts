@@ -231,6 +231,57 @@ export type Database = {
         }
         Relationships: []
       }
+      generation_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          duration_seconds: number | null
+          error_message: string | null
+          html_output: string | null
+          id: string
+          json_ld: string | null
+          keyword: string
+          meta_desc: string | null
+          meta_title: string | null
+          page_id: string | null
+          status: string
+          tokens_used: number | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          error_message?: string | null
+          html_output?: string | null
+          id?: string
+          json_ld?: string | null
+          keyword: string
+          meta_desc?: string | null
+          meta_title?: string | null
+          page_id?: string | null
+          status?: string
+          tokens_used?: number | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          error_message?: string | null
+          html_output?: string | null
+          id?: string
+          json_ld?: string | null
+          keyword?: string
+          meta_desc?: string | null
+          meta_title?: string | null
+          page_id?: string | null
+          status?: string
+          tokens_used?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       image_jobs: {
         Row: {
           completed_at: string | null

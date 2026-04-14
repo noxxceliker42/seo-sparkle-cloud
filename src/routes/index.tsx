@@ -498,57 +498,106 @@ function Index() {
   const handleGenerate = useCallback(async (data: SeoFormData) => {
     setGenerating(true);
     setGenerateError("");
+    setHtmlWarning("");
     try {
-      const { data: result, error } = await supabase.functions.invoke("generate-page", { body: data });
-      if (error || result?.error) {
-        const msg = error?.message || result?.error || "Fehler bei der Seitengenerierung";
+      // Get user for userId
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setGenerateError("Nicht eingeloggt. Bitte erneut anmelden.");
+        setGenerating(false);
+        return;
+      }
+
+      // Start async job
+      const { data: result, error } = await supabase.functions.invoke("generate-page", {
+        body: { ...data, userId: user.id },
+      });
+
+      if (error || !result?.jobId) {
+        const msg = error?.message || result?.error || "Job konnte nicht gestartet werden";
         if (msg.includes("Failed to send")) {
           setGenerateError("Edge Function nicht erreichbar. Bitte Seite neu laden und erneut versuchen.");
-        } else if (msg.includes("timeout") || msg.includes("Timeout")) {
-          setGenerateError("Zeitüberschreitung — die KI braucht zu lange. Bitte erneut versuchen.");
         } else {
           setGenerateError(msg);
         }
+        setGenerating(false);
         return;
       }
-      const html = result.htmlOutput || "";
-      const isComplete = html.trim().endsWith("</html>");
-      const hasFaq = html.includes('id="faq"');
-      const hasSchema = html.includes("application/ld+json");
-      const hasAutor = html.includes('id="autor"');
 
-      if (html && (!isComplete || !hasFaq || !hasSchema || !hasAutor)) {
-        const missing = [
-          !isComplete && "HTML-Ende fehlt",
-          !hasFaq && "FAQ-Sektion fehlt",
-          !hasSchema && "JSON-LD fehlt",
-          !hasAutor && "Autor-Sektion fehlt",
-        ].filter(Boolean).join(", ");
-        setHtmlWarning(`HTML unvollständig — Token-Limit erreicht. Fehlend: ${missing}`);
-      } else {
-        setHtmlWarning("");
-      }
+      const jobId = result.jobId;
 
-      setGeneratedPage({
-        metaTitle: result.metaTitle || "",
-        metaDesc: result.metaDesc || "",
-        metaKeywords: result.metaKeywords || "",
-        htmlOutput: html,
-        jsonLd: result.jsonLd || "",
-        masterPrompt: result.masterPrompt || "",
-        activeSections: data.activeSections,
-        firmName: data.firmName,
-        street: data.street,
-        city: data.city,
-        phone: data.phone,
-        pageId: result.pageId || undefined,
-        keyword: data.keyword,
-      });
-      setShowQaGate(false);
-      setShowOutput(true);
+      // Poll every 5 seconds
+      const pollInterval = setInterval(async () => {
+        try {
+          const { data: job } = await supabase
+            .from("generation_jobs")
+            .select("status, page_id, html_output, json_ld, meta_title, meta_desc, error_message, tokens_used, duration_seconds")
+            .eq("id", jobId)
+            .single();
+
+          if (!job) return;
+
+          if (job.status === "completed") {
+            clearInterval(pollInterval);
+            const html = job.html_output || "";
+            const isComplete = html.trim().endsWith("</html>");
+            const hasFaq = html.includes('id="faq"');
+            const hasSchema = html.includes("application/ld+json");
+            const hasAutor = html.includes('id="autor"');
+
+            if (html && (!isComplete || !hasFaq || !hasSchema || !hasAutor)) {
+              const missing = [
+                !isComplete && "HTML-Ende fehlt",
+                !hasFaq && "FAQ-Sektion fehlt",
+                !hasSchema && "JSON-LD fehlt",
+                !hasAutor && "Autor-Sektion fehlt",
+              ].filter(Boolean).join(", ");
+              setHtmlWarning(`HTML unvollständig — Token-Limit erreicht. Fehlend: ${missing}`);
+            }
+
+            setGeneratedPage({
+              metaTitle: job.meta_title || "",
+              metaDesc: job.meta_desc || "",
+              metaKeywords: "",
+              htmlOutput: html,
+              jsonLd: job.json_ld || "",
+              masterPrompt: "",
+              activeSections: data.activeSections,
+              firmName: data.firmName,
+              street: data.street,
+              city: data.city,
+              phone: data.phone,
+              pageId: job.page_id || undefined,
+              keyword: data.keyword,
+            });
+            setShowQaGate(false);
+            setShowOutput(true);
+            setGenerating(false);
+          }
+
+          if (job.status === "error") {
+            clearInterval(pollInterval);
+            setGenerateError(job.error_message || "Unbekannter Fehler bei der Generierung");
+            setGenerating(false);
+          }
+        } catch (pollErr) {
+          console.error("Poll error:", pollErr);
+        }
+      }, 5000);
+
+      // Safety timeout after 10 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        setGenerating((prev) => {
+          if (prev) {
+            setGenerateError("Generierung dauert länger als 10 Minuten. Bitte prüfe den Status manuell.");
+          }
+          return false;
+        });
+      }, 600000);
+
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : "Fehler");
-    } finally {
       setGenerating(false);
     }
   }, []);

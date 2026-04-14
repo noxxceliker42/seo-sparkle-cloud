@@ -357,17 +357,20 @@ export type Database = {
           cloudinary_url: string | null
           completed_at: string | null
           created_at: string | null
+          edit_strength: number | null
           firm_id: string | null
           height: number | null
           html_inserted: boolean | null
           id: string
           image_url: string | null
           is_selected: boolean | null
+          mode: string | null
           nano_url: string | null
           page_id: string | null
           prompt: string
           prompt_negative: string | null
           prompt_positive: string | null
+          reference_image_url: string | null
           slot: string | null
           slot_label: string | null
           status: string | null
@@ -383,17 +386,20 @@ export type Database = {
           cloudinary_url?: string | null
           completed_at?: string | null
           created_at?: string | null
+          edit_strength?: number | null
           firm_id?: string | null
           height?: number | null
           html_inserted?: boolean | null
           id?: string
           image_url?: string | null
           is_selected?: boolean | null
+          mode?: string | null
           nano_url?: string | null
           page_id?: string | null
           prompt: string
           prompt_negative?: string | null
           prompt_positive?: string | null
+          reference_image_url?: string | null
           slot?: string | null
           slot_label?: string | null
           status?: string | null
@@ -409,17 +415,20 @@ export type Database = {
           cloudinary_url?: string | null
           completed_at?: string | null
           created_at?: string | null
+          edit_strength?: number | null
           firm_id?: string | null
           height?: number | null
           html_inserted?: boolean | null
           id?: string
           image_url?: string | null
           is_selected?: boolean | null
+          mode?: string | null
           nano_url?: string | null
           page_id?: string | null
           prompt?: string
           prompt_negative?: string | null
           prompt_positive?: string | null
+          reference_image_url?: string | null
           slot?: string | null
           slot_label?: string | null
           status?: string | null

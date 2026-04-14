@@ -501,7 +501,7 @@ function Index() {
     return () => clearInterval(interval);
   }, [generating]);
 
-  const handleGenerate = useCallback(async (data: SeoFormData) => {
+  const handleGenerate = useCallback(async (data: SeoFormData, customPrompt?: string) => {
     setGenerating(true);
     setGenerateError("");
     setHtmlWarning("");

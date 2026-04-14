@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as FirmenRouteImport } from './routes/firmen'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ClusterRouteImport } from './routes/cluster'
+import { Route as BilderRouteImport } from './routes/bilder'
 import { Route as BenutzerRouteImport } from './routes/benutzer'
 import { Route as AnalysenRouteImport } from './routes/analysen'
 import { Route as IndexRouteImport } from './routes/index'
@@ -58,6 +59,11 @@ const ClusterRoute = ClusterRouteImport.update({
   path: '/cluster',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BilderRoute = BilderRouteImport.update({
+  id: '/bilder',
+  path: '/bilder',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BenutzerRoute = BenutzerRouteImport.update({
   id: '/benutzer',
   path: '/benutzer',
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analysen': typeof AnalysenRoute
   '/benutzer': typeof BenutzerRoute
+  '/bilder': typeof BilderRoute
   '/cluster': typeof ClusterRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/firmen': typeof FirmenRoute
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analysen': typeof AnalysenRoute
   '/benutzer': typeof BenutzerRoute
+  '/bilder': typeof BilderRoute
   '/dashboard': typeof DashboardRoute
   '/firmen': typeof FirmenRoute
   '/login': typeof LoginRoute
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/analysen': typeof AnalysenRoute
   '/benutzer': typeof BenutzerRoute
+  '/bilder': typeof BilderRoute
   '/cluster': typeof ClusterRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/firmen': typeof FirmenRoute
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
     | '/'
     | '/analysen'
     | '/benutzer'
+    | '/bilder'
     | '/cluster'
     | '/dashboard'
     | '/firmen'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
     | '/'
     | '/analysen'
     | '/benutzer'
+    | '/bilder'
     | '/dashboard'
     | '/firmen'
     | '/login'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
     | '/'
     | '/analysen'
     | '/benutzer'
+    | '/bilder'
     | '/cluster'
     | '/dashboard'
     | '/firmen'
@@ -185,6 +197,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnalysenRoute: typeof AnalysenRoute
   BenutzerRoute: typeof BenutzerRoute
+  BilderRoute: typeof BilderRoute
   ClusterRoute: typeof ClusterRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   FirmenRoute: typeof FirmenRoute
@@ -243,6 +256,13 @@ declare module '@tanstack/react-router' {
       path: '/cluster'
       fullPath: '/cluster'
       preLoaderRoute: typeof ClusterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bilder': {
+      id: '/bilder'
+      path: '/bilder'
+      fullPath: '/bilder'
+      preLoaderRoute: typeof BilderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/benutzer': {
@@ -309,6 +329,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalysenRoute: AnalysenRoute,
   BenutzerRoute: BenutzerRoute,
+  BilderRoute: BilderRoute,
   ClusterRoute: ClusterRouteWithChildren,
   DashboardRoute: DashboardRoute,
   FirmenRoute: FirmenRoute,

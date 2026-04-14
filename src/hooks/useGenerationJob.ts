@@ -14,11 +14,16 @@ interface GenerationJobState {
 export interface GenerationJobResult {
   pageId: string | null;
   htmlOutput: string;
+  bodyContent: string;
+  cssBlock: string;
   jsonLd: string;
   metaTitle: string;
   metaDesc: string;
+  metaKeywords: string;
+  promptUsed: string;
   tokensUsed: number | null;
   durationSeconds: number | null;
+  stopReason: string;
 }
 
 function readStorage(): { jobId: string; keyword: string } | null {

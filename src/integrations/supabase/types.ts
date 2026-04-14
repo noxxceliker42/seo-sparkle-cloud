@@ -520,6 +520,48 @@ export type Database = {
           },
         ]
       }
+      process_logs: {
+        Row: {
+          created_at: string | null
+          detail: Json | null
+          duration_ms: number | null
+          id: string
+          message: string | null
+          process_type: string
+          session_id: string
+          status: string
+          step_index: number
+          step_name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          detail?: Json | null
+          duration_ms?: number | null
+          id?: string
+          message?: string | null
+          process_type: string
+          session_id: string
+          status: string
+          step_index: number
+          step_name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          detail?: Json | null
+          duration_ms?: number | null
+          id?: string
+          message?: string | null
+          process_type?: string
+          session_id?: string
+          status?: string
+          step_index?: number
+          step_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

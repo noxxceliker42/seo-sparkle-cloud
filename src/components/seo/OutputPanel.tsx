@@ -172,29 +172,120 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
     };
   }, [imageSlots]);
 
+  // Track polling intervals per slot
+  const slotPollRefs = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+
   const generateImage = useCallback(async (slotId: string) => {
+    const slot = imageSlots.find((s) => s.id === slotId);
+    if (!slot) return;
+
     setImageSlots((prev) =>
       prev.map((s) => (s.id === slotId ? { ...s, status: "generating" } : s))
     );
 
     try {
-      const { data, error } = await supabase.functions.invoke("generate-image", {
-        body: { imageId: slotId },
+      const user = (await supabase.auth.getUser()).data.user;
+
+      // Step 1: Start task (returns immediately)
+      const { data, error } = await supabase.functions.invoke("start-image", {
+        body: {
+          prompt: slot.prompt,
+          pageId: page.pageId || null,
+          slot: slot.slot,
+          userId: user?.id,
+        },
       });
 
-      if (error) {
-        console.error("generate-image error:", error);
+      if (error || data?.error) {
+        console.error("start-image error:", error || data?.error);
         setImageSlots((prev) =>
           prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s))
         );
+        return;
       }
-      // Polling will pick up the status change
+
+      // Immediate completion (sync response)
+      if (data.status === "completed" && data.imageUrl) {
+        setImageSlots((prev) =>
+          prev.map((s) =>
+            s.id === slotId ? { ...s, status: "completed", nanoUrl: data.imageUrl } : s
+          )
+        );
+        // Update page_images record too
+        await supabase.from("page_images").update({
+          nano_url: data.imageUrl,
+          nano_status: "completed",
+        }).eq("id", slotId);
+        return;
+      }
+
+      // Step 2: Start polling with check-image
+      const jobId = data.jobId;
+      const taskId = data.taskId;
+      let attempts = 0;
+
+      // Clear any existing poll for this slot
+      if (slotPollRefs.current[slotId]) {
+        clearInterval(slotPollRefs.current[slotId]);
+      }
+
+      slotPollRefs.current[slotId] = setInterval(async () => {
+        attempts++;
+        if (attempts > 20) {
+          clearInterval(slotPollRefs.current[slotId]);
+          delete slotPollRefs.current[slotId];
+          setImageSlots((prev) =>
+            prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s))
+          );
+          return;
+        }
+
+        try {
+          const { data: checkData } = await supabase.functions.invoke("check-image", {
+            body: { jobId, taskId },
+          });
+
+          if (checkData?.status === "completed" && checkData?.imageUrl) {
+            clearInterval(slotPollRefs.current[slotId]);
+            delete slotPollRefs.current[slotId];
+            setImageSlots((prev) =>
+              prev.map((s) =>
+                s.id === slotId
+                  ? { ...s, status: "completed", nanoUrl: checkData.imageUrl }
+                  : s
+              )
+            );
+            // Update page_images
+            await supabase.from("page_images").update({
+              nano_url: checkData.imageUrl,
+              nano_status: "completed",
+            }).eq("id", slotId);
+          }
+
+          if (checkData?.status === "failed") {
+            clearInterval(slotPollRefs.current[slotId]);
+            delete slotPollRefs.current[slotId];
+            setImageSlots((prev) =>
+              prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s))
+            );
+          }
+        } catch (pollErr) {
+          console.error("check-image poll error:", pollErr);
+        }
+      }, 3000);
     } catch (err) {
       console.error("Image generation error:", err);
       setImageSlots((prev) =>
         prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s))
       );
     }
+  }, [imageSlots, page.pageId]);
+
+  // Cleanup all slot polls on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(slotPollRefs.current).forEach(clearInterval);
+    };
   }, []);
 
   const updateSlotPrompt = useCallback(async (slotId: string, prompt: string) => {

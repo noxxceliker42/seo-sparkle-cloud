@@ -18,6 +18,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ClusterRouteImport } from './routes/cluster'
 import { Route as BenutzerRouteImport } from './routes/benutzer'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ClusterIndexRouteImport } from './routes/cluster.index'
 import { Route as ClusterNeuRouteImport } from './routes/cluster.neu'
 import { Route as ClusterIdRouteImport } from './routes/cluster.$id'
 
@@ -66,6 +67,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClusterIndexRoute = ClusterIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ClusterRoute,
+} as any)
 const ClusterNeuRoute = ClusterNeuRouteImport.update({
   id: '/neu',
   path: '/neu',
@@ -89,11 +95,11 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/cluster/$id': typeof ClusterIdRoute
   '/cluster/neu': typeof ClusterNeuRoute
+  '/cluster/': typeof ClusterIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/benutzer': typeof BenutzerRoute
-  '/cluster': typeof ClusterRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/firmen': typeof FirmenRoute
   '/login': typeof LoginRoute
@@ -102,6 +108,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/cluster/$id': typeof ClusterIdRoute
   '/cluster/neu': typeof ClusterNeuRoute
+  '/cluster': typeof ClusterIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -116,6 +123,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/cluster/$id': typeof ClusterIdRoute
   '/cluster/neu': typeof ClusterNeuRoute
+  '/cluster/': typeof ClusterIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,11 +139,11 @@ export interface FileRouteTypes {
     | '/settings'
     | '/cluster/$id'
     | '/cluster/neu'
+    | '/cluster/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/benutzer'
-    | '/cluster'
     | '/dashboard'
     | '/firmen'
     | '/login'
@@ -144,6 +152,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/cluster/$id'
     | '/cluster/neu'
+    | '/cluster'
   id:
     | '__root__'
     | '/'
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/cluster/$id'
     | '/cluster/neu'
+    | '/cluster/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -236,6 +246,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cluster/': {
+      id: '/cluster/'
+      path: '/'
+      fullPath: '/cluster/'
+      preLoaderRoute: typeof ClusterIndexRouteImport
+      parentRoute: typeof ClusterRoute
+    }
     '/cluster/neu': {
       id: '/cluster/neu'
       path: '/neu'
@@ -256,11 +273,13 @@ declare module '@tanstack/react-router' {
 interface ClusterRouteChildren {
   ClusterIdRoute: typeof ClusterIdRoute
   ClusterNeuRoute: typeof ClusterNeuRoute
+  ClusterIndexRoute: typeof ClusterIndexRoute
 }
 
 const ClusterRouteChildren: ClusterRouteChildren = {
   ClusterIdRoute: ClusterIdRoute,
   ClusterNeuRoute: ClusterNeuRoute,
+  ClusterIndexRoute: ClusterIndexRoute,
 }
 
 const ClusterRouteWithChildren =

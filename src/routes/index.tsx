@@ -574,9 +574,12 @@ function Index() {
               onGenerate={handleGenerate}
             />
             {generating && (
-              <div className="flex items-center gap-3 rounded-md border border-border bg-card p-4">
+              <div className="flex items-center gap-3 rounded-md border border-primary/30 bg-primary/5 p-4">
                 <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <span className="text-sm font-medium text-foreground">Seite wird generiert… (Kie.AI, ~15–30 Sek.)</span>
+                <div>
+                  <span className="text-sm font-medium text-foreground">Seite wird generiert… (Kie.AI, ~2–4 Min.)</span>
+                  <p className="text-xs text-muted-foreground mt-1">Tab-Wechsel ist sicher — der Fortschritt bleibt erhalten.</p>
+                </div>
               </div>
             )}
             {generateError && (

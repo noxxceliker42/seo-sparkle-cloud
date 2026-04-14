@@ -609,6 +609,14 @@ function Index() {
         ) : (
           <>
 
+        {/* Active job indicator */}
+        {activeJobId && isPolling && (
+          <div className="flex items-center gap-3 rounded-md border border-primary/30 bg-primary/5 p-4 animate-pulse">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span className="text-sm font-medium text-foreground">Analyse läuft — bitte warten... (Tab-Wechsel möglich)</span>
+          </div>
+        )}
+
         <div className="space-y-3">
           <ModeToggle mode={mode} onModeChange={setMode} />
           <div className="flex flex-col gap-3">

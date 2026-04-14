@@ -93,8 +93,9 @@ export class ProcessLogger {
         detail: detail ? JSON.stringify(detail) : null,
         duration_ms: durationMs,
       })
-      .then()
-      .catch(console.error);
+      .then(({ error: dbErr }) => {
+        if (dbErr) console.error("ProcessLog save error:", dbErr);
+      });
   }
 
   getSessionId() {

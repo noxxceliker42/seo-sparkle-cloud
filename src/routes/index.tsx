@@ -113,6 +113,42 @@ function Index() {
 
   const isLoading = aiState === "loading" || serpState === "loading" || volState === "loading";
 
+  // Job persistence hook
+  const {
+    activeJobId,
+    isPolling,
+    resumedResult,
+    resumedKeyword,
+    createJob,
+    completeJob,
+    failJob,
+    clearJob,
+    clearResumedResult,
+  } = useAnalysisJob();
+
+  // Resume from saved job
+  useEffect(() => {
+    if (resumedResult && resumedKeyword) {
+      const r = resumedResult as { analysis?: AnalysisResult; serp?: SerpResult; volume?: VolumeResult; rawJson?: string };
+      if (r.analysis) {
+        setAnalysis(r.analysis);
+        setSelectedLsi(new Set(r.analysis.lsi || []));
+        setAiState("done");
+      }
+      if (r.serp) {
+        setSerp(r.serp);
+        setSerpState("done");
+      }
+      if (r.volume) {
+        setVolume(r.volume);
+        setVolState("done");
+      }
+      if (r.rawJson) setRawJson(r.rawJson);
+      setKeyword(resumedKeyword);
+      clearResumedResult();
+    }
+  }, [resumedResult, resumedKeyword, clearResumedResult]);
+
   const runStandardAnalysis = useCallback((kw: string): AnalysisResult => {
     // Local JS-based quick analysis (no API needed)
     const lower = kw.toLowerCase();

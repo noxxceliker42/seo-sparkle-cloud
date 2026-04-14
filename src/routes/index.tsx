@@ -503,111 +503,31 @@ function Index() {
   }, []);
 
   const handleGenerate = useCallback(async (data: SeoFormData) => {
-    setGenerating(true);
-    setGenerateError("");
-    setHtmlWarning("");
-    try {
-      // Get user for userId
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setGenerateError("Nicht eingeloggt. Bitte erneut anmelden.");
-        setGenerating(false);
-        return;
-      }
+    await startGeneration(data);
+  }, [startGeneration]);
 
-      // Start async job
-      const { data: result, error } = await supabase.functions.invoke("generate-page", {
-        body: { ...data, userId: user.id },
-      });
-
-      if (error || !result?.jobId) {
-        const msg = error?.message || result?.error || "Job konnte nicht gestartet werden";
-        if (msg.includes("Failed to send")) {
-          setGenerateError("Edge Function nicht erreichbar. Bitte Seite neu laden und erneut versuchen.");
-        } else {
-          setGenerateError(msg);
-        }
-        setGenerating(false);
-        return;
-      }
-
-      const jobId = result.jobId;
-
-      // Poll every 5 seconds
-      const pollInterval = setInterval(async () => {
-        try {
-          const { data: job } = await supabase
-            .from("generation_jobs")
-            .select("status, page_id, html_output, json_ld, meta_title, meta_desc, error_message, tokens_used, duration_seconds")
-            .eq("id", jobId)
-            .single();
-
-          if (!job) return;
-
-          if (job.status === "completed") {
-            clearInterval(pollInterval);
-            const html = job.html_output || "";
-            const isComplete = html.trim().endsWith("</html>");
-            const hasFaq = html.includes('id="faq"');
-            const hasSchema = html.includes("application/ld+json");
-            const hasAutor = html.includes('id="autor"');
-
-            if (html && (!isComplete || !hasFaq || !hasSchema || !hasAutor)) {
-              const missing = [
-                !isComplete && "HTML-Ende fehlt",
-                !hasFaq && "FAQ-Sektion fehlt",
-                !hasSchema && "JSON-LD fehlt",
-                !hasAutor && "Autor-Sektion fehlt",
-              ].filter(Boolean).join(", ");
-              setHtmlWarning(`HTML unvollständig — Token-Limit erreicht. Fehlend: ${missing}`);
-            }
-
-            setGeneratedPage({
-              metaTitle: job.meta_title || "",
-              metaDesc: job.meta_desc || "",
-              metaKeywords: "",
-              htmlOutput: html,
-              jsonLd: job.json_ld || "",
-              masterPrompt: "",
-              activeSections: data.activeSections,
-              firmName: data.firmName,
-              street: data.street,
-              city: data.city,
-              phone: data.phone,
-              pageId: job.page_id || undefined,
-              keyword: data.keyword,
-            });
-            setShowQaGate(false);
-            setShowOutput(true);
-            setGenerating(false);
-          }
-
-          if (job.status === "error") {
-            clearInterval(pollInterval);
-            setGenerateError(job.error_message || "Unbekannter Fehler bei der Generierung");
-            setGenerating(false);
-          }
-        } catch (pollErr) {
-          console.error("Poll error:", pollErr);
-        }
-      }, 5000);
-
-      // Safety timeout after 10 minutes
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        setGenerating((prev) => {
-          if (prev) {
-            setGenerateError("Generierung dauert länger als 10 Minuten. Bitte prüfe den Status manuell.");
-          }
-          return false;
-        });
-      }, 600000);
-
-    } catch (err) {
-      setGenerateError(err instanceof Error ? err.message : "Fehler");
-      setGenerating(false);
-    }
-  }, []);
+  // When generation completes, build the page object and show output
+  useEffect(() => {
+    if (!generationResult) return;
+    setGeneratedPage({
+      metaTitle: generationResult.metaTitle,
+      metaDesc: generationResult.metaDesc,
+      metaKeywords: "",
+      htmlOutput: generationResult.htmlOutput,
+      jsonLd: generationResult.jsonLd,
+      masterPrompt: "",
+      activeSections: qaFormData?.activeSections,
+      firmName: qaFormData?.firmName,
+      street: qaFormData?.street,
+      city: qaFormData?.city,
+      phone: qaFormData?.phone,
+      pageId: generationResult.pageId || undefined,
+      keyword: qaFormData?.keyword || keyword,
+    });
+    setShowQaGate(false);
+    setShowOutput(true);
+    clearGenerationResult();
+  }, [generationResult, qaFormData, keyword, clearGenerationResult]);
 
   const handleNewPage = useCallback(() => {
     setShowOutput(false);

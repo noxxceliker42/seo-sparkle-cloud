@@ -231,6 +231,53 @@ export type Database = {
         }
         Relationships: []
       }
+      image_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          image_url: string | null
+          page_id: string | null
+          prompt: string
+          slot: string | null
+          status: string | null
+          task_id: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          page_id?: string | null
+          prompt: string
+          slot?: string | null
+          status?: string | null
+          task_id?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          page_id?: string | null
+          prompt?: string
+          slot?: string | null
+          status?: string | null
+          task_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "image_jobs_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "seo_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       page_images: {
         Row: {
           alt_text: string | null

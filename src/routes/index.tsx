@@ -499,10 +499,12 @@ function Index() {
     setGeneratedPage({
       metaTitle: generationResult.metaTitle,
       metaDesc: generationResult.metaDesc,
-      metaKeywords: "",
+      metaKeywords: generationResult.metaKeywords || "",
       htmlOutput: generationResult.htmlOutput,
+      bodyContent: generationResult.bodyContent || "",
+      cssBlock: generationResult.cssBlock || "",
       jsonLd: generationResult.jsonLd,
-      masterPrompt: "",
+      masterPrompt: generationResult.promptUsed || "",
       activeSections: qaFormData?.activeSections || [],
       firmName: qaFormData?.firmName,
       street: qaFormData?.street,
@@ -510,6 +512,9 @@ function Index() {
       phone: qaFormData?.phone,
       pageId: generationResult.pageId || undefined,
       keyword: qaFormData?.keyword || keyword,
+      tokensUsed: generationResult.tokensUsed || 0,
+      duration: generationResult.durationSeconds || 0,
+      stopReason: generationResult.stopReason || "",
     });
     setShowQaGate(false);
     setShowOutput(true);

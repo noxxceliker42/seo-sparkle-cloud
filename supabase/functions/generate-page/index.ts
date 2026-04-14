@@ -1,5 +1,57 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
+// ─── Design Systems ───────────────────────────────────────────────────────
+const DESIGN_SYSTEMS: Record<string, any> = {
+  trust: {
+    name: "Trust & Service",
+    description: "Professionell, vertrauenswürdig, klar",
+    typography: { headlines: "system-ui, -apple-system, 'Segoe UI', sans-serif", body: "system-ui, -apple-system, 'Segoe UI', sans-serif", headlineWeight: "800", bodyLineHeight: "1.7" },
+    layout: { heroType: "grid-2col-image-right", sectionSpacing: "70px", cardRadius: "12px", cardShadow: "0 2px 12px rgba(0,0,0,0.08)", maxWidth: "1140px" },
+    components: { buttonStyle: "filled primary + outline secondary", cardHover: "translateY(-3px) + shadow increase", heroOverlay: "none" },
+    cssVars: "--c-primary: #1d4ed8; --c-primary-dark: #1e3a8a; --c-accent: #dc2626; --c-hero-bg: #fff5f5; --c-card-bg: #ffffff; --c-text: #1e293b; --c-muted: #64748b; --c-border: #e2e8f0; --radius-card: 12px; --shadow-card: 0 2px 12px rgba(0,0,0,0.08); --max-w: 1140px;",
+  },
+  glassmorphism: {
+    name: "Midnight Executive",
+    description: "Premium, dunkel, Glassmorphism",
+    typography: { headlines: "'Playfair Display', 'Georgia', serif", body: "'Inter var', system-ui, sans-serif", headlineWeight: "700", bodyLineHeight: "1.8" },
+    layout: { heroType: "fullwidth-dark-overlay-centered", sectionSpacing: "80px", cardRadius: "16px", cardShadow: "0 8px 32px rgba(0,0,0,0.4)", maxWidth: "1200px" },
+    components: { buttonStyle: "glass button with border glow", cardHover: "border-color: rgba(255,255,255,0.3)", heroOverlay: "linear-gradient dark overlay" },
+    cssVars: "--c-bg: #0f172a; --c-surface: #1e293b; --c-card: rgba(255,255,255,0.08); --c-primary: #3b82f6; --c-accent: #6366f1; --c-text: #f1f5f9; --c-muted: #94a3b8; --c-border: rgba(255,255,255,0.15); --radius-card: 16px; --blur: blur(12px); --shadow-card: 0 8px 32px rgba(0,0,0,0.4); --max-w: 1200px;",
+    specialRules: "body { background: #0f172a; color: #f1f5f9; } .card { background: rgba(255,255,255,0.08); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.15); } section:nth-child(even) { background: rgba(255,255,255,0.03); }",
+  },
+  editorial: {
+    name: "Clean Editorial",
+    description: "Journalistisch, minimalistisch, textstark",
+    typography: { headlines: "'Georgia', 'Times New Roman', serif", body: "'Charter', 'Georgia', serif", headlineWeight: "700", bodyLineHeight: "1.85" },
+    layout: { heroType: "single-column-text-heavy", sectionSpacing: "80px", cardRadius: "4px", cardShadow: "none", maxWidth: "900px" },
+    components: { buttonStyle: "minimal text links + one strong CTA", cardHover: "border-color dark", heroOverlay: "none" },
+    cssVars: "--c-primary: #1c1917; --c-accent: #dc2626; --c-hero-bg: #fafaf9; --c-card-bg: #ffffff; --c-text: #1c1917; --c-muted: #78716c; --c-border: #e5e5e4; --radius-card: 4px; --shadow-card: none; --max-w: 900px;",
+  },
+  eco: {
+    name: "Eco Service",
+    description: "Nachhaltig, organisch, vertrauenswürdig",
+    typography: { headlines: "'Nunito', 'Trebuchet MS', sans-serif", body: "'Nunito', system-ui, sans-serif", headlineWeight: "800", bodyLineHeight: "1.7" },
+    layout: { heroType: "grid-2col-organic-shapes", sectionSpacing: "60px", cardRadius: "20px", cardShadow: "0 4px 16px rgba(6,95,70,0.1)", maxWidth: "1100px" },
+    components: { buttonStyle: "filled green + outline", cardHover: "scale(1.02) + shadow", heroOverlay: "none" },
+    cssVars: "--c-primary: #065f46; --c-accent: #16a34a; --c-hero-bg: #f0fdf4; --c-text: #14532d; --c-muted: #6b7280; --c-border: #bbf7d0; --radius-card: 20px; --shadow-card: 0 4px 16px rgba(6,95,70,0.1); --max-w: 1100px;",
+  },
+  craft: {
+    name: "Warm Craft",
+    description: "Handwerklich, warm, persönlich",
+    typography: { headlines: "'Merriweather', 'Georgia', serif", body: "'Source Serif Pro', 'Georgia', serif", headlineWeight: "700", bodyLineHeight: "1.75" },
+    layout: { heroType: "warm-overlay-grid", sectionSpacing: "65px", cardRadius: "8px", cardShadow: "0 2px 8px rgba(154,52,18,0.1)", maxWidth: "1120px" },
+    components: { buttonStyle: "warm filled + text secondary", cardHover: "translateY(-2px) + warm shadow", heroOverlay: "subtle warm tint" },
+    cssVars: "--c-primary: #9a3412; --c-accent: #fb923c; --c-hero-bg: #fff7ed; --c-card-bg: #fffbf5; --c-text: #431407; --c-muted: #78716c; --c-border: #fed7aa; --radius-card: 8px; --shadow-card: 0 2px 8px rgba(154,52,18,0.1); --max-w: 1120px;",
+  },
+  tech: {
+    name: "Tech Precision",
+    description: "Technisch, präzise, modern",
+    typography: { headlines: "'JetBrains Mono', 'Courier New', monospace", body: "system-ui, -apple-system, sans-serif", headlineWeight: "700", bodyLineHeight: "1.65" },
+    layout: { heroType: "technical-data-grid", sectionSpacing: "60px", cardRadius: "6px", cardShadow: "0 1px 4px rgba(12,74,110,0.15)", maxWidth: "1160px" },
+    components: { buttonStyle: "outlined + mono text", cardHover: "border-primary + subtle glow", heroOverlay: "none" },
+    cssVars: "--c-primary: #0c4a6e; --c-accent: #0284c7; --c-hero-bg: #f0f9ff; --c-text: #0c4a6e; --c-muted: #64748b; --c-border: #bae6fd; --radius-card: 6px; --shadow-card: 0 1px 4px rgba(12,74,110,0.15); --max-w: 1160px;",
+  },
+};
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

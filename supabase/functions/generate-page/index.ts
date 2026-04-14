@@ -32,21 +32,21 @@ Deno.serve(async (req) => {
 
     // Test ping
     if ((body as Record<string, unknown>)?.test === true) {
-      const kieKey = Deno.env.get("KIE_AI_API_KEY");
+      const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
       return new Response(JSON.stringify({
-        ok: true, message: "generate-page läuft (async mode)",
-        keyPresent: !!kieKey, keyPrefix: kieKey?.slice(0, 8) + "...",
+        ok: true, message: "generate-page läuft (async mode, Anthropic direct)",
+        keyPresent: !!anthropicKey, keyPrefix: anthropicKey?.slice(0, 8) + "...",
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const kieKey = Deno.env.get("KIE_AI_API_KEY");
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!kieKey) {
+    if (!anthropicKey) {
       return new Response(JSON.stringify({
-        error: "KIE_AI_API_KEY nicht konfiguriert",
-        hint: "Lovable Cloud → Secrets → KIE_AI_API_KEY eintragen",
+        error: "ANTHROPIC_API_KEY nicht konfiguriert",
+        hint: "Lovable Cloud → Secrets → ANTHROPIC_API_KEY eintragen",
       }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
 
     // Fire-and-forget: run generation in background
     EdgeRuntime.waitUntil(
-      runGeneration(body, job.id, userId, supabase, kieKey, reqId)
+      runGeneration(body, job.id, userId, supabase, anthropicKey, reqId)
     );
 
     // Return immediately
@@ -132,50 +132,86 @@ async function runGeneration(
   jobId: string,
   userId: string,
   supabase: any,
-  kieKey: string,
+  anthropicKey: string,
   reqId: string,
 ) {
   const startTime = Date.now();
-  console.log(`[${reqId}] Kie.AI call starting for job:`, jobId);
+  console.log(`[${reqId}] Anthropic API call starting for job:`, jobId);
 
   try {
     const prompt = buildPrompt(body);
     console.log(`[${reqId}] Prompt length:`, prompt.length);
 
-    // No timeout — let Kie.AI take as long as needed
-    const response = await fetch("https://api.kie.ai/claude/v1/messages", {
+    // Streaming call to Anthropic API — no timeout issues
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${kieKey}`,
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 32000,
-        stream: false,
+        max_tokens: 16000,
+        stream: true,
         messages: [{ role: "user", content: prompt }],
       }),
     });
 
-    console.log(`[${reqId}] Kie.AI status:`, response.status);
+    console.log(`[${reqId}] Anthropic status:`, response.status);
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Kie.AI ${response.status}: ${errText.slice(0, 200)}`);
+      throw new Error(`Anthropic ${response.status}: ${errText.slice(0, 300)}`);
     }
 
-    const kieData = await response.json();
-    const content: string = kieData?.content?.[0]?.text || "";
-    const tokensUsed = kieData?.usage?.output_tokens || 0;
+    // Read SSE stream
+    let fullContent = "";
+    let tokensUsed = 0;
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (!reader) {
+      throw new Error("Response body nicht lesbar");
+    }
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split("\n");
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") break;
+
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === "content_block_delta") {
+            fullContent += parsed.delta?.text || "";
+          }
+          if (parsed.type === "message_delta" && parsed.usage) {
+            tokensUsed = parsed.usage.output_tokens || 0;
+          }
+        } catch {
+          // skip malformed SSE lines
+        }
+      }
+    }
+
     const duration = Math.round((Date.now() - startTime) / 1000);
 
-    console.log(`[${reqId}] Content length:`, content.length);
+    console.log(`[${reqId}] Content length:`, fullContent.length);
     console.log(`[${reqId}] Output tokens:`, tokensUsed);
     console.log(`[${reqId}] Duration:`, duration, "sec");
 
-    if (!content.trim()) {
-      throw new Error(`Leere Antwort. stop_reason: ${kieData?.stop_reason}`);
+    if (!fullContent.trim()) {
+      throw new Error("Leere Antwort von Anthropic API");
     }
+
+    const content = fullContent;
 
     const { htmlOutput, jsonLdOutput, metaTitle, metaDesc } = parseResponse(content);
     console.log(`[${reqId}] HTML length:`, htmlOutput.length);

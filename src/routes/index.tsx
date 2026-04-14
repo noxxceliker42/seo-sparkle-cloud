@@ -503,7 +503,7 @@ function Index() {
   }, []);
 
   const handleGenerate = useCallback(async (data: SeoFormData) => {
-    await startGeneration(data);
+    await startGeneration(data as unknown as Record<string, unknown>);
   }, [startGeneration]);
 
   // When generation completes, build the page object and show output
@@ -516,7 +516,7 @@ function Index() {
       htmlOutput: generationResult.htmlOutput,
       jsonLd: generationResult.jsonLd,
       masterPrompt: "",
-      activeSections: qaFormData?.activeSections,
+      activeSections: qaFormData?.activeSections || [],
       firmName: qaFormData?.firmName,
       street: qaFormData?.street,
       city: qaFormData?.city,

@@ -775,6 +775,58 @@ function Index() {
 
   return (
     <div className="space-y-6">
+      {/* Prompt Review Modal */}
+      {showPromptReview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="bg-background rounded-2xl w-full max-w-[860px] max-h-[90vh] flex flex-col overflow-hidden border border-border shadow-lg">
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-border flex items-center justify-between">
+              <div>
+                <div className="font-bold text-base text-foreground">Master-Prompt Review</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Prüfe und bearbeite den Prompt vor der Generierung</div>
+              </div>
+              <div className="flex gap-2.5 items-center">
+                {isPromptEdited && (
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                    ✏ Bearbeitet
+                  </span>
+                )}
+                <span className="text-[11px] text-muted-foreground">
+                  {reviewPrompt.length} Zeichen · {Math.round(reviewPrompt.length / 4)} Tokens (ca.)
+                </span>
+              </div>
+            </div>
+            {/* Prompt Editor */}
+            <div className="flex-1 overflow-hidden px-6 py-4">
+              <textarea
+                value={reviewPrompt}
+                onChange={e => { setReviewPrompt(e.target.value); setIsPromptEdited(true); }}
+                className="w-full h-full min-h-[400px] font-mono text-xs leading-relaxed text-foreground bg-muted/50 border border-border rounded-lg p-4 resize-none outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            {/* Hinweis */}
+            <div className="px-6 pb-3 text-[11px] text-muted-foreground">
+              Änderungen am Prompt wirken sich direkt auf die generierte Seite aus. Originalprompt kann durch Zurücksetzen wiederhergestellt werden.
+            </div>
+            {/* Footer Buttons */}
+            <div className="px-6 py-4 border-t border-border flex gap-2.5 justify-between">
+              <div className="flex gap-2.5">
+                <Button variant="outline" onClick={() => setShowPromptReview(false)}>
+                  ← Zurück zum Formular
+                </Button>
+                {isPromptEdited && qaFormData && (
+                  <Button variant="outline" className="border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300" onClick={() => { setReviewPrompt(buildMasterPrompt(qaFormData)); setIsPromptEdited(false); }}>
+                    ↺ Original wiederherstellen
+                  </Button>
+                )}
+              </div>
+              <Button onClick={() => { setShowPromptReview(false); if (qaFormData) handleGenerate(qaFormData, reviewPrompt); }} className="px-7 font-bold">
+                Seite generieren →
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Firm Selector */}
       <div className="flex items-center justify-between">
         <div>

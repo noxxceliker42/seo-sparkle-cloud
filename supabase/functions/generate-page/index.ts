@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  const reqId = Math.random().toString(36).slice(2, 9);
+  const reqId = Math.random().toString(36).slice(2, 8);
   console.log(`[${reqId}] === GENERATE-PAGE START ===`);
 
   try {
@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     if ((body as Record<string, unknown>)?.test === true) {
       const kieKey = Deno.env.get("KIE_AI_API_KEY");
       return new Response(JSON.stringify({
-        ok: true, message: "generate-page läuft",
+        ok: true, message: "generate-page läuft (async mode)",
         keyPresent: !!kieKey, keyPrefix: kieKey?.slice(0, 8) + "...",
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -43,8 +43,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    console.log(`[${reqId}] KIE_KEY:`, !!kieKey, "SUPA_URL:", !!supabaseUrl, "SVC_KEY:", !!serviceKey);
-
     if (!kieKey) {
       return new Response(JSON.stringify({
         error: "KIE_AI_API_KEY nicht konfiguriert",
@@ -52,137 +50,210 @@ Deno.serve(async (req) => {
       }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Dynamic import to avoid top-level crash
-    console.log(`[${reqId}] Loading supabase-js...`);
+    // Dynamic import
     let createClient: any;
     try {
       const mod = await import("https://esm.sh/@supabase/supabase-js@2.39.0");
       createClient = mod.createClient;
-      console.log(`[${reqId}] supabase-js loaded OK`);
     } catch (importErr: unknown) {
       const ie = importErr as Error;
-      console.error(`[${reqId}] supabase-js import FAILED:`, ie.message);
       return new Response(JSON.stringify({ error: "Supabase client import failed", detail: ie.message }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     const supabase = createClient(supabaseUrl ?? "", serviceKey ?? "");
 
-    const prompt = buildPrompt(body);
-    console.log(`[${reqId}] Prompt length: ${prompt.length}`);
-
-    // Kie.AI call with timeout
-    console.log(`[${reqId}] Calling Kie.AI...`);
-    let kieResponse: Response;
-    try {
-      kieResponse = await fetch("https://api.kie.ai/claude/v1/messages", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${kieKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 16000,
-          stream: false,
-          messages: [{ role: "user", content: prompt }],
-        }),
-        signal: AbortSignal.timeout(120000),
-      });
-    } catch (fetchErr: unknown) {
-      const err = fetchErr as Error;
-      console.error(`[${reqId}] Kie.AI fetch FAILED:`, err.name, err.message);
-      if (err.name === "AbortError" || err.name === "TimeoutError") {
-        return new Response(JSON.stringify({ error: "Kie.AI Timeout nach 120 Sekunden" }), {
-          status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ error: `Kie.AI nicht erreichbar: ${err.message}` }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    console.log(`[${reqId}] Kie.AI responded: ${kieResponse.status}`);
-
-    console.log(`[${reqId}] Kie.AI status: ${kieResponse.status}`);
-
-    if (!kieResponse.ok) {
-      const errText = await kieResponse.text();
-      console.error(`[${reqId}] Kie.AI error:`, errText.slice(0, 300));
-      return new Response(JSON.stringify({
-        error: `Kie.AI HTTP ${kieResponse.status}`, detail: errText.slice(0, 500),
-      }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const kieData = await kieResponse.json();
-    const rawContent: string = kieData?.content?.[0]?.text || "";
-
-    console.log(`[${reqId}] Content length: ${rawContent.length}`);
-
-    if (!rawContent.trim()) {
-      return new Response(JSON.stringify({
-        error: "Leere Antwort von Kie.AI", stopReason: kieData?.stop_reason,
-      }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const { htmlOutput, jsonLdOutput, metaTitle, metaDesc } = parseResponse(rawContent);
-    console.log(`[${reqId}] HTML: ${htmlOutput.length}, JSON-LD: ${jsonLdOutput.length}`);
-
-    // Save to DB
-    let pageId: string | null = null;
+    // Get user_id from auth header
+    let userId: string | null = (body.userId as string) || null;
     const authHeader = req.headers.get("authorization") || "";
-    if (supabaseUrl && authHeader) {
+    if (!userId && authHeader && supabaseUrl) {
       try {
         const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
           global: { headers: { Authorization: authHeader } },
         });
         const { data: { user } } = await userClient.auth.getUser();
-        if (user) {
-          const { data: savedPage, error: saveError } = await supabase
-            .from("seo_pages")
-            .insert({
-              keyword: (body.keyword as string) || "",
-              firm: (body.firmName as string) || (body.firm as string) || "",
-              city: (body.city as string) || "",
-              html_output: htmlOutput,
-              json_ld: jsonLdOutput,
-              meta_title: metaTitle,
-              meta_desc: metaDesc,
-              intent: (body.intent as string) || null,
-              page_type: (body.pageType as string) || null,
-              status: "draft",
-              design_preset: (body.designPreset as string) || "trust",
-              active_sections: (body.activeSections as string[]) || [],
-              user_id: user.id,
-              score: 0,
-            })
-            .select("id")
-            .single();
-          if (saveError) console.error(`[${reqId}] DB save error:`, saveError);
-          pageId = savedPage?.id || null;
-
-          if (body.clusterPageId && pageId) {
-            await supabase.from("cluster_pages").update({
-              seo_page_id: pageId, status: "generated", updated_at: new Date().toISOString(),
-            }).eq("id", body.clusterPageId);
-          }
-        }
-      } catch (dbErr) {
-        console.error(`[${reqId}] DB error (non-fatal):`, dbErr);
+        if (user) userId = user.id;
+      } catch (e) {
+        console.error(`[${reqId}] Auth check failed:`, e);
       }
     }
 
-    console.log(`[${reqId}] === GENERATE-PAGE SUCCESS ===`);
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "Nicht authentifiziert" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
+    // Create job immediately
+    const { data: job, error: jobError } = await supabase
+      .from("generation_jobs")
+      .insert({
+        user_id: userId,
+        keyword: (body.keyword as string) || "Unbekannt",
+        status: "running",
+      })
+      .select("id")
+      .single();
+
+    if (jobError || !job) {
+      console.error(`[${reqId}] Job creation failed:`, jobError);
+      return new Response(JSON.stringify({ error: "Job konnte nicht angelegt werden", detail: jobError?.message }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log(`[${reqId}] Job created:`, job.id);
+
+    // Fire-and-forget: run generation in background
+    EdgeRuntime.waitUntil(
+      runGeneration(body, job.id, userId, supabase, kieKey, reqId)
+    );
+
+    // Return immediately
     return new Response(JSON.stringify({
-      success: true, pageId, metaTitle, metaDesc,
-      htmlOutput, jsonLd: jsonLdOutput, masterPrompt: prompt,
+      jobId: job.id,
+      status: "running",
+      message: "Generierung gestartet — pollt alle 5 Sek",
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err: unknown) {
     const error = err as Error;
-    console.error(`[${reqId}] UNHANDLED:`, error.message, error.stack?.slice(0, 500));
+    console.error(`[${reqId}] UNHANDLED:`, error.message);
     return new Response(JSON.stringify({
       error: error.message || "Unbekannter Fehler", success: false,
     }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
+
+// --- Background generation ---
+
+async function runGeneration(
+  body: Record<string, unknown>,
+  jobId: string,
+  userId: string,
+  supabase: any,
+  kieKey: string,
+  reqId: string,
+) {
+  const startTime = Date.now();
+  console.log(`[${reqId}] Kie.AI call starting for job:`, jobId);
+
+  try {
+    const prompt = buildPrompt(body);
+    console.log(`[${reqId}] Prompt length:`, prompt.length);
+
+    // No timeout — let Kie.AI take as long as needed
+    const response = await fetch("https://api.kie.ai/claude/v1/messages", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${kieKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 32000,
+        stream: false,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    console.log(`[${reqId}] Kie.AI status:`, response.status);
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Kie.AI ${response.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const kieData = await response.json();
+    const content: string = kieData?.content?.[0]?.text || "";
+    const tokensUsed = kieData?.usage?.output_tokens || 0;
+    const duration = Math.round((Date.now() - startTime) / 1000);
+
+    console.log(`[${reqId}] Content length:`, content.length);
+    console.log(`[${reqId}] Output tokens:`, tokensUsed);
+    console.log(`[${reqId}] Duration:`, duration, "sec");
+
+    if (!content.trim()) {
+      throw new Error(`Leere Antwort. stop_reason: ${kieData?.stop_reason}`);
+    }
+
+    const { htmlOutput, jsonLdOutput, metaTitle, metaDesc } = parseResponse(content);
+    console.log(`[${reqId}] HTML length:`, htmlOutput.length);
+
+    // Save to seo_pages
+    let pageId: string | null = null;
+    try {
+      const { data: savedPage, error: saveError } = await supabase
+        .from("seo_pages")
+        .insert({
+          keyword: (body.keyword as string) || "",
+          firm: (body.firmName as string) || (body.firm as string) || "",
+          city: (body.city as string) || "",
+          html_output: htmlOutput,
+          json_ld: jsonLdOutput,
+          meta_title: metaTitle,
+          meta_desc: metaDesc,
+          intent: (body.intent as string) || null,
+          page_type: (body.pageType as string) || null,
+          status: "draft",
+          design_preset: (body.designPreset as string) || "trust",
+          active_sections: (body.activeSections as string[]) || [],
+          user_id: userId,
+          score: 0,
+        })
+        .select("id")
+        .single();
+
+      if (saveError) {
+        console.error(`[${reqId}] seo_pages save error:`, saveError);
+      } else {
+        pageId = savedPage?.id || null;
+      }
+    } catch (dbErr) {
+      console.error(`[${reqId}] seo_pages save exception:`, dbErr);
+    }
+
+    // Update cluster_pages if applicable
+    if (body.clusterPageId && pageId) {
+      await supabase.from("cluster_pages").update({
+        seo_page_id: pageId, status: "generated", updated_at: new Date().toISOString(),
+      }).eq("id", body.clusterPageId);
+    }
+
+    // Mark job completed
+    await supabase
+      .from("generation_jobs")
+      .update({
+        status: "completed",
+        page_id: pageId,
+        html_output: htmlOutput,
+        json_ld: jsonLdOutput,
+        meta_title: metaTitle,
+        meta_desc: metaDesc,
+        tokens_used: tokensUsed,
+        duration_seconds: duration,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", jobId);
+
+    console.log(`[${reqId}] Job completed:`, jobId);
+
+  } catch (err: unknown) {
+    const error = err as Error;
+    const duration = Math.round((Date.now() - startTime) / 1000);
+    console.error(`[${reqId}] Generation failed:`, error.message);
+
+    await supabase
+      .from("generation_jobs")
+      .update({
+        status: "error",
+        error_message: error.message,
+        duration_seconds: duration,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", jobId);
+  }
+}
 
 // --- Helper functions ---
 
@@ -296,6 +367,8 @@ SEO-REGELN (alle einhalten):
 11. Voice Search: Fragesätze in H2.
 12. NAP überall identisch.
 13. Duplikat-Schutz: page-uid Kommentar, variierte Micro-Texte.
+
+WICHTIG: Schreibe ALLE Sektionen vollständig aus. Kürze nichts ab. Kein Platzhaltertext. Vollständiges HTML bis </html> ist Pflicht.
 
 AUSGABE-FORMAT:
 1. META-BLOCK (3 Zeilen Plaintext):

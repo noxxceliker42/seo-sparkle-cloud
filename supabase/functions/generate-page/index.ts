@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  const reqId = Math.random().toString(36).slice(2, 8);
+  const reqId = Math.random().toString(36).slice(2, 9);
   console.log(`[${reqId}] === GENERATE-PAGE START ===`);
 
   try {
@@ -32,16 +32,18 @@ Deno.serve(async (req) => {
 
     // Test ping
     if ((body as Record<string, unknown>)?.test === true) {
-      const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+      const key = Deno.env.get("ANTHROPIC_API_KEY");
       return new Response(JSON.stringify({
-        ok: true, message: "generate-page läuft (async mode, Anthropic direct)",
-        keyPresent: !!anthropicKey, keyPrefix: anthropicKey?.slice(0, 8) + "...",
+        ok: true, keyPresent: !!key, keyPrefix: key?.slice(0, 8) + "...",
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    console.log(`[${reqId}] ANTHROPIC_KEY:`, !!anthropicKey);
+    console.log(`[${reqId}] Keyword:`, body?.keyword);
 
     if (!anthropicKey) {
       return new Response(JSON.stringify({
@@ -50,7 +52,6 @@ Deno.serve(async (req) => {
       }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Dynamic import
     let createClient: any;
     try {
       const mod = await import("https://esm.sh/@supabase/supabase-js@2.39.0");
@@ -84,7 +85,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create job immediately
+    // Create job
     const { data: job, error: jobError } = await supabase
       .from("generation_jobs")
       .insert({
@@ -96,32 +97,31 @@ Deno.serve(async (req) => {
       .single();
 
     if (jobError || !job) {
-      console.error(`[${reqId}] Job creation failed:`, jobError);
+      console.error(`[${reqId}] Job Fehler:`, jobError);
       return new Response(JSON.stringify({ error: "Job konnte nicht angelegt werden", detail: jobError?.message }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    console.log(`[${reqId}] Job created:`, job.id);
+    console.log(`[${reqId}] Job ID:`, job.id);
 
-    // Fire-and-forget: run generation in background
+    // Fire-and-forget
     EdgeRuntime.waitUntil(
       runGeneration(body, job.id, userId, supabase, anthropicKey, reqId)
     );
 
-    // Return immediately
     return new Response(JSON.stringify({
       jobId: job.id,
       status: "running",
-      message: "Generierung gestartet — pollt alle 5 Sek",
+      message: "Generierung gestartet",
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err: unknown) {
     const error = err as Error;
-    console.error(`[${reqId}] UNHANDLED:`, error.message);
-    return new Response(JSON.stringify({
-      error: error.message || "Unbekannter Fehler", success: false,
-    }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    console.error(`[${reqId}] FATAL:`, error.message);
+    return new Response(JSON.stringify({ error: error.message || "Unbekannter Fehler" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
 
@@ -136,13 +136,13 @@ async function runGeneration(
   reqId: string,
 ) {
   const startTime = Date.now();
-  console.log(`[${reqId}] Anthropic API call starting for job:`, jobId);
 
   try {
     const prompt = buildPrompt(body);
-    console.log(`[${reqId}] Prompt length:`, prompt.length);
+    console.log(`[${reqId}] Prompt Länge:`, prompt.length);
+    console.log(`[${reqId}] Anthropic Call startet...`);
 
-    // Streaming call to Anthropic API — no timeout issues
+    // Anthropic API — single call, NO AbortSignal, 64000 tokens
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -152,69 +152,39 @@ async function runGeneration(
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 16000,
-        stream: true,
+        max_tokens: 64000,
         messages: [{ role: "user", content: prompt }],
       }),
     });
 
-    console.log(`[${reqId}] Anthropic status:`, response.status);
+    console.log(`[${reqId}] Anthropic Status:`, response.status);
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Anthropic ${response.status}: ${errText.slice(0, 300)}`);
+      console.error(`[${reqId}] Anthropic Fehler:`, errText.slice(0, 500));
+      throw new Error(`Anthropic HTTP ${response.status}: ${errText.slice(0, 200)}`);
     }
 
-    // Read SSE stream
-    let fullContent = "";
-    let tokensUsed = 0;
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-
-    if (!reader) {
-      throw new Error("Response body nicht lesbar");
-    }
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n");
-
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const data = line.slice(6).trim();
-        if (data === "[DONE]") break;
-
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.type === "content_block_delta") {
-            fullContent += parsed.delta?.text || "";
-          }
-          if (parsed.type === "message_delta" && parsed.usage) {
-            tokensUsed = parsed.usage.output_tokens || 0;
-          }
-        } catch {
-          // skip malformed SSE lines
-        }
-      }
-    }
-
+    const apiData = await response.json();
+    const rawContent = apiData?.content?.[0]?.text || "";
+    const tokensUsed = apiData?.usage?.output_tokens || 0;
+    const stopReason = apiData?.stop_reason || "unknown";
     const duration = Math.round((Date.now() - startTime) / 1000);
 
-    console.log(`[${reqId}] Content length:`, fullContent.length);
-    console.log(`[${reqId}] Output tokens:`, tokensUsed);
-    console.log(`[${reqId}] Duration:`, duration, "sec");
+    console.log(`[${reqId}] Content Länge:`, rawContent.length);
+    console.log(`[${reqId}] Output Tokens:`, tokensUsed);
+    console.log(`[${reqId}] Stop Reason:`, stopReason);
+    console.log(`[${reqId}] Dauer:`, duration, "Sek");
 
-    if (!fullContent.trim()) {
-      throw new Error("Leere Antwort von Anthropic API");
+    if (!rawContent.trim()) {
+      throw new Error(`Leere Antwort. stop_reason: ${stopReason}. tokens: ${tokensUsed}`);
     }
 
-    const content = fullContent;
+    const parsed = parseFullResponse(rawContent);
 
-    const { htmlOutput, jsonLdOutput, metaTitle, metaDesc } = parseResponse(content);
-    console.log(`[${reqId}] HTML length:`, htmlOutput.length);
+    console.log(`[${reqId}] HTML Länge:`, parsed.htmlOutput.length);
+    console.log(`[${reqId}] HTML vollständig:`, parsed.htmlOutput.trim().endsWith("</html>"));
+    console.log(`[${reqId}] JSON-LD Länge:`, parsed.jsonLdOutput.length);
 
     // Save to seo_pages
     let pageId: string | null = null;
@@ -225,14 +195,18 @@ async function runGeneration(
           keyword: (body.keyword as string) || "",
           firm: (body.firmName as string) || (body.firm as string) || "",
           city: (body.city as string) || "",
-          html_output: htmlOutput,
-          json_ld: jsonLdOutput,
-          meta_title: metaTitle,
-          meta_desc: metaDesc,
+          html_output: parsed.htmlOutput,
+          body_content: parsed.bodyContent,
+          css_block: parsed.cssBlock,
+          json_ld: parsed.jsonLdOutput,
+          meta_title: parsed.metaTitle,
+          meta_desc: parsed.metaDesc,
+          meta_keywords: parsed.metaKeywords,
           intent: (body.intent as string) || null,
           page_type: (body.pageType as string) || null,
           status: "draft",
           design_preset: (body.designPreset as string) || "trust",
+          contao_mode: (body.contaoMode as boolean) || false,
           active_sections: (body.activeSections as string[]) || [],
           user_id: userId,
           score: 0,
@@ -262,22 +236,27 @@ async function runGeneration(
       .update({
         status: "completed",
         page_id: pageId,
-        html_output: htmlOutput,
-        json_ld: jsonLdOutput,
-        meta_title: metaTitle,
-        meta_desc: metaDesc,
+        html_output: parsed.htmlOutput,
+        body_content: parsed.bodyContent,
+        css_block: parsed.cssBlock,
+        json_ld: parsed.jsonLdOutput,
+        meta_title: parsed.metaTitle,
+        meta_desc: parsed.metaDesc,
+        meta_keywords: parsed.metaKeywords,
+        prompt_used: prompt,
         tokens_used: tokensUsed,
+        stop_reason: stopReason,
         duration_seconds: duration,
         completed_at: new Date().toISOString(),
       })
       .eq("id", jobId);
 
-    console.log(`[${reqId}] Job completed:`, jobId);
+    console.log(`[${reqId}] === FERTIG ===`, pageId);
 
   } catch (err: unknown) {
     const error = err as Error;
     const duration = Math.round((Date.now() - startTime) / 1000);
-    console.error(`[${reqId}] Generation failed:`, error.message);
+    console.error(`[${reqId}] GENERATION ERROR:`, error.message);
 
     await supabase
       .from("generation_jobs")
@@ -291,37 +270,65 @@ async function runGeneration(
   }
 }
 
-// --- Helper functions ---
+// --- Parsing ---
 
-function parseResponse(raw: string): {
-  htmlOutput: string; jsonLdOutput: string; metaTitle: string; metaDesc: string;
+function parseFullResponse(raw: string): {
+  htmlOutput: string; bodyContent: string; cssBlock: string;
+  jsonLdOutput: string; metaTitle: string; metaDesc: string; metaKeywords: string;
 } {
-  const htmlBlocks = [...raw.matchAll(/```(?:html)?\s*\n?([\s\S]*?)```/gi)]
+  // Meta block before first ```
+  const metaBlock = raw.split("```")[0];
+
+  const titleMatch = metaBlock.match(/^Title:\s*(.+)$/mi);
+  const descMatch = metaBlock.match(/^Description:\s*(.+)$/mi);
+  const keywordsMatch = metaBlock.match(/^Keywords:\s*(.+)$/mi);
+
+  // HTML blocks
+  const htmlBlocks = [...raw.matchAll(/```html\s*([\s\S]*?)```/gi)]
     .map((m) => m[1].trim()).filter((b) => b.length > 0);
 
-  const titleMatch = raw.match(/(?:Title|Titel|SEO-Titel):\s*(.+)/i);
-  const descMatch = raw.match(/(?:Description|Beschreibung|Meta-Desc):\s*(.+)/i);
-
   let htmlOutput = htmlBlocks[0] || "";
+
   if (!htmlOutput) {
-    const bodyMatch = raw.match(/(<!DOCTYPE[\s\S]*?<\/html>)/i);
-    htmlOutput = bodyMatch?.[1] || raw;
+    const docMatch = raw.match(/(<!DOCTYPE[\s\S]*?<\/html>)/i);
+    htmlOutput = docMatch?.[1] || raw;
   }
 
+  // Ensure HTML is complete
+  if (!htmlOutput.trim().endsWith("</html>")) {
+    htmlOutput = htmlOutput.trim() + "\n</body>\n</html>";
+  }
+
+  // Second block = JSON-LD
   const jsonLdOutput = htmlBlocks[1] || extractJsonLd(htmlOutput);
+
+  // Extract body content
+  const bodyMatch = htmlOutput.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const bodyContent = bodyMatch?.[1]?.trim() || htmlOutput;
+
+  // Extract CSS block
+  const styleMatch = htmlOutput.match(/(<style[^>]*>[\s\S]*?<\/style>)/i);
+  const cssBlock = styleMatch?.[1] || "";
 
   return {
     htmlOutput,
+    bodyContent,
+    cssBlock,
     jsonLdOutput,
     metaTitle: titleMatch?.[1]?.trim()?.slice(0, 60) || "",
     metaDesc: descMatch?.[1]?.trim()?.slice(0, 155) || "",
+    metaKeywords: keywordsMatch?.[1]?.trim() || "",
   };
 }
 
 function extractJsonLd(html: string): string {
-  const match = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/i);
-  return match?.[0] || "";
+  const matches = [...html.matchAll(
+    /<script[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi
+  )];
+  return matches.map((m) => m[0]).join("\n");
 }
+
+// --- Prompt ---
 
 function buildPrompt(data: Record<string, unknown>): string {
   const sections = Array.isArray(data.activeSections)

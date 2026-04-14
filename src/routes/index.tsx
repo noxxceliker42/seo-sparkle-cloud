@@ -636,15 +636,32 @@ function Index() {
 
       // Chunked Response lesen und parsen
       const text = await httpResponse.text();
+      console.log('Raw response length:', text.length);
+      console.log('Raw response preview:', text.slice(0, 200));
       let result: any;
       try {
         result = JSON.parse(text);
       } catch {
-        const lastBrace = text.lastIndexOf("}");
+        // JSON unvollständig — letztes } suchen:
+        const lastBrace = text.lastIndexOf('}');
         if (lastBrace > 0) {
-          result = JSON.parse(text.slice(0, lastBrace + 1));
+          try {
+            result = JSON.parse(text.slice(0, lastBrace + 1));
+          } catch {
+            // Fallback: html direkt aus Text extrahieren
+            const htmlMatch = text.match(/"html"\s*:\s*"([\s\S]*?)(?:","|\}$)/);
+            if (htmlMatch) {
+              result = { html: htmlMatch[1], success: true };
+            } else {
+              throw new Error(
+                'Response nicht parsbar. Länge: ' + text.length + ' Zeichen. Preview: ' + text.slice(0, 100)
+              );
+            }
+          }
         } else {
-          throw new Error("Response nicht parsbar: " + text.slice(0, 100));
+          throw new Error(
+            'Leere Response von Edge Function. Länge: ' + text.length
+          );
         }
       }
 

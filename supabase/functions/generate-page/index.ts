@@ -132,8 +132,11 @@ Deno.serve(async (req) => {
     console.log(`[${reqId}] Keyword:`, body?.keyword);
     console.log(`[${reqId}] Prompt wird gebaut...`);
 
-    const prompt = buildPrompt(body);
-    console.log(`[${reqId}] Prompt Länge:`, prompt.length);
+    // Falls customPrompt vom Client kommt → diesen nutzen statt buildPrompt()
+    const prompt = (typeof body.customPrompt === "string" && body.customPrompt.length > 100)
+      ? body.customPrompt
+      : buildPrompt(body);
+    console.log(`[${reqId}] Prompt Länge:`, prompt.length, "custom:", !!body.customPrompt);
 
     // ═══════════════════════════════════════
     // ANTHROPIC STREAMING CALL

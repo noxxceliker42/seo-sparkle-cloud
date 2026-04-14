@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Copy, ArrowLeft, RefreshCw } from "lucide-react";
+import { Check, X, Copy, ArrowLeft, RefreshCw, Monitor, Smartphone } from "lucide-react";
 
 export interface GeneratedPage {
   metaTitle: string;
@@ -48,7 +48,8 @@ function QaCheck({ passed, label }: { passed: boolean; label: string }) {
 }
 
 export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
-  const [tab, setTab] = useState<"html" | "prompt" | "jsonld" | "meta">("html");
+  const [tab, setTab] = useState<"html" | "preview" | "prompt" | "jsonld" | "meta">("html");
+  const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
 
   const qaChecks = useMemo(() => {
     const html = page.htmlOutput.toLowerCase();
@@ -74,6 +75,7 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
 
   const tabs = [
     { id: "html" as const, label: "HTML (vollständig)" },
+    { id: "preview" as const, label: "Vorschau" },
     { id: "prompt" as const, label: "Master-Prompt" },
     { id: "jsonld" as const, label: "JSON-LD Schema" },
     { id: "meta" as const, label: "Meta-Block" },
@@ -116,6 +118,50 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
             <Button variant="outline" onClick={() => handleCopy(page.htmlOutput)} className="min-h-[44px] gap-2">
               <Copy className="h-4 w-4" /> HTML kopieren
             </Button>
+          </>
+        )}
+        {tab === "preview" && (
+          <>
+            <div className="flex gap-2 mb-3">
+              <Button
+                variant={previewMode === "desktop" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setPreviewMode("desktop")}
+                className="gap-2"
+              >
+                <Monitor className="h-4 w-4" /> Desktop
+              </Button>
+              <Button
+                variant={previewMode === "mobile" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setPreviewMode("mobile")}
+                className="gap-2"
+              >
+                <Smartphone className="h-4 w-4" /> Mobile
+              </Button>
+            </div>
+            <div className="rounded-lg border border-border overflow-hidden h-[600px] bg-muted/30">
+              {page.htmlOutput ? (
+                <iframe
+                  srcDoc={page.htmlOutput
+                    .replace(/^```html\s*/i, '')
+                    .replace(/```\s*$/i, '')
+                    .trim()
+                  }
+                  className={`h-full border-none ${
+                    previewMode === "mobile"
+                      ? "w-[375px] mx-auto block"
+                      : "w-full"
+                  }`}
+                  title="SEO-Seite Live-Vorschau"
+                  sandbox="allow-same-origin allow-scripts"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  Seite generieren um Vorschau zu sehen
+                </div>
+              )}
+            </div>
           </>
         )}
         {tab === "prompt" && (

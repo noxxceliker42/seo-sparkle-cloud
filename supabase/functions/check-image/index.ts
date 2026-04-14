@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
 
     // Noch nicht fertig
     return new Response(
-      JSON.stringify({ status: "generating", taskStatus: status }),
+      JSON.stringify({ status: "generating", taskStatus: dataStatus || topStatus || "" }),
       { headers: corsHeaders }
     );
   } catch (err: any) {

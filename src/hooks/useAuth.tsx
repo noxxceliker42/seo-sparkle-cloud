@@ -69,6 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Only reset state on explicit sign-out — TOKEN_REFRESHED with null session must NOT clear auth
+      if (event === "SIGNED_OUT") {
+        setState({ user: null, session: null, profile: null, role: null, loading: false, isAuthenticated: false });
+        return;
+      }
+
       if (session?.user) {
         setState((s) => ({ ...s, user: session.user, session, isAuthenticated: true, loading: true }));
         // Defer Supabase calls to avoid deadlocks
@@ -76,9 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const { profile, role } = await fetchProfileAndRole(session.user.id);
           setState((s) => ({ ...s, profile, role, loading: false }));
         }, 0);
-      } else {
-        setState({ user: null, session: null, profile: null, role: null, loading: false, isAuthenticated: false });
       }
+      // Ignore TOKEN_REFRESHED, INITIAL_SESSION etc. when session is null — no redirect
     });
 
     // Then check existing session

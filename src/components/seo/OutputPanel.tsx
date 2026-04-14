@@ -2,7 +2,10 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Copy, ArrowLeft, RefreshCw, Monitor, Smartphone, ImageIcon, Sparkles, RotateCcw } from "lucide-react";
+import {
+  Check, X, Copy, ArrowLeft, RefreshCw, Monitor, Smartphone,
+  ImageIcon, Sparkles, RotateCcw, ExternalLink, AlertTriangle, Info,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface GeneratedPage {
@@ -10,6 +13,8 @@ export interface GeneratedPage {
   metaDesc: string;
   metaKeywords: string;
   htmlOutput: string;
+  bodyContent: string;
+  cssBlock: string;
   jsonLd: string;
   masterPrompt: string;
   activeSections: string[];
@@ -19,6 +24,9 @@ export interface GeneratedPage {
   phone?: string;
   pageId?: string;
   keyword?: string;
+  tokensUsed?: number;
+  duration?: number;
+  stopReason?: string;
 }
 
 interface OutputPanelProps {
@@ -46,6 +54,8 @@ const SECTION_LABELS: Record<string, string> = {
   "10": "Preise", "11": "Rep-vs-Neukauf", "12": "Qualität", "13": "Marken", "14": "FAQ", "15": "Autor+Kontakt",
 };
 
+type TabId = "html" | "body" | "meta" | "jsonld" | "css" | "prompt" | "preview" | "images";
+
 function copyToClipboard(text: string) {
   navigator.clipboard.writeText(text);
 }
@@ -53,298 +63,230 @@ function copyToClipboard(text: string) {
 function QaCheck({ passed, label }: { passed: boolean; label: string }) {
   return (
     <div className="flex items-center gap-2 text-sm">
-      {passed ? (
-        <Check className="h-4 w-4 text-green-600 shrink-0" />
-      ) : (
-        <X className="h-4 w-4 text-red-500 shrink-0" />
-      )}
+      {passed ? <Check className="h-4 w-4 text-green-600 shrink-0" /> : <X className="h-4 w-4 text-red-500 shrink-0" />}
       <span className={passed ? "text-foreground" : "text-red-600 font-medium"}>{label}</span>
     </div>
   );
 }
 
+function InfoBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-300">
+      <Info className="h-4 w-4 shrink-0 mt-0.5" />
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        copyToClipboard(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      className="gap-1.5 text-xs min-h-[36px]"
+    >
+      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? "Kopiert!" : label}
+    </Button>
+  );
+}
+
+function CharCounter({ current, max, optimal }: { current: number; max: number; optimal?: [number, number] }) {
+  let color = "text-green-600";
+  if (current > max) color = "text-red-600";
+  else if (optimal && (current < optimal[0] || current > optimal[1])) color = "text-amber-600";
+  return <span className={`text-xs font-bold ${color}`}>{current}/{max}</span>;
+}
+
 export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
-  const [tab, setTab] = useState<"html" | "preview" | "images" | "prompt" | "jsonld" | "meta">("html");
+  const [tab, setTab] = useState<TabId>("html");
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [imageSlots, setImageSlots] = useState<ImageSlot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsAnalyzed, setSlotsAnalyzed] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const slotPollRefs = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
-  // Analyze image slots when switching to images tab
+  const htmlComplete = page.htmlOutput.trim().endsWith("</html>");
+
+  // --- Image slot logic (kept from original) ---
   useEffect(() => {
     if (tab !== "images" || slotsAnalyzed || !page.pageId || !page.htmlOutput) return;
-
     async function analyzeSlots() {
       setSlotsLoading(true);
       try {
-        // First check if slots already exist in DB
         const { data: existing } = await supabase
           .from("page_images")
           .select("id, slot, slot_label, nano_prompt, alt_text, width, height, nano_status, cloudinary_url, nano_url")
           .eq("page_id", page.pageId!);
-
         if (existing && existing.length > 0) {
           setImageSlots(existing.map((r: any) => ({
-            id: r.id,
-            slot: r.slot,
-            slotLabel: r.slot_label || r.slot,
-            prompt: r.nano_prompt || "",
-            altText: r.alt_text || "",
-            width: r.width || 800,
-            height: r.height || 450,
+            id: r.id, slot: r.slot, slotLabel: r.slot_label || r.slot,
+            prompt: r.nano_prompt || "", altText: r.alt_text || "",
+            width: r.width || 800, height: r.height || 450,
             status: r.nano_status || "pending",
-            cloudinaryUrl: r.cloudinary_url,
-            nanoUrl: r.nano_url,
+            cloudinaryUrl: r.cloudinary_url, nanoUrl: r.nano_url,
           })));
-          setSlotsAnalyzed(true);
-          setSlotsLoading(false);
-          return;
+          setSlotsAnalyzed(true); setSlotsLoading(false); return;
         }
-
-        // Analyze HTML for slots
         const { data, error } = await supabase.functions.invoke("analyze-image-slots", {
-          body: {
-            pageId: page.pageId,
-            html: page.htmlOutput,
-            keyword: page.keyword || "",
-            firm: page.firmName || "",
-            city: page.city || "",
-          },
+          body: { pageId: page.pageId, html: page.htmlOutput, keyword: page.keyword || "", firm: page.firmName || "", city: page.city || "" },
         });
-
-        if (error) {
-          console.error("analyze-image-slots error:", error);
-        } else if (data?.slots) {
-          setImageSlots(data.slots);
-        }
+        if (!error && data?.slots) setImageSlots(data.slots);
         setSlotsAnalyzed(true);
-      } catch (err) {
-        console.error("Slot analysis error:", err);
-      }
+      } catch (err) { console.error("Slot analysis error:", err); }
       setSlotsLoading(false);
     }
-
     analyzeSlots();
   }, [tab, slotsAnalyzed, page.pageId, page.htmlOutput, page.keyword, page.firmName, page.city]);
 
-  // Poll for generating images
   useEffect(() => {
     const generating = imageSlots.filter((s) => s.status === "generating");
     if (generating.length === 0) {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
+      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
       return;
     }
-
     pollingRef.current = setInterval(async () => {
       for (const slot of generating) {
-        const { data } = await supabase
-          .from("page_images")
-          .select("nano_status, cloudinary_url, nano_url, alt_text")
-          .eq("id", slot.id)
-          .single();
-
+        const { data } = await supabase.from("page_images")
+          .select("nano_status, cloudinary_url, nano_url, alt_text").eq("id", slot.id).single();
         if (!data) continue;
-
-        if (data.nano_status === "uploaded" || data.nano_status === "completed" || data.nano_status === "failed") {
-          setImageSlots((prev) =>
-            prev.map((s) =>
-              s.id === slot.id
-                ? {
-                    ...s,
-                    status: data.nano_status!,
-                    cloudinaryUrl: data.cloudinary_url || undefined,
-                    nanoUrl: data.nano_url || undefined,
-                    altText: data.alt_text || s.altText,
-                  }
-                : s
-            )
-          );
+        if (["uploaded", "completed", "failed"].includes(data.nano_status!)) {
+          setImageSlots((prev) => prev.map((s) => s.id === slot.id ? {
+            ...s, status: data.nano_status!, cloudinaryUrl: data.cloudinary_url || undefined,
+            nanoUrl: data.nano_url || undefined, altText: data.alt_text || s.altText,
+          } : s));
         }
       }
     }, 3000);
-
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, [imageSlots]);
 
-  // Track polling intervals per slot
-  const slotPollRefs = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  useEffect(() => { return () => { Object.values(slotPollRefs.current).forEach(clearInterval); }; }, []);
 
   const generateImage = useCallback(async (slotId: string) => {
     const slot = imageSlots.find((s) => s.id === slotId);
     if (!slot) return;
-
-    setImageSlots((prev) =>
-      prev.map((s) => (s.id === slotId ? { ...s, status: "generating" } : s))
-    );
-
+    setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "generating" } : s)));
     try {
       const user = (await supabase.auth.getUser()).data.user;
-
-      // Step 1: Start task (returns immediately)
       const { data, error } = await supabase.functions.invoke("start-image", {
-        body: {
-          prompt: slot.prompt,
-          pageId: page.pageId || null,
-          slot: slot.slot,
-          userId: user?.id,
-        },
+        body: { prompt: slot.prompt, pageId: page.pageId || null, slot: slot.slot, userId: user?.id },
       });
-
       if (error || data?.error) {
-        console.error("start-image error:", error || data?.error);
-        setImageSlots((prev) =>
-          prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s))
-        );
+        setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s)));
         return;
       }
-
-      // Immediate completion (sync response)
       if (data.status === "completed" && data.imageUrl) {
-        setImageSlots((prev) =>
-          prev.map((s) =>
-            s.id === slotId ? { ...s, status: "completed", nanoUrl: data.imageUrl } : s
-          )
-        );
-        // Update page_images record too
-        await supabase.from("page_images").update({
-          nano_url: data.imageUrl,
-          nano_status: "completed",
-        }).eq("id", slotId);
+        setImageSlots((prev) => prev.map((s) => s.id === slotId ? { ...s, status: "completed", nanoUrl: data.imageUrl } : s));
+        await supabase.from("page_images").update({ nano_url: data.imageUrl, nano_status: "completed" }).eq("id", slotId);
         return;
       }
-
-      // Step 2: Start polling with check-image
-      const jobId = data.jobId;
-      const taskId = data.taskId;
-      let attempts = 0;
-
-      // Clear any existing poll for this slot
-      if (slotPollRefs.current[slotId]) {
-        clearInterval(slotPollRefs.current[slotId]);
-      }
-
+      const jobId = data.jobId; const taskId = data.taskId; let attempts = 0;
+      if (slotPollRefs.current[slotId]) clearInterval(slotPollRefs.current[slotId]);
       slotPollRefs.current[slotId] = setInterval(async () => {
         attempts++;
         if (attempts > 20) {
-          clearInterval(slotPollRefs.current[slotId]);
-          delete slotPollRefs.current[slotId];
-          setImageSlots((prev) =>
-            prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s))
-          );
+          clearInterval(slotPollRefs.current[slotId]); delete slotPollRefs.current[slotId];
+          setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s)));
           return;
         }
-
         try {
-          const { data: checkData } = await supabase.functions.invoke("check-image", {
-            body: { jobId, taskId },
-          });
-
+          const { data: checkData } = await supabase.functions.invoke("check-image", { body: { jobId, taskId } });
           if (checkData?.status === "completed" && checkData?.imageUrl) {
-            clearInterval(slotPollRefs.current[slotId]);
-            delete slotPollRefs.current[slotId];
-            setImageSlots((prev) =>
-              prev.map((s) =>
-                s.id === slotId
-                  ? { ...s, status: "completed", nanoUrl: checkData.imageUrl }
-                  : s
-              )
-            );
-            // Update page_images
-            await supabase.from("page_images").update({
-              nano_url: checkData.imageUrl,
-              nano_status: "completed",
-            }).eq("id", slotId);
+            clearInterval(slotPollRefs.current[slotId]); delete slotPollRefs.current[slotId];
+            setImageSlots((prev) => prev.map((s) => s.id === slotId ? { ...s, status: "completed", nanoUrl: checkData.imageUrl } : s));
+            await supabase.from("page_images").update({ nano_url: checkData.imageUrl, nano_status: "completed" }).eq("id", slotId);
           }
-
           if (checkData?.status === "failed") {
-            clearInterval(slotPollRefs.current[slotId]);
-            delete slotPollRefs.current[slotId];
-            setImageSlots((prev) =>
-              prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s))
-            );
+            clearInterval(slotPollRefs.current[slotId]); delete slotPollRefs.current[slotId];
+            setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s)));
           }
-        } catch (pollErr) {
-          console.error("check-image poll error:", pollErr);
-        }
+        } catch {}
       }, 3000);
-    } catch (err) {
-      console.error("Image generation error:", err);
-      setImageSlots((prev) =>
-        prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s))
-      );
+    } catch {
+      setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s)));
     }
   }, [imageSlots, page.pageId]);
 
-  // Cleanup all slot polls on unmount
-  useEffect(() => {
-    return () => {
-      Object.values(slotPollRefs.current).forEach(clearInterval);
-    };
-  }, []);
-
   const updateSlotPrompt = useCallback(async (slotId: string, prompt: string) => {
-    setImageSlots((prev) =>
-      prev.map((s) => (s.id === slotId ? { ...s, prompt } : s))
-    );
+    setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, prompt } : s)));
     await supabase.from("page_images").update({ nano_prompt: prompt }).eq("id", slotId);
   }, []);
 
   const updateSlotAlt = useCallback(async (slotId: string, altText: string) => {
-    setImageSlots((prev) =>
-      prev.map((s) => (s.id === slotId ? { ...s, altText } : s))
-    );
+    setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, altText } : s)));
     await supabase.from("page_images").update({ alt_text: altText }).eq("id", slotId);
   }, []);
 
+  // --- QA checks ---
   const qaChecks = useMemo(() => {
     const html = page.htmlOutput.toLowerCase();
     const sectionsPresent = page.activeSections.every((id) => {
       const label = SECTION_LABELS[id]?.toLowerCase() || "";
-      return html.includes(`section`) || html.includes(label) || html.includes(`id="${id}"`) || html.includes(`id="section-${id}"`);
+      return html.includes("section") || html.includes(label) || html.includes(`id="${id}"`) || html.includes(`id="section-${id}"`);
     });
     const imagesHaveSize = !html.includes("<img") || (html.includes("width=") && html.includes("height="));
     const hasJsonLd = html.includes("application/ld+json") || page.jsonLd.length > 10;
     const napConsistent = (() => {
       if (!page.firmName) return true;
-      const combined = html + page.jsonLd.toLowerCase();
-      return combined.includes(page.firmName.toLowerCase());
+      return (html + page.jsonLd.toLowerCase()).includes(page.firmName.toLowerCase());
     })();
-    const hasMaxImagePreview = html.includes("max-image-preview") || html.includes("max-image-preview:large");
-    return { sectionsPresent, imagesHaveSize, hasJsonLd, napConsistent, hasMaxImagePreview };
-  }, [page]);
+    const hasMaxImagePreview = html.includes("max-image-preview");
+    const bodyExtracted = (page.bodyContent?.length || 0) > 50;
+    const titleOk = page.metaTitle.length > 0 && page.metaTitle.length <= 60;
+    const descOk = page.metaDesc.length >= 140 && page.metaDesc.length <= 155;
+    return { sectionsPresent, htmlComplete, imagesHaveSize, hasJsonLd, napConsistent, hasMaxImagePreview, bodyExtracted, titleOk, descOk };
+  }, [page, htmlComplete]);
 
-  const handleCopy = useCallback((content: string) => {
-    copyToClipboard(content);
-  }, []);
-
-  const tabs = [
-    { id: "html" as const, label: "HTML (vollständig)" },
-    { id: "preview" as const, label: "Vorschau" },
-    { id: "images" as const, label: "🖼 Bilder" },
-    { id: "prompt" as const, label: "Master-Prompt" },
-    { id: "jsonld" as const, label: "JSON-LD Schema" },
-    { id: "meta" as const, label: "Meta-Block" },
+  const tabs: { id: TabId; label: string }[] = [
+    { id: "html", label: "HTML (vollständig)" },
+    { id: "body", label: "Body-Content" },
+    { id: "meta", label: "Meta-Block" },
+    { id: "jsonld", label: "JSON-LD Schema" },
+    { id: "css", label: "CSS / Styles" },
+    { id: "prompt", label: "Master-Prompt" },
+    { id: "preview", label: "Vorschau" },
+    { id: "images", label: "🖼 Bilder" },
   ];
 
-  const metaBlock = `Title: ${page.metaTitle}\nDescription: ${page.metaDesc}\nKeywords: ${page.metaKeywords}`;
-
   const generatingCount = imageSlots.filter((s) => s.status === "generating").length;
-  const uploadedCount = imageSlots.filter((s) => s.status === "uploaded" || s.status === "completed").length;
+  const uploadedCount = imageSlots.filter((s) => ["uploaded", "completed"].includes(s.status)).length;
+
+  const openInNewTab = () => {
+    const blob = new Blob([page.htmlOutput], { type: "text/html" });
+    window.open(URL.createObjectURL(blob), "_blank");
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
-          <ArrowLeft className="h-4 w-4" />
-          Zurück
-        </Button>
-        <h2 className="text-lg font-bold text-foreground">Output — Generierte SEO-Seite</h2>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
+            <ArrowLeft className="h-4 w-4" /> Zurück
+          </Button>
+          <h2 className="text-lg font-bold text-foreground">Output — Generierte SEO-Seite</h2>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span>64.000 Tokens verfügbar</span>
+          <span className="text-foreground font-bold">·</span>
+          {page.tokensUsed ? (
+            <Badge variant="secondary" className="text-xs">{page.tokensUsed.toLocaleString()} genutzt</Badge>
+          ) : null}
+          {page.duration ? (
+            <Badge variant="outline" className="text-xs">{page.duration} Sek</Badge>
+          ) : null}
+          {page.stopReason && page.stopReason !== "end_turn" ? (
+            <Badge variant="destructive" className="text-xs">Stop: {page.stopReason}</Badge>
+          ) : null}
+        </div>
       </div>
 
       {/* Tab navigation */}
@@ -354,16 +296,12 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${
-              tab === t.id
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+              tab === t.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             {t.label}
             {t.id === "images" && imageSlots.length > 0 && (
-              <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 py-0">
-                {uploadedCount}/{imageSlots.length}
-              </Badge>
+              <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 py-0">{uploadedCount}/{imageSlots.length}</Badge>
             )}
           </button>
         ))}
@@ -371,44 +309,166 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
 
       {/* Tab content */}
       <div className="space-y-3">
+        {/* TAB 1: HTML */}
         {tab === "html" && (
           <>
+            {!htmlComplete && (
+              <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                ⚠ HTML möglicherweise unvollständig — endet nicht mit &lt;/html&gt;
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <CopyButton text={page.htmlOutput} label="HTML kopieren" />
+              {page.tokensUsed ? <Badge variant="secondary">{page.tokensUsed.toLocaleString()} Tokens</Badge> : null}
+              {page.duration ? <Badge variant="outline">{page.duration} Sek</Badge> : null}
+            </div>
             <Textarea readOnly value={page.htmlOutput} className="min-h-[400px] font-mono text-xs" />
-            <Button variant="outline" onClick={() => handleCopy(page.htmlOutput)} className="min-h-[44px] gap-2">
-              <Copy className="h-4 w-4" /> HTML kopieren
-            </Button>
           </>
         )}
+
+        {/* TAB 2: Body-Content */}
+        {tab === "body" && (
+          <>
+            <InfoBox>
+              Direkt in CMS-Artikelbereich einfügen. Kein &lt;html&gt;, &lt;head&gt; oder &lt;body&gt; nötig.
+            </InfoBox>
+            <CopyButton text={page.bodyContent || ""} label="Body kopieren" />
+            <Textarea readOnly value={page.bodyContent || ""} className="min-h-[400px] font-mono text-xs" />
+          </>
+        )}
+
+        {/* TAB 3: Meta-Block */}
+        {tab === "meta" && (
+          <div className="space-y-4">
+            {/* SEO-Titel */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">SEO-Titel</label>
+                <CharCounter current={page.metaTitle.length} max={60} />
+              </div>
+              <div className="flex items-center gap-2">
+                <input readOnly value={page.metaTitle} className="flex-1 px-3 py-2 rounded-md border border-input bg-background text-sm font-mono" />
+                <CopyButton text={page.metaTitle} label="Kopieren" />
+              </div>
+            </div>
+
+            {/* Meta-Description */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Meta-Description</label>
+                <CharCounter current={page.metaDesc.length} max={155} optimal={[140, 155]} />
+              </div>
+              <div className="flex items-center gap-2">
+                <Textarea readOnly value={page.metaDesc} className="flex-1 min-h-[60px] font-mono text-sm" />
+                <CopyButton text={page.metaDesc} label="Kopieren" />
+              </div>
+            </div>
+
+            {/* Keywords */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Keywords</label>
+              <div className="flex items-center gap-2">
+                <input readOnly value={page.metaKeywords} className="flex-1 px-3 py-2 rounded-md border border-input bg-background text-sm font-mono" />
+                <CopyButton text={page.metaKeywords} label="Kopieren" />
+              </div>
+            </div>
+
+            {/* SERP-Vorschau */}
+            <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+              <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">SERP-Vorschau</h4>
+              <p className="text-[13px] text-green-700 dark:text-green-400 truncate">
+                {page.firmName ? `${page.firmName.toLowerCase().replace(/\s+/g, "-")}.de` : "example.de"} › {page.keyword?.toLowerCase().replace(/\s+/g, "-") || "seite"}
+              </p>
+              <p className={`text-lg font-medium leading-snug ${page.metaTitle.length > 60 ? "text-red-600" : "text-blue-700 dark:text-blue-400"}`}>
+                {page.metaTitle || "Kein Title vorhanden"}
+              </p>
+              <p className={`text-sm mt-0.5 ${page.metaDesc.length > 155 ? "text-red-600" : "text-muted-foreground"}`}>
+                {page.metaDesc || "Keine Description vorhanden"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: JSON-LD Schema */}
+        {tab === "jsonld" && (
+          <>
+            {!page.jsonLd ? (
+              <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300">
+                <AlertTriangle className="h-4 w-4 shrink-0" /> JSON-LD nicht generiert
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <CopyButton text={page.jsonLd} label="Schema kopieren" />
+                  <Button
+                    variant="outline" size="sm" className="gap-1.5 text-xs min-h-[36px]"
+                    onClick={() => window.open("https://validator.schema.org/", "_blank")}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" /> Schema validieren
+                  </Button>
+                </div>
+                <InfoBox>Diesen Block in den &lt;head&gt; der Seite einfügen.</InfoBox>
+                <Textarea readOnly value={page.jsonLd} className="min-h-[300px] font-mono text-xs" />
+              </>
+            )}
+          </>
+        )}
+
+        {/* TAB 5: CSS / Styles */}
+        {tab === "css" && (
+          <>
+            <InfoBox>Für externe Stylesheets oder CMS-eigene CSS-Verwaltung.</InfoBox>
+            {page.cssBlock ? (
+              <>
+                <CopyButton text={page.cssBlock} label="CSS kopieren" />
+                <Textarea readOnly value={page.cssBlock} className="min-h-[300px] font-mono text-xs" />
+              </>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground text-sm">
+                Kein separater CSS-Block extrahiert — CSS ist inline im HTML.
+              </div>
+            )}
+          </>
+        )}
+
+        {/* TAB 6: Master-Prompt */}
+        {tab === "prompt" && (
+          <>
+            {page.masterPrompt ? (
+              <>
+                <InfoBox>Der exakte Prompt der für diese Seite genutzt wurde.</InfoBox>
+                <CopyButton text={page.masterPrompt} label="Prompt kopieren" />
+                <Textarea readOnly value={page.masterPrompt} className="min-h-[400px] font-mono text-xs" />
+              </>
+            ) : (
+              <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300">
+                <AlertTriangle className="h-4 w-4 shrink-0" /> Prompt nicht gespeichert
+              </div>
+            )}
+          </>
+        )}
+
+        {/* TAB 7: Vorschau */}
         {tab === "preview" && (
           <>
-            <div className="flex gap-2 mb-3">
-              <Button
-                variant={previewMode === "desktop" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setPreviewMode("desktop")}
-                className="gap-2"
-              >
+            <div className="flex items-center gap-2 mb-3">
+              <Button variant={previewMode === "desktop" ? "default" : "outline"} size="sm" onClick={() => setPreviewMode("desktop")} className="gap-2">
                 <Monitor className="h-4 w-4" /> Desktop
               </Button>
-              <Button
-                variant={previewMode === "mobile" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setPreviewMode("mobile")}
-                className="gap-2"
-              >
+              <Button variant={previewMode === "mobile" ? "default" : "outline"} size="sm" onClick={() => setPreviewMode("mobile")} className="gap-2">
                 <Smartphone className="h-4 w-4" /> Mobile
               </Button>
+              <Button variant="outline" size="sm" onClick={openInNewTab} className="gap-2 ml-auto">
+                <ExternalLink className="h-4 w-4" /> In neuem Tab öffnen
+              </Button>
             </div>
+            <InfoBox>Externe Bilder/Fonts nicht geladen in Vorschau.</InfoBox>
             <div className="rounded-lg border border-border overflow-hidden h-[600px] bg-muted/30">
               {page.htmlOutput ? (
                 <iframe
-                  srcDoc={page.htmlOutput
-                    .replace(/^```html\s*/i, "")
-                    .replace(/```\s*$/i, "")
-                    .trim()}
-                  className={`h-full border-none ${
-                    previewMode === "mobile" ? "w-[375px] mx-auto block" : "w-full"
-                  }`}
+                  srcDoc={page.htmlOutput.replace(/^```html\s*/i, "").replace(/```\s*$/i, "").trim()}
+                  className={`h-full border-none ${previewMode === "mobile" ? "w-[375px] mx-auto block" : "w-full"}`}
                   title="SEO-Seite Live-Vorschau"
                   sandbox="allow-same-origin allow-scripts"
                 />
@@ -420,6 +480,8 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
             </div>
           </>
         )}
+
+        {/* TAB 8: Images */}
         {tab === "images" && (
           <div className="space-y-4">
             {slotsLoading && (
@@ -428,7 +490,6 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
                 HTML wird nach Bild-Slots analysiert...
               </div>
             )}
-
             {!slotsLoading && imageSlots.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
                 <ImageIcon className="h-10 w-10 mx-auto mb-3 opacity-40" />
@@ -438,167 +499,58 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
                 </p>
               </div>
             )}
-
             {generatingCount > 0 && (
               <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium">
                 <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
-                {generatingCount} {generatingCount === 1 ? "Bild wird" : "Bilder werden"} generiert... (ca. 15–30 Sek pro Bild)
+                {generatingCount} {generatingCount === 1 ? "Bild wird" : "Bilder werden"} generiert...
               </div>
             )}
-
             {imageSlots.map((slot) => (
-              <div
-                key={slot.id}
-                className={`rounded-xl border p-4 space-y-3 ${
-                  slot.status === "uploaded" || slot.status === "completed"
-                    ? "border-green-200 bg-green-50/50"
-                    : slot.status === "failed"
-                    ? "border-red-200 bg-red-50/50"
-                    : "border-border bg-card"
-                }`}
-              >
-                {/* Header */}
+              <div key={slot.id} className={`rounded-xl border p-4 space-y-3 ${
+                ["uploaded", "completed"].includes(slot.status) ? "border-green-200 bg-green-50/50"
+                : slot.status === "failed" ? "border-red-200 bg-red-50/50" : "border-border bg-card"
+              }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-foreground">{slot.slotLabel}</span>
-                    <Badge
-                      variant={
-                        slot.status === "uploaded" || slot.status === "completed"
-                          ? "default"
-                          : slot.status === "generating"
-                          ? "secondary"
-                          : slot.status === "failed"
-                          ? "destructive"
-                          : "outline"
-                      }
-                      className="text-[10px]"
-                    >
-                      {slot.status === "uploaded" || slot.status === "completed"
-                        ? "✓ Fertig"
-                        : slot.status === "generating"
-                        ? "⏳ Generiert..."
-                        : slot.status === "failed"
-                        ? "✗ Fehler"
-                        : "● Bereit"}
+                    <Badge variant={["uploaded","completed"].includes(slot.status) ? "default" : slot.status === "generating" ? "secondary" : slot.status === "failed" ? "destructive" : "outline"} className="text-[10px]">
+                      {["uploaded","completed"].includes(slot.status) ? "✓ Fertig" : slot.status === "generating" ? "⏳ Generiert..." : slot.status === "failed" ? "✗ Fehler" : "● Bereit"}
                     </Badge>
                   </div>
                   {slot.status !== "generating" && (
-                    <div className="flex gap-2">
-                      {slot.status !== "uploaded" && slot.status !== "completed" && (
-                        <Button
-                          size="sm"
-                          onClick={() => generateImage(slot.id)}
-                          className="gap-1.5 text-xs"
-                        >
-                          <Sparkles className="h-3.5 w-3.5" />
-                          Generieren
-                        </Button>
-                      )}
-                      {(slot.status === "uploaded" || slot.status === "completed") && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => generateImage(slot.id)}
-                          className="gap-1.5 text-xs"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          Neu
-                        </Button>
-                      )}
-                    </div>
+                    <Button size="sm" variant={["uploaded","completed"].includes(slot.status) ? "outline" : "default"} onClick={() => generateImage(slot.id)} className="gap-1.5 text-xs">
+                      {["uploaded","completed"].includes(slot.status) ? <RotateCcw className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      {["uploaded","completed"].includes(slot.status) ? "Neu" : "Generieren"}
+                    </Button>
                   )}
                 </div>
-
-                {/* Image preview */}
                 {(slot.cloudinaryUrl || slot.nanoUrl) && (
-                  <img
-                    src={slot.cloudinaryUrl || slot.nanoUrl}
-                    alt={slot.altText}
-                    className="w-full max-h-[200px] object-cover rounded-lg border border-border"
-                  />
+                  <img src={slot.cloudinaryUrl || slot.nanoUrl} alt={slot.altText} className="w-full max-h-[200px] object-cover rounded-lg border border-border" />
                 )}
-
-                {/* Generating indicator */}
                 {slot.status === "generating" && (
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
-                    <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
-                    NanoBanana generiert Bild... (ca. 15–30 Sek)
+                    <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" /> NanoBanana generiert Bild...
                   </div>
                 )}
-
-                {/* Prompt (editable) */}
                 <div>
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1 block">
-                    Bildprompt (bearbeitbar)
-                  </label>
-                  <Textarea
-                    value={slot.prompt}
-                    onChange={(e) => updateSlotPrompt(slot.id, e.target.value)}
-                    className="min-h-[60px] font-mono text-xs bg-muted/30"
-                  />
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1 block">Bildprompt (bearbeitbar)</label>
+                  <Textarea value={slot.prompt} onChange={(e) => updateSlotPrompt(slot.id, e.target.value)} className="min-h-[60px] font-mono text-xs bg-muted/30" />
                 </div>
-
-                {/* Alt text (editable) */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
-                      Alt-Text (SEO-kritisch)
-                    </label>
-                    <span
-                      className={`text-[10px] font-bold ${
-                        (slot.altText?.length || 0) > 125 ? "text-red-600" : "text-green-600"
-                      }`}
-                    >
-                      {slot.altText?.length || 0}/125
-                    </span>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Alt-Text</label>
+                    <span className={`text-[10px] font-bold ${(slot.altText?.length || 0) > 125 ? "text-red-600" : "text-green-600"}`}>{slot.altText?.length || 0}/125</span>
                   </div>
-                  <input
-                    type="text"
-                    value={slot.altText}
-                    onChange={(e) => updateSlotAlt(slot.id, e.target.value)}
-                    className="w-full px-3 py-2 rounded-md border border-input bg-background text-xs"
-                  />
+                  <input type="text" value={slot.altText} onChange={(e) => updateSlotAlt(slot.id, e.target.value)} className="w-full px-3 py-2 rounded-md border border-input bg-background text-xs" />
                 </div>
               </div>
             ))}
-
             {imageSlots.length > 0 && imageSlots.some((s) => s.status === "pending") && (
-              <Button
-                onClick={() => {
-                  const pending = imageSlots.filter((s) => s.status === "pending");
-                  pending.forEach((s) => generateImage(s.id));
-                }}
-                className="w-full min-h-[44px] gap-2"
-              >
-                <Sparkles className="h-4 w-4" />
-                Alle Bilder generieren ({imageSlots.filter((s) => s.status === "pending").length})
+              <Button onClick={() => imageSlots.filter((s) => s.status === "pending").forEach((s) => generateImage(s.id))} className="w-full min-h-[44px] gap-2">
+                <Sparkles className="h-4 w-4" /> Alle Bilder generieren ({imageSlots.filter((s) => s.status === "pending").length})
               </Button>
             )}
           </div>
-        )}
-        {tab === "prompt" && (
-          <>
-            <Textarea readOnly value={page.masterPrompt} className="min-h-[400px] font-mono text-xs" />
-            <Button variant="outline" onClick={() => handleCopy(page.masterPrompt)} className="min-h-[44px] gap-2">
-              <Copy className="h-4 w-4" /> Prompt kopieren
-            </Button>
-          </>
-        )}
-        {tab === "jsonld" && (
-          <>
-            <Textarea readOnly value={page.jsonLd} className="min-h-[300px] font-mono text-xs" />
-            <Button variant="outline" onClick={() => handleCopy(page.jsonLd)} className="min-h-[44px] gap-2">
-              <Copy className="h-4 w-4" /> Schema kopieren
-            </Button>
-          </>
-        )}
-        {tab === "meta" && (
-          <>
-            <Textarea readOnly value={metaBlock} className="min-h-[120px] font-mono text-sm" />
-            <Button variant="outline" onClick={() => handleCopy(metaBlock)} className="min-h-[44px] gap-2">
-              <Copy className="h-4 w-4" /> Meta kopieren
-            </Button>
-          </>
         )}
       </div>
 
@@ -606,45 +558,20 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
         <h3 className="text-sm font-bold text-foreground">Post-QA Check</h3>
         <QaCheck passed={qaChecks.sectionsPresent} label="HTML enthält alle aktiven Sektionen" />
+        <QaCheck passed={qaChecks.htmlComplete} label="HTML vollständig (endet mit </html>)" />
         <QaCheck passed={qaChecks.imagesHaveSize} label="Alle Bild-Platzhalter mit width+height" />
         <QaCheck passed={qaChecks.hasJsonLd} label="JSON-LD vorhanden" />
         <QaCheck passed={qaChecks.napConsistent} label="NAP im HTML identisch mit Schema" />
         <QaCheck passed={qaChecks.hasMaxImagePreview} label="HTML hat meta max-image-preview:large" />
-      </div>
-
-      {/* SERP Preview */}
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <h3 className="text-sm font-bold text-foreground">Live SERP-Vorschau</h3>
-        <div className="rounded-md border border-border bg-background p-4 max-w-xl">
-          <p className="text-[13px] text-green-700 truncate">
-            {page.firmName ? `${page.firmName.toLowerCase().replace(/\s+/g, "-")}.de` : "example.de"} › ...
-          </p>
-          <p className={`text-lg font-medium leading-snug ${page.metaTitle.length > 60 ? "text-red-600" : "text-blue-700"}`}>
-            {page.metaTitle || "Kein Title vorhanden"}
-          </p>
-          <p className={`text-sm mt-1 ${page.metaDesc.length > 155 ? "text-red-600" : "text-muted-foreground"}`}>
-            {page.metaDesc || "Keine Description vorhanden"}
-          </p>
-        </div>
-        <div className="flex gap-4 text-xs text-muted-foreground">
-          <span>
-            Title: <span className={page.metaTitle.length > 60 ? "text-red-600 font-bold" : "text-green-600 font-bold"}>
-              {page.metaTitle.length}/60
-            </span>
-          </span>
-          <span>
-            Desc: <span className={page.metaDesc.length > 155 ? "text-red-600 font-bold" : "text-green-600 font-bold"}>
-              {page.metaDesc.length}/155
-            </span>
-          </span>
-        </div>
+        <QaCheck passed={qaChecks.bodyExtracted} label="Body-Content extrahiert" />
+        <QaCheck passed={qaChecks.titleOk} label="Meta-Title unter 60 Zeichen" />
+        <QaCheck passed={qaChecks.descOk} label="Meta-Desc 140–155 Zeichen" />
       </div>
 
       {/* Actions */}
       <div className="flex gap-3">
         <Button onClick={onNewPage} className="min-h-[44px] gap-2">
-          <RefreshCw className="h-4 w-4" />
-          Neue Seite generieren
+          <RefreshCw className="h-4 w-4" /> Neue Seite generieren
         </Button>
       </div>
     </div>

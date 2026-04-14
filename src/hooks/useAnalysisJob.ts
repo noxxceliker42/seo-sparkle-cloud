@@ -9,40 +9,54 @@ interface JobResult {
   rawJson?: string;
 }
 
-interface AnalysisJob {
-  id: string;
-  keyword: string;
-  status: string;
-  mode: string;
-  result_json: JobResult | null;
-  error_message: string | null;
-}
-
 const STORAGE_KEY_JOB = "seo_active_job";
 const STORAGE_KEY_KW = "seo_active_keyword";
+const STORAGE_KEY_STARTED = "seo_analysis_started";
+const MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
 
 export function useAnalysisJob() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [resumedResult, setResumedResult] = useState<JobResult | null>(null);
   const [resumedKeyword, setResumedKeyword] = useState<string | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const clearJob = useCallback(() => {
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isPollingRef = useRef(false);
+  const activeJobIdRef = useRef<string | null>(null);
+  const onCompleteRef = useRef<((result: JobResult) => void) | null>(null);
+  const onErrorRef = useRef<((msg: string) => void) | null>(null);
+
+  const stopPolling = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    setActiveJobId(null);
+    isPollingRef.current = false;
     setIsPolling(false);
+  }, []);
+
+  const clearJob = useCallback(() => {
+    stopPolling();
+    setActiveJobId(null);
+    activeJobIdRef.current = null;
     try {
       localStorage.removeItem(STORAGE_KEY_JOB);
       localStorage.removeItem(STORAGE_KEY_KW);
+      localStorage.removeItem(STORAGE_KEY_STARTED);
     } catch { /* SSR or private browsing */ }
-  }, []);
+  }, [stopPolling]);
 
-  const startPolling = useCallback((jobId: string, onComplete: (result: JobResult) => void, onError: (msg: string) => void) => {
+  const startPolling = useCallback((
+    jobId: string,
+    onComplete: (result: JobResult) => void,
+    onError: (msg: string) => void,
+  ) => {
+    // Prevent duplicate polling
     if (intervalRef.current) clearInterval(intervalRef.current);
+
+    onCompleteRef.current = onComplete;
+    onErrorRef.current = onError;
+    isPollingRef.current = true;
     setIsPolling(true);
 
     intervalRef.current = setInterval(async () => {
@@ -56,33 +70,21 @@ export function useAnalysisJob() {
         if (error || !data) return;
 
         if (data.status === "completed" && data.result_json) {
-          clearInterval(intervalRef.current!);
-          intervalRef.current = null;
-          setIsPolling(false);
-          setActiveJobId(null);
-          try {
-            localStorage.removeItem(STORAGE_KEY_JOB);
-            localStorage.removeItem(STORAGE_KEY_KW);
-          } catch { /* ignore */ }
-          onComplete(data.result_json as JobResult);
+          clearJob();
+          onCompleteRef.current?.(data.result_json as JobResult);
+          toast.success("Analyse abgeschlossen");
         }
 
         if (data.status === "error") {
-          clearInterval(intervalRef.current!);
-          intervalRef.current = null;
-          setIsPolling(false);
-          setActiveJobId(null);
-          try {
-            localStorage.removeItem(STORAGE_KEY_JOB);
-            localStorage.removeItem(STORAGE_KEY_KW);
-          } catch { /* ignore */ }
-          onError(data.error_message || "Analyse fehlgeschlagen");
+          clearJob();
+          onErrorRef.current?.(data.error_message || "Analyse fehlgeschlagen");
+          toast.error(data.error_message || "Analyse fehlgeschlagen");
         }
       } catch {
         // Network error during poll — continue polling
       }
-    }, 2000);
-  }, []);
+    }, 2500);
+  }, [clearJob]);
 
   const createJob = useCallback(async (keyword: string, mode: string): Promise<string | null> => {
     try {
@@ -107,9 +109,11 @@ export function useAnalysisJob() {
 
       const jobId = data.id;
       setActiveJobId(jobId);
+      activeJobIdRef.current = jobId;
       try {
         localStorage.setItem(STORAGE_KEY_JOB, jobId);
         localStorage.setItem(STORAGE_KEY_KW, keyword);
+        localStorage.setItem(STORAGE_KEY_STARTED, Date.now().toString());
       } catch { /* ignore */ }
 
       return jobId;
@@ -121,8 +125,7 @@ export function useAnalysisJob() {
 
   const completeJob = useCallback(async (jobId: string, result: JobResult) => {
     try {
-      await (supabase
-        .from("analysis_jobs") as any)
+      await (supabase.from("analysis_jobs") as any)
         .update({
           status: "completed",
           result_json: result,
@@ -151,7 +154,7 @@ export function useAnalysisJob() {
     clearJob();
   }, [clearJob]);
 
-  // Resume on mount
+  // Resume on mount — check for saved job in localStorage
   useEffect(() => {
     const checkSavedJob = async () => {
       let savedJobId: string | null = null;
@@ -160,6 +163,17 @@ export function useAnalysisJob() {
       } catch { return; }
 
       if (!savedJobId) return;
+
+      // Check age
+      try {
+        const started = parseInt(localStorage.getItem(STORAGE_KEY_STARTED) || "0");
+        if (Date.now() - started > MAX_AGE_MS) {
+          localStorage.removeItem(STORAGE_KEY_JOB);
+          localStorage.removeItem(STORAGE_KEY_KW);
+          localStorage.removeItem(STORAGE_KEY_STARTED);
+          return;
+        }
+      } catch { /* ignore */ }
 
       try {
         const { data } = await supabase
@@ -173,16 +187,15 @@ export function useAnalysisJob() {
           return;
         }
 
-        const job = data as AnalysisJob;
-
-        if (job.status === "running") {
+        if (data.status === "running") {
           setActiveJobId(savedJobId);
-          setResumedKeyword(job.keyword);
+          activeJobIdRef.current = savedJobId;
+          setResumedKeyword(data.keyword);
           toast.info("Analyse wird fortgesetzt...");
-          // Caller should start polling when they detect activeJobId
-        } else if (job.status === "completed" && job.result_json) {
-          setResumedResult(job.result_json);
-          setResumedKeyword(job.keyword);
+          // Caller should call startPolling when they detect activeJobId
+        } else if (data.status === "completed" && data.result_json) {
+          setResumedResult(data.result_json as JobResult);
+          setResumedKeyword(data.keyword);
           toast.success("Analyse-Ergebnis geladen");
           clearJob();
         } else {
@@ -196,36 +209,41 @@ export function useAnalysisJob() {
     checkSavedJob();
   }, [clearJob]);
 
-  // Visibility change handler
+  // Page Visibility API — detect tab switch and check job status
   useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible" && activeJobId && !isPolling) {
-        // Tab returned — check job status immediately
-        (async () => {
-          try {
-            const { data } = await supabase
-              .from("analysis_jobs")
-              .select("status, result_json, error_message")
-              .eq("id", activeJobId)
-              .single();
+    const handleVisibility = async () => {
+      if (document.visibilityState !== "visible") return;
 
-            if (data?.status === "completed" && data.result_json) {
-              setResumedResult(data.result_json as JobResult);
-              toast.success("Analyse abgeschlossen");
-              clearJob();
-            } else if (data?.status === "error") {
-              toast.error(data.error_message || "Analyse fehlgeschlagen");
-              clearJob();
-            }
-            // If still running, the existing polling should handle it
-          } catch { /* ignore */ }
-        })();
+      const jobId = activeJobIdRef.current;
+      if (!jobId) return;
+
+      // Restart polling if it was throttled by the browser
+      if (!isPollingRef.current && onCompleteRef.current && onErrorRef.current) {
+        startPolling(jobId, onCompleteRef.current, onErrorRef.current);
       }
+
+      // Also check immediately
+      try {
+        const { data } = await supabase
+          .from("analysis_jobs")
+          .select("status, result_json, error_message")
+          .eq("id", jobId)
+          .single();
+
+        if (data?.status === "completed" && data.result_json) {
+          clearJob();
+          setResumedResult(data.result_json as JobResult);
+          toast.success("Analyse abgeschlossen");
+        } else if (data?.status === "error") {
+          clearJob();
+          toast.error(data.error_message || "Analyse fehlgeschlagen");
+        }
+      } catch { /* ignore */ }
     };
 
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [activeJobId, isPolling, clearJob]);
+  }, [clearJob, startPolling]);
 
   // Cleanup on unmount
   useEffect(() => {

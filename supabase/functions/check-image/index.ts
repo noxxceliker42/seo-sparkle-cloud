@@ -4,6 +4,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Content-Type": "application/json",
 };
 
 async function uploadToCloudinary(
@@ -55,41 +56,57 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Poll NanoBanana task status
-    const statusRes = await fetch("https://api.kie.ai/api/v1/jobs/taskStatus", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${kieKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ taskId }),
-      signal: AbortSignal.timeout(8000),
-    });
+    // Poll task status
+    const statusRes = await fetch(
+      `https://api.kie.ai/api/v1/task/${taskId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${kieKey}`,
+        },
+        signal: AbortSignal.timeout(10000),
+      }
+    );
+
+    console.log("Task status HTTP:", statusRes.status);
 
     if (!statusRes.ok) {
+      console.error("Task status check failed:", statusRes.status);
       return new Response(
         JSON.stringify({ status: "generating" }),
-        { headers: { ...cors, "Content-Type": "application/json" } }
+        { headers: cors }
       );
     }
 
     const statusData = await statusRes.json();
-    console.log("Task Status:", JSON.stringify(statusData).substring(0, 500));
+    console.log("Task status data:", JSON.stringify(statusData));
 
-    const state = statusData?.data?.status || statusData?.status || statusData?.state || "";
-    const isDone = ["SUCCESS", "success", "completed", "COMPLETED"].includes(state);
-    const isFailed = ["FAILED", "failed", "error", "ERROR"].includes(state);
-
+    // Extract URL from all possible fields
     const imageUrl =
-      statusData?.data?.output?.[0] ||
-      statusData?.data?.url ||
+      statusData?.data?.[0]?.url ||
+      statusData?.data?.[0]?.imageUrl ||
+      statusData?.data?.[0]?.image_url ||
+      statusData?.images?.[0]?.url ||
+      statusData?.images?.[0] ||
+      statusData?.result?.[0]?.url ||
       statusData?.result?.url ||
       statusData?.imageUrl ||
+      statusData?.image_url ||
       statusData?.url ||
+      statusData?.output?.[0] ||
+      statusData?.data?.output?.[0] ||
+      statusData?.data?.url ||
       null;
 
+    const state = statusData?.data?.status || statusData?.status || statusData?.state || "";
+    const isDone =
+      ["SUCCESS", "success", "completed", "COMPLETED", "finished", "FINISHED", "done", "DONE"].includes(state) ||
+      !!imageUrl; // URL present = done
+
+    const isFailed = ["FAILED", "failed", "error", "ERROR"].includes(state);
+
+    console.log("isDone:", isDone, "isFailed:", isFailed, "imageUrl:", imageUrl);
+
     if (isDone && imageUrl) {
-      // Upload to Cloudinary
       const cloudUrl = await uploadToCloudinary(imageUrl, slot || "free", keyword || "", jobId);
 
       await supabase
@@ -104,7 +121,7 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ status: "completed", imageUrl, cloudinaryUrl: cloudUrl }),
-        { headers: { ...cors, "Content-Type": "application/json" } }
+        { headers: cors }
       );
     }
 
@@ -112,19 +129,19 @@ Deno.serve(async (req) => {
       await supabase.from("image_jobs").update({ status: "failed" }).eq("id", jobId);
       return new Response(
         JSON.stringify({ status: "failed" }),
-        { headers: { ...cors, "Content-Type": "application/json" } }
+        { headers: cors }
       );
     }
 
     return new Response(
       JSON.stringify({ status: "generating" }),
-      { headers: { ...cors, "Content-Type": "application/json" } }
+      { headers: cors }
     );
   } catch (err) {
     console.error("check-image error:", err);
     return new Response(
       JSON.stringify({ error: (err as Error).message }),
-      { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
+      { status: 500, headers: cors }
     );
   }
 });

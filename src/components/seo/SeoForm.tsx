@@ -94,12 +94,12 @@ const STEPS = [
 const INTENTS = ["Informational", "Commercial", "Transactional", "Local"];
 const PAGE_TYPES = ["Pillar Page", "Supporting Info", "Supporting Commercial", "Transactional/Local", "Deep Page"];
 const DESIGN_PRESETS = [
-  { id: "trust", label: "Trust & Service", color: "#1d4ed8" },
-  { id: "professional", label: "Professional", color: "#374151" },
-  { id: "eco", label: "Eco", color: "#16a34a" },
-  { id: "premium", label: "Premium", color: "#7c3aed" },
-  { id: "warm", label: "Warm", color: "#ea580c" },
-  { id: "minimal", label: "Minimal", color: "#525252" },
+  { id: "trust", label: "Trust & Service", color: "#1d4ed8", desc: "Professionell & vertrauenswürdig", gradient: "linear-gradient(135deg, #1d4ed8, #3b82f6)" },
+  { id: "glassmorphism", label: "Midnight Executive", color: "#3b82f6", desc: "Premium & dunkel", gradient: "linear-gradient(135deg, #0f172a, #1e3a8a)" },
+  { id: "editorial", label: "Clean Editorial", color: "#1c1917", desc: "Minimalistisch & textstark", gradient: "linear-gradient(135deg, #fafaf9, #d6d3d1)" },
+  { id: "eco", label: "Eco Service", color: "#065f46", desc: "Nachhaltig & organisch", gradient: "linear-gradient(135deg, #065f46, #16a34a)" },
+  { id: "craft", label: "Warm Craft", color: "#9a3412", desc: "Handwerklich & warm", gradient: "linear-gradient(135deg, #9a3412, #fb923c)" },
+  { id: "tech", label: "Tech Precision", color: "#0c4a6e", desc: "Technisch & präzise", gradient: "linear-gradient(135deg, #0c4a6e, #0284c7)" },
 ];
 const TONE_OPTIONS = ["Sachlich-kompetent", "Freundlich-nahbar", "Direkt-verkaufend"];
 const IMAGE_STRATEGIES = ["NanoBanana KI", "Upload + Alt-Text", "Platzhalter"];
@@ -390,28 +390,45 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
   const renderStepF = () => (
     <div className="space-y-5">
       <FieldWrapper label="Design-Paket">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {DESIGN_PRESETS.map((dp) => (
-            <Button
+            <button
               key={dp.id}
               type="button"
-              variant={form.designPreset === dp.id ? "default" : "outline"}
-              size="sm"
               onClick={() => { update("designPreset", dp.id); update("primaryColor", dp.color); }}
-              className="min-h-[44px] text-sm gap-2"
+              className={`relative rounded-xl overflow-hidden text-left transition-all ${
+                form.designPreset === dp.id
+                  ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                  : "ring-1 ring-border hover:ring-primary/50"
+              }`}
             >
-              <span className="h-3 w-3 rounded-full border" style={{ backgroundColor: dp.color }} />
-              {dp.label}
-            </Button>
+              <div className="h-16 w-full" style={{ background: dp.gradient }} />
+              <div className="p-3 bg-card">
+                <p className="text-sm font-bold text-foreground">{dp.label}</p>
+                <p className="text-[11px] text-muted-foreground">{dp.desc}</p>
+              </div>
+              {form.designPreset === dp.id && (
+                <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
+                  <span className="text-primary-foreground text-[10px] font-bold">✓</span>
+                </div>
+              )}
+            </button>
           ))}
         </div>
       </FieldWrapper>
-      <FieldWrapper label="Primärfarbe">
-        <div className="flex items-center gap-3">
-          <input type="color" value={form.primaryColor} onChange={(e) => update("primaryColor", e.target.value)} className="h-10 w-14 cursor-pointer rounded border border-border" />
-          <Input value={form.primaryColor} onChange={(e) => update("primaryColor", e.target.value)} className="w-32 font-mono text-sm" />
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+        <Switch
+          checked={form.designPreset === "contao_inline"}
+          onCheckedChange={(checked) => {
+            if (checked) update("designPreset", form.designPreset);
+          }}
+          id="contao-mode"
+        />
+        <div>
+          <Label htmlFor="contao-mode" className="text-sm font-medium">Contao-Modus (Inline CSS)</Label>
+          <p className="text-[11px] text-muted-foreground">Styles direkt am Element — für Contao 4.x und ältere CMS</p>
         </div>
-      </FieldWrapper>
+      </div>
       <FieldWrapper label="Tone of Voice">
         <ButtonGroup options={TONE_OPTIONS} value={form.toneOfVoice} onChange={(v) => update("toneOfVoice", v)} />
       </FieldWrapper>

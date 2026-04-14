@@ -98,16 +98,17 @@ Deno.serve(async (req) => {
         ...(resolution && { image_size: resolution }),
       };
     } else {
-      nanoEndpoint = "https://api.kie.ai/api/v1/images/generations";
+      nanoEndpoint = "https://api.kie.ai/api/v1/jobs/createTask";
       nanoBody = {
-        prompt,
-        negative_prompt: promptNegative || "",
         model: "nano-banana-2",
-        width: width || 1200,
-        height: height || 675,
-        aspect_ratio: aspectRatio || (width === height ? "1:1" : "16:9"),
-        image_size: resolution || "1K",
-        n: 1,
+        input: {
+          prompt,
+          negative_prompt: promptNegative || "",
+          image_input: [],
+          aspect_ratio: aspectRatio || (width === height ? "1:1" : "16:9"),
+          resolution: resolution || "1K",
+          output_format: "jpg",
+        },
       };
     }
 

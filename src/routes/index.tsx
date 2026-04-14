@@ -122,32 +122,39 @@ function Index() {
     createJob,
     completeJob,
     failJob,
+    startPolling,
     clearJob,
     clearResumedResult,
   } = useAnalysisJob();
 
-  // Resume from saved job
+  // Apply results from a completed job (used by both resume and polling)
+  const applyJobResult = useCallback((result: Record<string, unknown>, kw: string) => {
+    const r = result as { analysis?: AnalysisResult; serp?: SerpResult; volume?: VolumeResult; rawJson?: string };
+    if (r.analysis) {
+      setAnalysis(r.analysis);
+      setSelectedLsi(new Set(r.analysis.lsi || []));
+      setAiState("done");
+    }
+    if (r.serp) {
+      setSerp(r.serp);
+      setSerpState("done");
+    }
+    if (r.volume) {
+      setVolume(r.volume);
+      setVolState("done");
+    }
+    if (r.rawJson) setRawJson(r.rawJson as string);
+    setKeyword(kw);
+  }, []);
+
+  // Resume from saved job — either completed result or running job that needs polling
   useEffect(() => {
     if (resumedResult && resumedKeyword) {
-      const r = resumedResult as { analysis?: AnalysisResult; serp?: SerpResult; volume?: VolumeResult; rawJson?: string };
-      if (r.analysis) {
-        setAnalysis(r.analysis);
-        setSelectedLsi(new Set(r.analysis.lsi || []));
-        setAiState("done");
-      }
-      if (r.serp) {
-        setSerp(r.serp);
-        setSerpState("done");
-      }
-      if (r.volume) {
-        setVolume(r.volume);
-        setVolState("done");
-      }
-      if (r.rawJson) setRawJson(r.rawJson);
-      setKeyword(resumedKeyword);
+      applyJobResult(resumedResult as Record<string, unknown>, resumedKeyword);
       clearResumedResult();
     }
-  }, [resumedResult, resumedKeyword, clearResumedResult]);
+  }, [resumedResult, resumedKeyword, clearResumedResult, applyJobResult]);
+
 
   const runStandardAnalysis = useCallback((kw: string): AnalysisResult => {
     // Local JS-based quick analysis (no API needed)
@@ -225,6 +232,26 @@ function Index() {
     }
   }, [selectedFirm]);
 
+  // If we have an active running job (e.g. after page reload), restart polling
+  useEffect(() => {
+    if (activeJobId && !isPolling && resumedKeyword) {
+      setAiState("loading");
+      setSerpState("loading");
+      setVolState("loading");
+      setKeyword(resumedKeyword);
+      startPolling(activeJobId, (result) => {
+        applyJobResult(result as Record<string, unknown>, resumedKeyword);
+        const r = result as { analysis?: AnalysisResult; serp?: SerpResult; volume?: VolumeResult; rawJson?: string };
+        saveAnalysis(resumedKeyword, "kieai", r.analysis || null, r.volume || null, r.serp || null, r.rawJson || "");
+      }, (errorMsg) => {
+        setAiError(errorMsg);
+        setAiState("error");
+        setSerpState("idle");
+        setVolState("idle");
+      });
+    }
+  }, [activeJobId, isPolling, resumedKeyword, startPolling, applyJobResult, saveAnalysis]);
+
   const handleAnalyze = useCallback(async () => {
     if (!keyword.trim()) return;
     const kw = keyword.trim();
@@ -239,8 +266,6 @@ function Index() {
     setSelectedPaa(new Set());
     setActiveTab("results");
 
-    const allResults: Record<string, unknown> = {};
-
     if (mode === "standard") {
       setAiState("loading");
       setSerpState("idle");
@@ -252,7 +277,7 @@ function Index() {
         setAnalysis(result);
         setSelectedLsi(new Set(result.lsi || []));
         setAiState("done");
-        allResults.seoAnalyze = result;
+        const allResults = { seoAnalyze: result };
         const json = JSON.stringify(allResults, null, 2);
         setRawJson(json);
         await saveAnalysis(kw, "standard", result, null, null, json);
@@ -260,86 +285,38 @@ function Index() {
       return;
     }
 
-    // Kie.AI Live mode: create persistent job first
+    // Kie.AI Live mode: fire-and-poll pattern
+    // 1. Create persistent job in DB
     const jobId = await createJob(kw, "kieai");
+    if (!jobId) return;
 
     setAiState("loading"); setAiError("");
     setSerpState("loading"); setSerpError("");
     setVolState("loading"); setVolError("");
 
-    let finalAnalysis: AnalysisResult | null = null;
-    let finalSerp: SerpResult | null = null;
-    let finalVolume: VolumeResult | null = null;
-    let hasError = false;
+    // 2. Fire the orchestrator edge function (runs server-side, tab-switch safe)
+    supabase.functions.invoke("analyze-orchestrator", {
+      body: { jobId, keyword: kw, firm: selectedFirm?.name, city: selectedFirm?.city },
+    }).catch((e) => {
+      console.error("Orchestrator invoke failed:", e);
+      // Don't fail here — polling will detect the error state from DB
+    });
 
-    const aiCall = supabase.functions.invoke("seo-analyze", {
-      body: { keyword: kw, firm: selectedFirm?.name, city: selectedFirm?.city },
-    })
-      .then(({ data, error }) => {
-        if (error || data?.error) {
-          setAiError(error?.message || data?.error || "Unbekannter Fehler");
-          setAiState("error");
-          hasError = true;
-        } else {
-          const a = data?.analysis || data;
-          setAnalysis(a);
-          finalAnalysis = a;
-          setSelectedLsi(new Set(a?.lsi || []));
-          setAiState("done");
-          allResults.seoAnalyze = data;
-        }
-      })
-      .catch((e) => { setAiError(e.message); setAiState("error"); hasError = true; });
-
-    const serpCall = supabase.functions.invoke("serp-data", { body: { keyword: kw } })
-      .then(({ data, error }) => {
-        if (error || data?.error) {
-          setSerpError(error?.message || data?.error || "Unbekannter Fehler");
-          setSerpState("error");
-        } else {
-          setSerp(data);
-          finalSerp = data;
-          setSerpState("done");
-          allResults.serpData = data;
-        }
-      })
-      .catch((e) => { setSerpError(e.message); setSerpState("error"); });
-
-    const volCall = supabase.functions.invoke("keyword-volume", { body: { keywords: [kw] } })
-      .then(({ data, error }) => {
-        if (error || data?.error) {
-          setVolError(error?.message || data?.error || "Unbekannter Fehler");
-          setVolState("error");
-        } else {
-          const v = data?.data || {};
-          setVolume(v);
-          finalVolume = v;
-          setVolState("done");
-          allResults.keywordVolume = data;
-        }
-      })
-      .catch((e) => { setVolError(e.message); setVolState("error"); });
-
-    await Promise.all([aiCall, serpCall, volCall]);
-    const json = JSON.stringify(allResults, null, 2);
-    setRawJson(json);
-
-    // Persist job result
-    if (jobId) {
-      if (hasError && !finalAnalysis) {
-        await failJob(jobId, "Analyse fehlgeschlagen");
-      } else {
-        await completeJob(jobId, {
-          analysis: finalAnalysis,
-          serp: finalSerp,
-          volume: finalVolume,
-          rawJson: json,
-        });
-      }
-    }
-
-    await saveAnalysis(kw, "kieai", finalAnalysis, finalVolume, finalSerp, json);
-  }, [keyword, mode, selectedFirm, runStandardAnalysis, saveAnalysis, createJob, completeJob, failJob]);
+    // 3. Poll for results — server does the work, frontend just watches
+    startPolling(jobId, (result) => {
+      // On complete
+      applyJobResult(result as Record<string, unknown>, kw);
+      // Save to seo_analyses for history
+      const r = result as { analysis?: AnalysisResult; serp?: SerpResult; volume?: VolumeResult; rawJson?: string };
+      saveAnalysis(kw, "kieai", r.analysis || null, r.volume || null, r.serp || null, r.rawJson || "");
+    }, (errorMsg) => {
+      // On error
+      setAiError(errorMsg);
+      setAiState("error");
+      setSerpState("idle");
+      setVolState("idle");
+    });
+  }, [keyword, mode, selectedFirm, runStandardAnalysis, saveAnalysis, createJob, startPolling, applyJobResult]);
 
   const handleVerifyDataForSEO = useCallback(async () => {
     if (!keyword.trim()) return;

@@ -14,6 +14,142 @@ export type Database = {
   }
   public: {
     Tables: {
+      cluster_pages: {
+        Row: {
+          cluster_id: string
+          content_angle: string | null
+          created_at: string
+          differentiator: string | null
+          estimated_difficulty: number | null
+          estimated_volume: number | null
+          firm_id: string | null
+          id: string
+          intent: string | null
+          internal_link_anchor: string | null
+          keyword: string
+          page_type: string
+          priority: string
+          reason: string | null
+          seo_page_id: string | null
+          sort_order: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cluster_id: string
+          content_angle?: string | null
+          created_at?: string
+          differentiator?: string | null
+          estimated_difficulty?: number | null
+          estimated_volume?: number | null
+          firm_id?: string | null
+          id?: string
+          intent?: string | null
+          internal_link_anchor?: string | null
+          keyword: string
+          page_type: string
+          priority?: string
+          reason?: string | null
+          seo_page_id?: string | null
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cluster_id?: string
+          content_angle?: string | null
+          created_at?: string
+          differentiator?: string | null
+          estimated_difficulty?: number | null
+          estimated_volume?: number | null
+          firm_id?: string | null
+          id?: string
+          intent?: string | null
+          internal_link_anchor?: string | null
+          keyword?: string
+          page_type?: string
+          priority?: string
+          reason?: string | null
+          seo_page_id?: string | null
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cluster_pages_cluster_id_fkey"
+            columns: ["cluster_id"]
+            isOneToOne: false
+            referencedRelation: "clusters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cluster_pages_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cluster_pages_seo_page_id_fkey"
+            columns: ["seo_page_id"]
+            isOneToOne: false
+            referencedRelation: "seo_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clusters: {
+        Row: {
+          created_at: string
+          firm_id: string | null
+          id: string
+          name: string
+          pillar_keyword: string
+          pillar_page_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          firm_id?: string | null
+          id?: string
+          name: string
+          pillar_keyword: string
+          pillar_page_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          firm_id?: string | null
+          id?: string
+          name?: string
+          pillar_keyword?: string
+          pillar_page_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clusters_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clusters_pillar_page_id_fkey"
+            columns: ["pillar_page_id"]
+            isOneToOne: false
+            referencedRelation: "seo_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       firms: {
         Row: {
           city: string | null

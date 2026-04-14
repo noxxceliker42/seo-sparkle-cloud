@@ -12,9 +12,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LogOut, User, Users } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, User, Users } from "lucide-react";
+import appCss from "../styles.css?url";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {

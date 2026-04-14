@@ -242,7 +242,6 @@ function Index() {
     const allResults: Record<string, unknown> = {};
 
     if (mode === "standard") {
-      // Standard mode: local analysis, no AI call
       setAiState("loading");
       setSerpState("idle");
       setVolState("idle");
@@ -261,7 +260,9 @@ function Index() {
       return;
     }
 
-    // Kie.AI Live mode: all 3 calls parallel
+    // Kie.AI Live mode: create persistent job first
+    const jobId = await createJob(kw, "kieai");
+
     setAiState("loading"); setAiError("");
     setSerpState("loading"); setSerpError("");
     setVolState("loading"); setVolError("");
@@ -269,6 +270,7 @@ function Index() {
     let finalAnalysis: AnalysisResult | null = null;
     let finalSerp: SerpResult | null = null;
     let finalVolume: VolumeResult | null = null;
+    let hasError = false;
 
     const aiCall = supabase.functions.invoke("seo-analyze", {
       body: { keyword: kw, firm: selectedFirm?.name, city: selectedFirm?.city },
@@ -277,6 +279,7 @@ function Index() {
         if (error || data?.error) {
           setAiError(error?.message || data?.error || "Unbekannter Fehler");
           setAiState("error");
+          hasError = true;
         } else {
           const a = data?.analysis || data;
           setAnalysis(a);
@@ -286,7 +289,7 @@ function Index() {
           allResults.seoAnalyze = data;
         }
       })
-      .catch((e) => { setAiError(e.message); setAiState("error"); });
+      .catch((e) => { setAiError(e.message); setAiState("error"); hasError = true; });
 
     const serpCall = supabase.functions.invoke("serp-data", { body: { keyword: kw } })
       .then(({ data, error }) => {
@@ -320,8 +323,23 @@ function Index() {
     await Promise.all([aiCall, serpCall, volCall]);
     const json = JSON.stringify(allResults, null, 2);
     setRawJson(json);
+
+    // Persist job result
+    if (jobId) {
+      if (hasError && !finalAnalysis) {
+        await failJob(jobId, "Analyse fehlgeschlagen");
+      } else {
+        await completeJob(jobId, {
+          analysis: finalAnalysis,
+          serp: finalSerp,
+          volume: finalVolume,
+          rawJson: json,
+        });
+      }
+    }
+
     await saveAnalysis(kw, "kieai", finalAnalysis, finalVolume, finalSerp, json);
-  }, [keyword, mode, selectedFirm, runStandardAnalysis, saveAnalysis]);
+  }, [keyword, mode, selectedFirm, runStandardAnalysis, saveAnalysis, createJob, completeJob, failJob]);
 
   const handleVerifyDataForSEO = useCallback(async () => {
     if (!keyword.trim()) return;

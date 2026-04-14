@@ -53,16 +53,26 @@ Deno.serve(async (req) => {
     }
 
     // Dynamic import to avoid top-level crash
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.39.0");
+    console.log(`[${reqId}] Loading supabase-js...`);
+    let createClient: any;
+    try {
+      const mod = await import("https://esm.sh/@supabase/supabase-js@2.39.0");
+      createClient = mod.createClient;
+      console.log(`[${reqId}] supabase-js loaded OK`);
+    } catch (importErr: unknown) {
+      const ie = importErr as Error;
+      console.error(`[${reqId}] supabase-js import FAILED:`, ie.message);
+      return new Response(JSON.stringify({ error: "Supabase client import failed", detail: ie.message }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const supabase = createClient(supabaseUrl ?? "", serviceKey ?? "");
 
     const prompt = buildPrompt(body);
     console.log(`[${reqId}] Prompt length: ${prompt.length}`);
 
     // Kie.AI call with timeout
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 55000);
-
+    console.log(`[${reqId}] Calling Kie.AI...`);
     let kieResponse: Response;
     try {
       kieResponse = await fetch("https://api.kie.ai/claude/v1/messages", {
@@ -74,19 +84,21 @@ Deno.serve(async (req) => {
           stream: false,
           messages: [{ role: "user", content: prompt }],
         }),
-        signal: controller.signal,
+        signal: AbortSignal.timeout(55000),
       });
-      clearTimeout(timeout);
     } catch (fetchErr: unknown) {
-      clearTimeout(timeout);
       const err = fetchErr as Error;
-      if (err.name === "AbortError") {
+      console.error(`[${reqId}] Kie.AI fetch FAILED:`, err.name, err.message);
+      if (err.name === "AbortError" || err.name === "TimeoutError") {
         return new Response(JSON.stringify({ error: "Kie.AI Timeout nach 55 Sekunden" }), {
           status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      throw fetchErr;
+      return new Response(JSON.stringify({ error: `Kie.AI nicht erreichbar: ${err.message}` }), {
+        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+    console.log(`[${reqId}] Kie.AI responded: ${kieResponse.status}`);
 
     console.log(`[${reqId}] Kie.AI status: ${kieResponse.status}`);
 

@@ -6,6 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Search, Image as ImageIcon, Loader2, ArrowRight, BarChart3 } from "lucide-react";
+import { ProcessLogger } from "@/lib/ProcessLogger";
+import { useLogContext } from "@/context/LogContext";
 import { LsiChips } from "@/components/seo/LsiChips";
 import { SerpPreview } from "@/components/seo/SerpPreview";
 import { PaaList } from "@/components/seo/PaaList";
@@ -116,6 +118,7 @@ function Index() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const isLoading = aiState === "loading" || serpState === "loading" || volState === "loading";
+  const { setEntries: setLogEntries, setVisible: setShowLog, setTotalSteps, setProcessName, setOnRetry } = useLogContext();
 
   const {
     isRunning: isAnalysisRunning,
@@ -496,13 +499,106 @@ function Index() {
     setGenerating(true);
     setGenerateError("");
     setHtmlWarning("");
+    setShowLog(true);
+    setLogEntries([]);
+    setTotalSteps(7);
+    setProcessName("Neue Seite");
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const logger = new ProcessLogger(
+      "neue_seite",
+      authUser?.id || "",
+      supabase,
+      setLogEntries,
+    );
 
-      const { data: result, error } = await supabase.functions.invoke("generate-page", {
-        body: { ...data, userId: user?.id || null },
+    setOnRetry(() => () => { handleGenerate(data); });
+
+    // SCHRITT 1: Validierung
+    await logger.log("Formular-Validierung", "running", "Pflichtfelder werden geprüft...");
+    const missing: string[] = [];
+    if (!data.keyword?.trim()) missing.push("Keyword");
+    if (!data.firmName?.trim()) missing.push("Firma");
+    if (!data.city?.trim()) missing.push("Stadt");
+    if (!data.informationGain?.trim()) missing.push("Information Gain");
+    if (missing.length > 0) {
+      await logger.log("Formular-Validierung", "error", `Fehlende Felder: ${missing.join(", ")}`, {
+        missingFields: missing,
+        hint: "Formular ergänzen und erneut versuchen",
       });
+      setGenerating(false);
+      return;
+    }
+    await logger.log("Formular-Validierung", "success", "Alle Pflichtfelder vorhanden", {
+      keyword: data.keyword, firm: data.firmName,
+    });
+
+    // SCHRITT 2: Auth
+    await logger.log("Auth-Prüfung", "running", "Session wird geprüft...");
+    if (!authUser) {
+      await logger.log("Auth-Prüfung", "error", "Keine aktive Session", {
+        hint: "Bitte neu einloggen und erneut versuchen",
+      });
+      setGenerating(false);
+      return;
+    }
+    await logger.log("Auth-Prüfung", "success", `Eingeloggt als ${authUser.email}`);
+
+    // SCHRITT 3: Edge Function Ping
+    await logger.log("Edge Function Ping", "running", "Verbindung zu generate-page wird geprüft...");
+    const pingStart = Date.now();
+    try {
+      const { data: pingData, error: pingError } = await supabase.functions.invoke("generate-page", {
+        body: { test: true },
+      });
+      const pingMs = Date.now() - pingStart;
+      if (pingError) {
+        const msg = pingError.message || "";
+        await logger.log("Edge Function Ping", "error", `Nicht erreichbar: ${msg}`, {
+          error: msg,
+          hint: msg.includes("Failed to send")
+            ? "Edge Function nicht deployed — Status prüfen"
+            : msg.includes("404")
+            ? "Function nicht gefunden — Name prüfen"
+            : "Netzwerkfehler — VPN oder Firewall?",
+          duration: pingMs + "ms",
+        });
+        setGenerating(false);
+        return;
+      }
+      await logger.log("Edge Function Ping", "success", `Erreichbar (${pingMs}ms) · Key: ${pingData?.keyPresent ? "vorhanden" : "FEHLT!"}`, {
+        pingData, duration: pingMs + "ms",
+      });
+      if (!pingData?.keyPresent) {
+        await logger.log("API Key Check", "error", "API Key fehlt in Secrets", {
+          hint: "Backend Secrets prüfen und API Key eintragen",
+        });
+        setGenerating(false);
+        return;
+      }
+    } catch (err: any) {
+      await logger.log("Edge Function Ping", "error", `Netzwerkfehler: ${err.message}`, {
+        hint: "Internetverbindung prüfen",
+      });
+      setGenerating(false);
+      return;
+    }
+
+    // SCHRITT 4: Prompt aufbauen
+    await logger.log("Prompt aufbauen", "running", "Master-Prompt wird zusammengestellt...");
+    const promptSize = JSON.stringify(data).length;
+    await logger.log("Prompt aufbauen", "success", `Prompt bereit · ${promptSize} Zeichen Input`, {
+      designPreset: data.designPreset, activeSections: data.activeSections?.length || 0, contaoMode: (data as any).contaoMode || false,
+    });
+
+    // SCHRITT 5: Anthropic Call
+    await logger.log("Anthropic Generierung", "running", "Claude generiert HTML... (30-90 Sek)");
+    const genStart = Date.now();
+    try {
+      const { data: result, error } = await supabase.functions.invoke("generate-page", {
+        body: { ...data, userId: authUser.id },
+      });
+      const genMs = Date.now() - genStart;
 
       if (error) {
         let msg = error.message;
@@ -510,39 +606,77 @@ function Index() {
           const ctx = (error as any).context;
           if (ctx) { const b = await ctx.json(); msg = b.error || b.message || msg; }
         } catch {}
+        let hint = "";
+        if (msg.includes("timeout") || genMs > 140000) hint = "Timeout — Weniger Sektionen aktivieren.";
+        else if (msg.includes("401")) hint = "API Key ungültig — Key erneuern";
+        else if (msg.includes("429")) hint = "Rate Limit — 30 Sek warten";
+        else if (msg.includes("500")) hint = "Interner Fehler — Logs prüfen";
+        await logger.log("Anthropic Generierung", "error", `Fehler nach ${Math.round(genMs / 1000)}s: ${msg}`, {
+          error: msg, hint, duration: genMs + "ms",
+        });
         setGenerateError(msg);
         setGenerating(false);
         return;
       }
 
       if (!result || result.error) {
+        await logger.log("Anthropic Generierung", "error", result?.error || "Keine Antwort", {
+          hint: "Edge Function Logs prüfen",
+        });
         setGenerateError(result?.error || "Keine Antwort von der Edge Function");
         setGenerating(false);
         return;
       }
 
       if (!result.html || result.html.trim() === "") {
+        await logger.log("Anthropic Generierung", "error", "HTML leer — stop_reason: " + (result.stopReason || "unbekannt"));
         setGenerateError("HTML leer — stop_reason: " + (result.stopReason || "unbekannt"));
         setGenerating(false);
         return;
       }
 
-      // Check HTML completeness
+      // Warnings prüfen
+      const warnings: string[] = [];
+      if (!result.html.trim().endsWith("</html>")) warnings.push("HTML nicht vollständig");
+      if (!result.jsonLd || result.jsonLd.trim() === "") warnings.push("JSON-LD fehlt");
+      if (!result.metaTitle) warnings.push("Meta-Title fehlt");
+
+      if (warnings.length > 0) {
+        await logger.log("Anthropic Generierung", "warning", `HTML generiert mit Hinweisen nach ${Math.round(genMs / 1000)}s · ${result.tokensUsed || "?"} Tokens`, {
+          htmlLength: result.html?.length, warnings, duration: genMs + "ms", tokensUsed: result.tokensUsed,
+        });
+      } else {
+        await logger.log("Anthropic Generierung", "success", `${result.html?.length || 0} Zeichen HTML · ${result.tokensUsed || "?"} Tokens · ${Math.round(genMs / 1000)}s`, {
+          htmlLength: result.html?.length, duration: genMs + "ms", tokensUsed: result.tokensUsed, isComplete: result.isComplete,
+        });
+      }
+
+      // HTML completeness check for warning banner
       const html = result.html;
       const isComplete = html.trim().endsWith("</html>");
       const hasFaq = html.includes('id="faq"');
       const hasSchema = html.includes("application/ld+json");
       const hasAutor = html.includes('id="autor"');
       if (!(isComplete && hasFaq && hasSchema && hasAutor)) {
-        const missing = [
+        const missingParts = [
           !isComplete && "HTML-Ende fehlt",
           !hasFaq && "FAQ-Sektion fehlt",
           !hasSchema && "JSON-LD fehlt",
           !hasAutor && "Autor-Sektion fehlt",
         ].filter(Boolean).join(", ");
-        setHtmlWarning(`HTML unvollständig — Token-Limit erreicht. Fehlend: ${missing}`);
+        setHtmlWarning(`HTML unvollständig — Token-Limit erreicht. Fehlend: ${missingParts}`);
       }
 
+      // SCHRITT 6: Speichern
+      await logger.log("Seite speichern", "running", "Wird gespeichert...");
+      if (result.pageId) {
+        await logger.log("Seite speichern", "success", `Gespeichert · ID: ${result.pageId}`);
+      } else {
+        await logger.log("Seite speichern", "warning", "Keine pageId erhalten — möglicherweise nicht gespeichert");
+      }
+
+      // SCHRITT 7: Output laden
+      await logger.log("Output laden", "running", "Ergebnisse werden in UI geladen...");
       setGeneratedPage({
         metaTitle: result.metaTitle || "",
         metaDesc: result.metaDesc || "",
@@ -563,15 +697,17 @@ function Index() {
         duration: result.duration || 0,
         stopReason: result.stopReason || "",
       });
+      await logger.log("Output laden", "success", "Fertig — Output-Panel wird geöffnet");
       setShowQaGate(false);
       setShowOutput(true);
       toast.success(`Seite generiert: ${result.tokensUsed} Tokens, ${result.duration}s`);
     } catch (err: any) {
+      await logger.log("Anthropic Generierung", "error", `Unerwarteter Fehler: ${err.message}`);
       setGenerateError(err.message || "Unbekannter Fehler");
     } finally {
       setGenerating(false);
     }
-  }, [keyword]);
+  }, [keyword, setLogEntries, setShowLog, setTotalSteps, setProcessName, setOnRetry]);
 
   const handleNewPage = useCallback(() => {
     setShowOutput(false);

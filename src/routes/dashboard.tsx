@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, CheckCircle2, Clock, BarChart3, Search, Trash2, ExternalLink, Pencil, Download, ArrowUpDown } from "lucide-react";
+import { FileText, CheckCircle2, Clock, BarChart3, Search, Trash2, ExternalLink, Pencil, Download, ArrowUpDown, Layers } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/dashboard")({
@@ -60,9 +60,13 @@ function DashboardPage() {
   const [intentFilter, setIntentFilter] = useState("all");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [detailPage, setDetailPage] = useState<SeoPage | null>(null);
+  const [clusterCount, setClusterCount] = useState(0);
 
   useEffect(() => {
     loadPages();
+    supabase.from("clusters").select("id", { count: "exact", head: true }).then(({ count }) => {
+      setClusterCount(count || 0);
+    });
   }, []);
 
   const loadPages = async () => {
@@ -117,12 +121,13 @@ function DashboardPage() {
       <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
           { label: "Gesamt Seiten", value: stats.total, icon: FileText, color: "text-foreground" },
           { label: "Freigegeben", value: stats.approved, icon: CheckCircle2, color: "text-green-600" },
           { label: "In Bearbeitung", value: stats.inProgress, icon: Clock, color: "text-amber-600" },
           { label: "Ø QA-Score", value: `${stats.avgScore}%`, icon: BarChart3, color: "text-primary" },
+          { label: "Aktive Cluster", value: clusterCount, icon: Layers, color: "text-purple-600" },
         ].map((s) => (
           <Card key={s.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">

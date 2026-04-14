@@ -231,6 +231,71 @@ export type Database = {
         }
         Relationships: []
       }
+      page_images: {
+        Row: {
+          alt_text: string | null
+          cloudinary_public_id: string | null
+          cloudinary_url: string | null
+          created_at: string
+          height: number | null
+          id: string
+          nano_prompt: string | null
+          nano_status: string
+          nano_task_id: string | null
+          nano_url: string | null
+          page_id: string
+          section_context: string | null
+          slot: string
+          slot_label: string | null
+          updated_at: string
+          width: number | null
+        }
+        Insert: {
+          alt_text?: string | null
+          cloudinary_public_id?: string | null
+          cloudinary_url?: string | null
+          created_at?: string
+          height?: number | null
+          id?: string
+          nano_prompt?: string | null
+          nano_status?: string
+          nano_task_id?: string | null
+          nano_url?: string | null
+          page_id: string
+          section_context?: string | null
+          slot: string
+          slot_label?: string | null
+          updated_at?: string
+          width?: number | null
+        }
+        Update: {
+          alt_text?: string | null
+          cloudinary_public_id?: string | null
+          cloudinary_url?: string | null
+          created_at?: string
+          height?: number | null
+          id?: string
+          nano_prompt?: string | null
+          nano_status?: string
+          nano_task_id?: string | null
+          nano_url?: string | null
+          page_id?: string
+          section_context?: string | null
+          slot?: string
+          slot_label?: string | null
+          updated_at?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_images_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "seo_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -435,6 +500,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      owns_seo_page: {
+        Args: { _page_id: string; _user_id: string }
         Returns: boolean
       }
     }

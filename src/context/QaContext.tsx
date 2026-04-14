@@ -41,7 +41,7 @@ export function QaProvider({ children }: { children: ReactNode }) {
       if (analysisId) {
         void supabase
           .from("saved_analyses")
-          .update({ qa_state: state })
+          .update({ qa_state: state as unknown as import("@/integrations/supabase/types").Json })
           .eq("id", analysisId);
       }
     } catch {}

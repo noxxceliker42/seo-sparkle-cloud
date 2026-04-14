@@ -87,7 +87,7 @@ export function useGenerationJob() {
     try {
       const { data: job } = await supabase
         .from("generation_jobs")
-        .select("status, page_id, html_output, json_ld, meta_title, meta_desc, error_message, tokens_used, duration_seconds")
+        .select("status, page_id, html_output, body_content, css_block, json_ld, meta_title, meta_desc, meta_keywords, prompt_used, stop_reason, error_message, tokens_used, duration_seconds")
         .eq("id", jobId)
         .single();
 
@@ -96,20 +96,25 @@ export function useGenerationJob() {
       if (job.status === "completed") {
         stopPolling();
         clearStorage();
-        const html = job.html_output || "";
+        const html = (job as any).html_output || "";
         setState({
           jobId: "",
           generating: false,
           error: "",
           htmlWarning: checkHtmlCompleteness(html),
           result: {
-            pageId: job.page_id || null,
+            pageId: (job as any).page_id || null,
             htmlOutput: html,
-            jsonLd: job.json_ld || "",
-            metaTitle: job.meta_title || "",
-            metaDesc: job.meta_desc || "",
-            tokensUsed: job.tokens_used || null,
-            durationSeconds: job.duration_seconds || null,
+            bodyContent: (job as any).body_content || "",
+            cssBlock: (job as any).css_block || "",
+            jsonLd: (job as any).json_ld || "",
+            metaTitle: (job as any).meta_title || "",
+            metaDesc: (job as any).meta_desc || "",
+            metaKeywords: (job as any).meta_keywords || "",
+            promptUsed: (job as any).prompt_used || "",
+            tokensUsed: (job as any).tokens_used || null,
+            durationSeconds: (job as any).duration_seconds || null,
+            stopReason: (job as any).stop_reason || "",
           },
         });
       }

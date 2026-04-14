@@ -429,6 +429,93 @@ export type Database = {
           },
         ]
       }
+      saved_analyses: {
+        Row: {
+          analysis_status: string | null
+          created_at: string | null
+          firm_id: string | null
+          form_data: Json | null
+          generated_html: string | null
+          id: string
+          is_template: boolean | null
+          json_ld: string | null
+          keyword: string
+          meta_desc: string | null
+          meta_title: string | null
+          mode: string | null
+          name: string | null
+          page_id: string | null
+          qa_state: Json | null
+          result_kieai: Json | null
+          result_serp: Json | null
+          result_volume: Json | null
+          tags: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis_status?: string | null
+          created_at?: string | null
+          firm_id?: string | null
+          form_data?: Json | null
+          generated_html?: string | null
+          id?: string
+          is_template?: boolean | null
+          json_ld?: string | null
+          keyword: string
+          meta_desc?: string | null
+          meta_title?: string | null
+          mode?: string | null
+          name?: string | null
+          page_id?: string | null
+          qa_state?: Json | null
+          result_kieai?: Json | null
+          result_serp?: Json | null
+          result_volume?: Json | null
+          tags?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          analysis_status?: string | null
+          created_at?: string | null
+          firm_id?: string | null
+          form_data?: Json | null
+          generated_html?: string | null
+          id?: string
+          is_template?: boolean | null
+          json_ld?: string | null
+          keyword?: string
+          meta_desc?: string | null
+          meta_title?: string | null
+          mode?: string | null
+          name?: string | null
+          page_id?: string | null
+          qa_state?: Json | null
+          result_kieai?: Json | null
+          result_serp?: Json | null
+          result_volume?: Json | null
+          tags?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_analyses_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_analyses_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "seo_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seo_analyses: {
         Row: {
           city: string | null

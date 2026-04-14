@@ -130,6 +130,7 @@ function AuthGate() {
             <div className="flex items-center">
               <SidebarTrigger className="mr-3" />
               <span className="text-sm font-semibold text-foreground">SEO-OS v3.1</span>
+              <AnalysisStatusBadge />
             </div>
             <div className="flex items-center gap-2">
               <Badge className={roleBadgeColor + " text-xs capitalize"}>{role}</Badge>

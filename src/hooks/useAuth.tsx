@@ -67,16 +67,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [state.user, fetchProfileAndRole]);
 
   useEffect(() => {
+    let initialLoadDone = false;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Only reset state on explicit sign-out — TOKEN_REFRESHED with null session must NOT clear auth
+      console.log("Auth event:", event, "initialDone:", initialLoadDone);
+
+      // Only reset state on explicit sign-out
       if (event === "SIGNED_OUT") {
         setState({ user: null, session: null, profile: null, role: null, loading: false, isAuthenticated: false });
         return;
       }
 
       if (session?.user) {
-        setState((s) => ({ ...s, user: session.user, session, isAuthenticated: true, loading: true }));
+        // CRITICAL: Do NOT set loading:true on subsequent SIGNED_IN events (e.g. tab return).
+        // Only set loading during initial load. This prevents unmounting all pages.
+        if (!initialLoadDone) {
+          // Initial load — show loading state
+          setState((s) => ({ ...s, user: session.user, session, isAuthenticated: true, loading: true }));
+        } else {
+          // Subsequent events (tab return, token refresh) — update user/session silently
+          setState((s) => ({ ...s, user: session.user, session, isAuthenticated: true }));
+        }
+
         // Defer Supabase calls to avoid deadlocks
         setTimeout(async () => {
           const { profile, role } = await fetchProfileAndRole(session.user.id);
@@ -94,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setState((s) => ({ ...s, loading: false }));
       }
+      initialLoadDone = true;
     });
 
     return () => subscription.unsubscribe();

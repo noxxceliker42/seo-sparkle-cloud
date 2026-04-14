@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Copy, ArrowLeft, RefreshCw } from "lucide-react";
+import { Check, X, Copy, ArrowLeft, RefreshCw, Monitor, Smartphone } from "lucide-react";
 
 export interface GeneratedPage {
   metaTitle: string;

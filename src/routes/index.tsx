@@ -122,32 +122,38 @@ function Index() {
     createJob,
     completeJob,
     failJob,
+    startPolling,
     clearJob,
     clearResumedResult,
   } = useAnalysisJob();
 
+  // Apply results from a completed job (used by both resume and polling)
+  const applyJobResult = useCallback((result: Record<string, unknown>, kw: string) => {
+    const r = result as { analysis?: AnalysisResult; serp?: SerpResult; volume?: VolumeResult; rawJson?: string };
+    if (r.analysis) {
+      setAnalysis(r.analysis);
+      setSelectedLsi(new Set(r.analysis.lsi || []));
+      setAiState("done");
+    }
+    if (r.serp) {
+      setSerp(r.serp);
+      setSerpState("done");
+    }
+    if (r.volume) {
+      setVolume(r.volume);
+      setVolState("done");
+    }
+    if (r.rawJson) setRawJson(r.rawJson as string);
+    setKeyword(kw);
+  }, []);
+
   // Resume from saved job
   useEffect(() => {
     if (resumedResult && resumedKeyword) {
-      const r = resumedResult as { analysis?: AnalysisResult; serp?: SerpResult; volume?: VolumeResult; rawJson?: string };
-      if (r.analysis) {
-        setAnalysis(r.analysis);
-        setSelectedLsi(new Set(r.analysis.lsi || []));
-        setAiState("done");
-      }
-      if (r.serp) {
-        setSerp(r.serp);
-        setSerpState("done");
-      }
-      if (r.volume) {
-        setVolume(r.volume);
-        setVolState("done");
-      }
-      if (r.rawJson) setRawJson(r.rawJson);
-      setKeyword(resumedKeyword);
+      applyJobResult(resumedResult as Record<string, unknown>, resumedKeyword);
       clearResumedResult();
     }
-  }, [resumedResult, resumedKeyword, clearResumedResult]);
+  }, [resumedResult, resumedKeyword, clearResumedResult, applyJobResult]);
 
   const runStandardAnalysis = useCallback((kw: string): AnalysisResult => {
     // Local JS-based quick analysis (no API needed)

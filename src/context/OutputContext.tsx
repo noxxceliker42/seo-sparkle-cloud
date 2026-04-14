@@ -59,7 +59,7 @@ export function OutputProvider({ children }: { children: ReactNode }) {
           const analysisRaw = sessionStorage.getItem(ANALYSIS_KEY);
           const analysisId = analysisRaw ? JSON.parse(analysisRaw).savedAnalysisId : null;
           if (analysisId) {
-            supabase
+            void (supabase
               .from("saved_analyses")
               .update({
                 generated_html: data.html,
@@ -67,10 +67,9 @@ export function OutputProvider({ children }: { children: ReactNode }) {
                 meta_title: data.metaTitle || "",
                 meta_desc: data.metaDesc || "",
                 page_id: data.pageId || null,
-              } as Record<string, unknown>)
+              })
               .eq("id", analysisId)
-              .then(() => console.log("HTML in Analyse gespeichert"))
-              .catch(console.error);
+              .then(() => console.log("HTML in Analyse gespeichert")));
           }
         } catch {}
       }

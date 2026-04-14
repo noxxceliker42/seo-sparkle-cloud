@@ -39,11 +39,10 @@ export function QaProvider({ children }: { children: ReactNode }) {
       const analysisRaw = sessionStorage.getItem(ANALYSIS_KEY);
       const analysisId = analysisRaw ? JSON.parse(analysisRaw).savedAnalysisId : null;
       if (analysisId) {
-        supabase
+        void supabase
           .from("saved_analyses")
-          .update({ qa_state: state } as Record<string, unknown>)
-          .eq("id", analysisId)
-          .catch(console.error);
+          .update({ qa_state: state })
+          .eq("id", analysisId);
       }
     } catch {}
   }, []);

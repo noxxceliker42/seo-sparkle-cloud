@@ -501,7 +501,14 @@ function Index() {
     try {
       const { data: result, error } = await supabase.functions.invoke("generate-page", { body: data });
       if (error || result?.error) {
-        setGenerateError(error?.message || result?.error || "Fehler bei der Seitengenerierung");
+        const msg = error?.message || result?.error || "Fehler bei der Seitengenerierung";
+        if (msg.includes("Failed to send")) {
+          setGenerateError("Edge Function nicht erreichbar. Bitte Seite neu laden und erneut versuchen.");
+        } else if (msg.includes("timeout") || msg.includes("Timeout")) {
+          setGenerateError("Zeitüberschreitung — die KI braucht zu lange. Bitte erneut versuchen.");
+        } else {
+          setGenerateError(msg);
+        }
         return;
       }
       const html = result.htmlOutput || "";

@@ -83,6 +83,17 @@ function ClusterDetailPage() {
   const [previewPage, setPreviewPage] = useState<ClusterPage | null>(null);
   const [generateConfirm, setGenerateConfirm] = useState<ClusterPage | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const generatingRef = useRef<{ jobId: string; pageId: string } | null>(null);
+
+  const CLUSTER_GEN_KEY = "seo_os_cluster_gen";
+
+  const stopClusterPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     const [clusterRes, pagesRes] = await Promise.all([

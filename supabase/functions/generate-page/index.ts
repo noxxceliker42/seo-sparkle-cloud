@@ -179,140 +179,90 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Stream lesen und vollständigen Text aufbauen
-    const reader = apiResponse.body!.getReader();
-    const decoder = new TextDecoder();
-    let rawContent = "";
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let stopReason = "unknown";
+    // ═══════════════════════════════════════
+    // BEDINGUNG C: TransformStream + waitUntil
+    // Response wird SOFORT zurückgegeben,
+    // Stream-Verarbeitung läuft im Hintergrund.
+    // ═══════════════════════════════════════
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
+    const encoder = new TextEncoder();
 
-    console.log(`[${reqId}] Stream startet...`);
+    const processStream = async () => {
+      const reader = apiResponse.body!.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = "";
+      let outputTokens = 0;
+      let inputTokens = 0;
+      let stopReason = "unknown";
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n");
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n");
 
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const data = line.slice(6).trim();
-        if (data === "[DONE]") break;
-        if (!data) continue;
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6).trim();
+            if (data === "[DONE]" || !data) continue;
 
-        try {
-          const parsed = JSON.parse(data);
+            try {
+              const parsed = JSON.parse(data);
 
-          // Text-Delta akkumulieren
-          if (parsed.type === "content_block_delta" &&
-              parsed.delta?.type === "text_delta") {
-            rawContent += parsed.delta.text || "";
+              if (parsed.type === "content_block_delta" &&
+                  parsed.delta?.type === "text_delta") {
+                fullContent += parsed.delta.text || "";
+              }
+
+              if (parsed.type === "message_delta") {
+                outputTokens = parsed.usage?.output_tokens || outputTokens;
+                if (parsed.delta?.stop_reason) {
+                  stopReason = parsed.delta.stop_reason;
+                }
+              }
+
+              if (parsed.type === "message_start" && parsed.message?.usage) {
+                inputTokens = parsed.message.usage.input_tokens;
+              }
+            } catch {}
           }
-
-          // Token-Verbrauch aus message_delta
-          if (parsed.type === "message_delta") {
-            if (parsed.usage) {
-              outputTokens = parsed.usage.output_tokens;
-            }
-            if (parsed.delta?.stop_reason) {
-              stopReason = parsed.delta.stop_reason;
-            }
-          }
-
-          // Input-Tokens aus message_start
-          if (parsed.type === "message_start" &&
-              parsed.message?.usage) {
-            inputTokens = parsed.message.usage.input_tokens;
-          }
-        } catch {
-          // SSE parse error — skip
         }
+      } finally {
+        reader.releaseLock();
       }
-    }
 
-    const duration = Math.round((Date.now() - startTime) / 1000);
-    const tokensUsed = outputTokens;
+      const duration = Math.round((Date.now() - startTime) / 1000);
 
-    console.log(`[${reqId}] Stream fertig: ${rawContent.length} Zeichen (${duration}s)`);
-    console.log(`[${reqId}] Tokens: ${inputTokens} in / ${outputTokens} out`);
-    console.log(`[${reqId}] Stop reason:`, stopReason);
-    console.log(`[${reqId}] Vollständig:`, rawContent.trim().endsWith("</html>"));
+      console.log(`[${reqId}] Content: ${fullContent.length} Zeichen`);
+      console.log(`[${reqId}] Tokens: ${inputTokens} in / ${outputTokens} out`);
+      console.log(`[${reqId}] Dauer: ${duration}s`);
+      console.log(`[${reqId}] Stop: ${stopReason}`);
+      console.log(`[${reqId}] Vollständig: ${fullContent.trim().endsWith("</html>")}`);
 
-    if (!rawContent.trim()) {
-      return new Response(
-        JSON.stringify({
+      if (!fullContent.trim()) {
+        await writer.write(encoder.encode(JSON.stringify({
           error: "Leere Antwort von Anthropic",
           stopReason,
-          tokensUsed,
-          hint: stopReason === "max_tokens" ? "Token-Limit erreicht" : "Unbekannte Ursache",
-        }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // HTML parsen
-    const parsed = parseFullResponse(rawContent);
-
-    console.log(`[${reqId}] HTML Länge:`, parsed.htmlOutput.length);
-    console.log(`[${reqId}] Vollständig:`, parsed.htmlOutput.trim().endsWith("</html>"));
-    console.log(`[${reqId}] JSON-LD Länge:`, parsed.jsonLdOutput.length);
-
-    // In seo_pages speichern
-    let pageId: string | null = null;
-    try {
-      const { data: savedPage, error: saveError } = await supabase
-        .from("seo_pages")
-        .insert({
-          keyword: (body.keyword as string) || "",
-          firm: (body.firmName as string) || (body.firm as string) || "",
-          city: (body.city as string) || "",
-          html_output: parsed.htmlOutput,
-          body_content: parsed.bodyContent,
-          css_block: parsed.cssBlock,
-          json_ld: parsed.jsonLdOutput,
-          meta_title: parsed.metaTitle,
-          meta_desc: parsed.metaDesc,
-          meta_keywords: parsed.metaKeywords,
-          intent: (body.intent as string) || null,
-          page_type: (body.pageType as string) || null,
-          status: "draft",
-          design_preset: (body.designPreset as string) || "trust",
-          contao_mode: (body.contaoMode as boolean) || false,
-          active_sections: (body.activeSections as string[]) || [],
-          user_id: userId,
-          score: 0,
-        })
-        .select("id")
-        .single();
-
-      if (saveError) {
-        console.error(`[${reqId}] seo_pages save error:`, saveError);
-      } else {
-        pageId = savedPage?.id || null;
+          success: false,
+        })));
+        await writer.close();
+        return;
       }
-    } catch (dbErr: any) {
-      console.error(`[${reqId}] Save Error:`, dbErr.message);
-    }
 
-    // Update cluster_pages if applicable
-    if (body.clusterPageId && pageId) {
-      await supabase.from("cluster_pages").update({
-        seo_page_id: pageId,
-        status: "generated",
-        updated_at: new Date().toISOString(),
-      }).eq("id", body.clusterPageId);
-    }
+      const parsed = parseFullResponse(fullContent);
 
-    // generation_jobs aktualisieren falls jobId vorhanden
-    if (body.jobId) {
+      // In seo_pages speichern
+      let pageId: string | null = null;
       try {
-        await supabase
-          .from("generation_jobs")
-          .update({
-            status: "completed",
-            page_id: pageId,
+        const { data: savedPage, error: saveError } = await supabase
+          .from("seo_pages")
+          .insert({
+            keyword: (body.keyword as string) || "",
+            firm: (body.firmName as string) || (body.firm as string) || "",
+            city: (body.city as string) || "",
             html_output: parsed.htmlOutput,
             body_content: parsed.bodyContent,
             css_block: parsed.cssBlock,
@@ -320,21 +270,64 @@ Deno.serve(async (req) => {
             meta_title: parsed.metaTitle,
             meta_desc: parsed.metaDesc,
             meta_keywords: parsed.metaKeywords,
-            prompt_used: prompt,
-            tokens_used: tokensUsed,
-            stop_reason: stopReason,
-            duration_seconds: duration,
-            completed_at: new Date().toISOString(),
+            intent: (body.intent as string) || null,
+            page_type: (body.pageType as string) || null,
+            status: "draft",
+            design_preset: (body.designPreset as string) || "trust",
+            contao_mode: (body.contaoMode as boolean) || false,
+            active_sections: (body.activeSections as string[]) || [],
+            user_id: userId,
+            score: 0,
           })
-          .eq("id", body.jobId);
-      } catch {}
-    }
+          .select("id")
+          .single();
 
-    console.log(`[${reqId}] === SUCCESS ===`);
+        if (saveError) {
+          console.error(`[${reqId}] seo_pages save error:`, saveError);
+        } else {
+          pageId = savedPage?.id || null;
+        }
+      } catch (dbErr: any) {
+        console.error(`[${reqId}] Save Error:`, dbErr.message);
+      }
 
-    // Vollständiges Ergebnis direkt zurückgeben
-    return new Response(
-      JSON.stringify({
+      // Update cluster_pages if applicable
+      if (body.clusterPageId && pageId) {
+        await supabase.from("cluster_pages").update({
+          seo_page_id: pageId,
+          status: "generated",
+          updated_at: new Date().toISOString(),
+        }).eq("id", body.clusterPageId);
+      }
+
+      // generation_jobs aktualisieren falls jobId vorhanden
+      if (body.jobId) {
+        try {
+          await supabase
+            .from("generation_jobs")
+            .update({
+              status: "completed",
+              page_id: pageId,
+              html_output: parsed.htmlOutput,
+              body_content: parsed.bodyContent,
+              css_block: parsed.cssBlock,
+              json_ld: parsed.jsonLdOutput,
+              meta_title: parsed.metaTitle,
+              meta_desc: parsed.metaDesc,
+              meta_keywords: parsed.metaKeywords,
+              prompt_used: prompt,
+              tokens_used: outputTokens,
+              stop_reason: stopReason,
+              duration_seconds: duration,
+              completed_at: new Date().toISOString(),
+            })
+            .eq("id", body.jobId);
+        } catch {}
+      }
+
+      console.log(`[${reqId}] === SUCCESS === pageId: ${pageId}`);
+
+      await writer.write(encoder.encode(JSON.stringify({
         success: true,
         html: parsed.htmlOutput,
         bodyContent: parsed.bodyContent,
@@ -344,14 +337,26 @@ Deno.serve(async (req) => {
         metaDesc: parsed.metaDesc,
         metaKeywords: parsed.metaKeywords,
         prompt: prompt,
-        pageId: pageId,
-        tokensUsed: tokensUsed,
-        duration: duration,
-        stopReason: stopReason,
+        pageId,
+        tokensUsed: outputTokens,
+        duration,
+        stopReason,
         isComplete: parsed.htmlOutput.trim().endsWith("</html>"),
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      })));
+      await writer.close();
+    };
+
+    // Response wird SOFORT zurückgegeben — kein Timeout!
+    EdgeRuntime.waitUntil(processStream());
+
+    return new Response(readable, {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+        "Transfer-Encoding": "chunked",
+      },
+    });
 
   } catch (err: any) {
     console.error(`[${reqId}] FATAL:`, err.message);

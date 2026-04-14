@@ -591,20 +591,35 @@ function Index() {
       designPreset: data.designPreset, activeSections: data.activeSections?.length || 0, contaoMode: (data as any).contaoMode || false,
     });
 
-    // SCHRITT 5: Anthropic Call
+    // SCHRITT 5: Anthropic Call (direkter fetch für Streaming/chunked Response)
     await logger.log("Anthropic Generierung", "running", "Claude generiert HTML... (30-90 Sek)");
     const genStart = Date.now();
     try {
-      const { data: result, error } = await supabase.functions.invoke("generate-page", {
-        body: { ...data, userId: authUser.id },
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const httpResponse = await fetch(
+        `${supabaseUrl}/functions/v1/generate-page`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token}`,
+            "apikey": supabaseKey,
+          },
+          body: JSON.stringify({ ...data, userId: authUser.id }),
+        }
+      );
+
       const genMs = Date.now() - genStart;
 
-      if (error) {
-        let msg = error.message;
+      if (!httpResponse.ok) {
+        const errText = await httpResponse.text();
+        let msg = `HTTP ${httpResponse.status}`;
         try {
-          const ctx = (error as any).context;
-          if (ctx) { const b = await ctx.json(); msg = b.error || b.message || msg; }
+          const errJson = JSON.parse(errText);
+          msg = errJson.error || msg;
         } catch {}
         let hint = "";
         if (msg.includes("timeout") || genMs > 140000) hint = "Timeout — Weniger Sektionen aktivieren.";
@@ -619,11 +634,25 @@ function Index() {
         return;
       }
 
-      if (!result || result.error) {
-        await logger.log("Anthropic Generierung", "error", result?.error || "Keine Antwort", {
+      // Chunked Response lesen und parsen
+      const text = await httpResponse.text();
+      let result: any;
+      try {
+        result = JSON.parse(text);
+      } catch {
+        const lastBrace = text.lastIndexOf("}");
+        if (lastBrace > 0) {
+          result = JSON.parse(text.slice(0, lastBrace + 1));
+        } else {
+          throw new Error("Response nicht parsbar: " + text.slice(0, 100));
+        }
+      }
+
+      if (result.error) {
+        await logger.log("Anthropic Generierung", "error", result.error, {
           hint: "Edge Function Logs prüfen",
         });
-        setGenerateError(result?.error || "Keine Antwort von der Edge Function");
+        setGenerateError(result.error);
         setGenerating(false);
         return;
       }

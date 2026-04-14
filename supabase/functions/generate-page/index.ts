@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 16000,
+          max_tokens: 64000,
           stream: true,
           messages: [{ role: "user", content: prompt }],
         }),
@@ -421,6 +421,13 @@ function extractJsonLd(html: string): string {
 // BUILD PROMPT
 // ═══════════════════════════════════════
 
+function truncateList(value: unknown, max: number): string {
+  if (!value || typeof value !== "string") return "keine";
+  const items = value.split(/[,·|]/).map(s => s.trim()).filter(Boolean);
+  if (items.length <= max) return value;
+  return items.slice(0, max).join(", ") + ` … (${items.length - max} weitere)`;
+}
+
 function buildPrompt(data: Record<string, unknown>): string {
   const ds = DESIGN_SYSTEMS[(data.designPreset as string) || "trust"] || DESIGN_SYSTEMS.trust;
   const isContao = data.contaoMode === true;
@@ -437,11 +444,11 @@ SEITEN-KONTEXT
 KEYWORD: "${data.keyword || "Keyword"}"
 SEITENTYP: ${data.pageType || "Pillar Page"}
 INTENT: ${data.intent || "Informational"}
-SEKUNDÄR-KEYWORDS: ${data.secondaryKeywords || "keine"}
-LSI-BEGRIFFE: ${data.lsiTerms || data.lsi || "keine"}
-GESCHWISTER-SEITEN: ${data.siblingPages || "keine"}
-DEEP PAGES: ${data.deepPages || "keine"}
-CONTENT-GAP: ${data.contentGap || "keine"}
+SEKUNDÄR-KEYWORDS: ${truncateList(data.secondaryKeywords, 5)}
+LSI-BEGRIFFE: ${truncateList(data.lsiTerms || data.lsi, 8)}
+GESCHWISTER-SEITEN: ${truncateList(data.siblingPages, 3)}
+DEEP PAGES: ${truncateList(data.deepPages, 2)}
+CONTENT-GAP: ${truncateList(data.contentGap, 2)}
 PAA-FRAGEN: ${data.paaQuestions || data.paa || "keine"}
 
 ══════════════════════════════════════
@@ -583,5 +590,11 @@ WICHTIG:
 - ALLE Sektionen vollständig ausschreiben
 - Kein Platzhaltertext wie "Lorem ipsum"
 - HTML endet mit </html>
-- Antworte SOFORT ohne Erklärungen`;
+- Antworte SOFORT ohne Erklärungen
+
+PFLICHT: Die letzten 2000 Tokens MÜSSEN für folgendes genutzt werden:
+1. FAQ-Sektion mit allen PAA-Fragen
+2. Autor-Box (Sektion 15)
+3. JSON-LD Schemas (FAQPage + HowTo + LocalBusiness + BreadcrumbList)
+Kürze andere Sektionen wenn nötig, aber diese 3 Punkte sind NICHT optional.`;
 }

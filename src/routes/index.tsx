@@ -669,6 +669,7 @@ function Index() {
       if (!result.html.trim().endsWith("</html>")) warnings.push("HTML nicht vollständig");
       if (!result.jsonLd || result.jsonLd.trim() === "") warnings.push("JSON-LD fehlt");
       if (!result.metaTitle) warnings.push("Meta-Title fehlt");
+      if (result.tokensUsed >= 63500) warnings.push("Token-Limit fast erreicht — Sektionen möglicherweise gekürzt");
 
       if (warnings.length > 0) {
         await logger.log("Anthropic Generierung", "warning", `HTML generiert mit Hinweisen nach ${Math.round(genMs / 1000)}s · ${result.tokensUsed || "?"} Tokens`, {

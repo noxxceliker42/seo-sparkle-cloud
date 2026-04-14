@@ -129,6 +129,7 @@ function Index() {
     startAnalysis,
     clearResult: clearAnalysisResult,
     clearError: clearAnalysisError,
+    savedAnalysisId,
   } = useAnalysis();
 
   useEffect(() => {

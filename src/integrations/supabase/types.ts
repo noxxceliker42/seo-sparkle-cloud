@@ -233,8 +233,10 @@ export type Database = {
       }
       generation_jobs: {
         Row: {
+          body_content: string | null
           completed_at: string | null
           created_at: string
+          css_block: string | null
           duration_seconds: number | null
           error_message: string | null
           html_output: string | null
@@ -242,15 +244,20 @@ export type Database = {
           json_ld: string | null
           keyword: string
           meta_desc: string | null
+          meta_keywords: string | null
           meta_title: string | null
           page_id: string | null
+          prompt_used: string | null
           status: string
+          stop_reason: string | null
           tokens_used: number | null
           user_id: string
         }
         Insert: {
+          body_content?: string | null
           completed_at?: string | null
           created_at?: string
+          css_block?: string | null
           duration_seconds?: number | null
           error_message?: string | null
           html_output?: string | null
@@ -258,15 +265,20 @@ export type Database = {
           json_ld?: string | null
           keyword: string
           meta_desc?: string | null
+          meta_keywords?: string | null
           meta_title?: string | null
           page_id?: string | null
+          prompt_used?: string | null
           status?: string
+          stop_reason?: string | null
           tokens_used?: number | null
           user_id: string
         }
         Update: {
+          body_content?: string | null
           completed_at?: string | null
           created_at?: string
+          css_block?: string | null
           duration_seconds?: number | null
           error_message?: string | null
           html_output?: string | null
@@ -274,9 +286,12 @@ export type Database = {
           json_ld?: string | null
           keyword?: string
           meta_desc?: string | null
+          meta_keywords?: string | null
           meta_title?: string | null
           page_id?: string | null
+          prompt_used?: string | null
           status?: string
+          stop_reason?: string | null
           tokens_used?: number | null
           user_id?: string
         }
@@ -600,8 +615,11 @@ export type Database = {
       seo_pages: {
         Row: {
           active_sections: Json | null
+          body_content: string | null
           city: string | null
+          contao_mode: boolean | null
           created_at: string | null
+          css_block: string | null
           design_preset: string | null
           firm: string | null
           html_output: string | null
@@ -610,6 +628,7 @@ export type Database = {
           json_ld: string | null
           keyword: string
           meta_desc: string | null
+          meta_keywords: string | null
           meta_title: string | null
           page_type: string | null
           score: number | null
@@ -619,8 +638,11 @@ export type Database = {
         }
         Insert: {
           active_sections?: Json | null
+          body_content?: string | null
           city?: string | null
+          contao_mode?: boolean | null
           created_at?: string | null
+          css_block?: string | null
           design_preset?: string | null
           firm?: string | null
           html_output?: string | null
@@ -629,6 +651,7 @@ export type Database = {
           json_ld?: string | null
           keyword: string
           meta_desc?: string | null
+          meta_keywords?: string | null
           meta_title?: string | null
           page_type?: string | null
           score?: number | null
@@ -638,8 +661,11 @@ export type Database = {
         }
         Update: {
           active_sections?: Json | null
+          body_content?: string | null
           city?: string | null
+          contao_mode?: boolean | null
           created_at?: string | null
+          css_block?: string | null
           design_preset?: string | null
           firm?: string | null
           html_output?: string | null
@@ -648,6 +674,7 @@ export type Database = {
           json_ld?: string | null
           keyword?: string
           meta_desc?: string | null
+          meta_keywords?: string | null
           meta_title?: string | null
           page_type?: string | null
           score?: number | null

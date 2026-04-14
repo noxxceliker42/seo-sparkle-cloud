@@ -179,3 +179,26 @@ function hasMinRoleCheck(userRole: AppRole | null, minRole: AppRole): boolean {
   if (!userRole) return false;
   return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[minRole];
 }
+
+function AnalysisStatusBadge() {
+  const { isRunning, keyword, result } = useAnalysis();
+
+  if (isRunning) {
+    return (
+      <span className="ml-3 inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-600">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+        Analyse läuft
+      </span>
+    );
+  }
+
+  if (result && keyword) {
+    return (
+      <span className="ml-3 text-[11px] font-bold text-green-600">
+        ✓ „{keyword}" analysiert
+      </span>
+    );
+  }
+
+  return null;
+}

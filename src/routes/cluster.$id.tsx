@@ -113,6 +113,74 @@ function ClusterDetailPage() {
     if (previewPage?.id === pageId) setPreviewPage((prev) => prev ? { ...prev, status } : null);
   };
 
+  const startClusterPolling = useCallback((jobId: string, pageId: string, pageKeyword: string) => {
+    if (pollingRef.current) return;
+    generatingRef.current = { jobId, pageId };
+    try { sessionStorage.setItem(CLUSTER_GEN_KEY, JSON.stringify({ jobId, pageId })); } catch {}
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const { data: job } = await supabase
+          .from("generation_jobs")
+          .select("status, page_id, error_message")
+          .eq("id", jobId)
+          .single();
+
+        if (!job) return;
+
+        if (job.status === "completed") {
+          stopClusterPolling();
+          try { sessionStorage.removeItem(CLUSTER_GEN_KEY); } catch {}
+          generatingRef.current = null;
+          if (job.page_id) {
+            setClusterPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, status: "generated", seo_page_id: job.page_id } : p)));
+          }
+          toast.success(`Seite "${pageKeyword}" wurde generiert`);
+          setGenerating(null);
+        }
+
+        if (job.status === "error") {
+          stopClusterPolling();
+          try { sessionStorage.removeItem(CLUSTER_GEN_KEY); } catch {}
+          generatingRef.current = null;
+          toast.error(job.error_message || "Generierung fehlgeschlagen");
+          await updateStatus(pageId, "approved");
+          setGenerating(null);
+        }
+      } catch (pollErr) {
+        console.error("Poll error:", pollErr);
+      }
+    }, 5000);
+  }, [stopClusterPolling, updateStatus]);
+
+  // Restore generation state on mount
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(CLUSTER_GEN_KEY);
+      if (!raw) return;
+      const { jobId, pageId } = JSON.parse(raw);
+      if (!jobId || !pageId) return;
+      setGenerating(pageId);
+      const page = clusterPages.find((p) => p.id === pageId);
+      startClusterPolling(jobId, pageId, page?.keyword || "");
+    } catch {}
+    return () => stopClusterPolling();
+  }, [clusterPages.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Resume polling on tab visibility change
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState !== "visible") return;
+      const cur = generatingRef.current;
+      if (cur && !pollingRef.current) {
+        const page = clusterPages.find((p) => p.id === cur.pageId);
+        startClusterPolling(cur.jobId, cur.pageId, page?.keyword || "");
+      }
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, [startClusterPolling, clusterPages]);
+
   const handleGenerate = async (page: ClusterPage) => {
     setGenerateConfirm(null);
     setGenerating(page.id);
@@ -165,56 +233,12 @@ function ClusterDetailPage() {
         return;
       }
 
-      const jobId = data.jobId;
-      toast.info("Generierung gestartet — dauert 2–4 Minuten...");
-
-      // Poll for completion
-      const pollInterval = setInterval(async () => {
-        try {
-          const { data: job } = await supabase
-            .from("generation_jobs")
-            .select("status, page_id, error_message")
-            .eq("id", jobId)
-            .single();
-
-          if (!job) return;
-
-          if (job.status === "completed") {
-            clearInterval(pollInterval);
-            // The edge function already saved to seo_pages and updated cluster_pages
-            if (job.page_id) {
-              setClusterPages((prev) => prev.map((p) => (p.id === page.id ? { ...p, status: "generated", seo_page_id: job.page_id } : p)));
-            }
-            toast.success(`Seite "${page.keyword}" wurde generiert`);
-            setGenerating(null);
-          }
-
-          if (job.status === "error") {
-            clearInterval(pollInterval);
-            toast.error(job.error_message || "Generierung fehlgeschlagen");
-            await updateStatus(page.id, "approved");
-            setGenerating(null);
-          }
-        } catch (pollErr) {
-          console.error("Poll error:", pollErr);
-        }
-      }, 5000);
-
-      // Safety timeout
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        setGenerating((prev) => {
-          if (prev) {
-            toast.error("Generierung dauert zu lange. Bitte Status prüfen.");
-          }
-          return null;
-        });
-      }, 600000);
+      toast.info("Generierung gestartet — dauert 2–4 Minuten. Tab-Wechsel ist sicher.");
+      startClusterPolling(data.jobId, page.id, page.keyword);
     } catch (err) {
       console.error(err);
       toast.error("Generierung fehlgeschlagen");
       await updateStatus(page.id, "approved");
-    } finally {
       setGenerating(null);
     }
   };

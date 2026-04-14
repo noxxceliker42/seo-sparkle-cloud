@@ -55,6 +55,7 @@ Deno.serve(async (req) => {
   try {
     const {
       promptPositive, promptNegative, width, height,
+      aspectRatio, resolution, slotLabel,
       slot, pageId, firmId, altText, userId, keyword
     } = await req.json();
 
@@ -81,8 +82,8 @@ Deno.serve(async (req) => {
           prompt,
           negative_prompt: promptNegative || "",
           image_input: [],
-          aspect_ratio: width === height ? "1:1" : "16:9",
-          resolution: "1K",
+          aspect_ratio: aspectRatio || (width === height ? "1:1" : "16:9"),
+          resolution: resolution || "1K",
           output_format: "jpg",
         },
       }),
@@ -123,6 +124,7 @@ Deno.serve(async (req) => {
           firm_id: firmId || null,
           page_id: pageId || null,
           slot: slot || "free",
+          slot_label: slotLabel || null,
           prompt: prompt,
           prompt_positive: promptPositive,
           prompt_negative: promptNegative || "",
@@ -160,6 +162,7 @@ Deno.serve(async (req) => {
         firm_id: firmId || null,
         page_id: pageId || null,
         slot: slot || "free",
+        slot_label: slotLabel || null,
         prompt: prompt,
         prompt_positive: promptPositive,
         prompt_negative: promptNegative || "",

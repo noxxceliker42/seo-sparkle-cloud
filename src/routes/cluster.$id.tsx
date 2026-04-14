@@ -120,6 +120,10 @@ function ClusterDetailPage() {
         .filter((p) => p.id !== page.id && p.status === "generated" && p.seo_page_id)
         .map((p) => ({ keyword: p.keyword, anchor: p.internal_link_anchor }));
 
+      // Get user for userId
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setGenerating(null); return; }
+
       const { data, error } = await supabase.functions.invoke("generate-page", {
         body: {
           keyword: page.keyword,
@@ -138,44 +142,63 @@ function ClusterDetailPage() {
           infoGain: "",
           pillarKeyword: cluster?.pillar_keyword || "",
           clusterSiblings: siblings,
+          userId: user.id,
+          clusterPageId: page.id,
         },
       });
 
-      if (error || data?.error) {
-        toast.error(data?.error || "Generierung fehlgeschlagen");
+      if (error || !data?.jobId) {
+        toast.error(data?.error || error?.message || "Generierung konnte nicht gestartet werden");
         await updateStatus(page.id, "approved");
         setGenerating(null);
         return;
       }
 
-      // Save to seo_pages
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setGenerating(null); return; }
+      const jobId = data.jobId;
+      toast.info("Generierung gestartet — dauert 2–4 Minuten...");
 
-      const { data: seoPage, error: saveErr } = await supabase.from("seo_pages").insert({
-        keyword: page.keyword,
-        user_id: user.id,
-        firm: (firmData as { name?: string })?.name || null,
-        city: (firmData as { city?: string })?.city || null,
-        intent: page.intent,
-        page_type: page.page_type,
-        html_output: data.html || null,
-        meta_title: data.metaTitle || null,
-        meta_desc: data.metaDesc || null,
-        json_ld: data.jsonLd || null,
-        score: data.score || 0,
-        status: "draft",
-      }).select().single();
+      // Poll for completion
+      const pollInterval = setInterval(async () => {
+        try {
+          const { data: job } = await supabase
+            .from("generation_jobs")
+            .select("status, page_id, error_message")
+            .eq("id", jobId)
+            .single();
 
-      if (saveErr || !seoPage) {
-        console.error(saveErr);
-        toast.error("Seite konnte nicht gespeichert werden");
-        await updateStatus(page.id, "approved");
-      } else {
-        await supabase.from("cluster_pages").update({ seo_page_id: seoPage.id, status: "generated" }).eq("id", page.id);
-        setClusterPages((prev) => prev.map((p) => (p.id === page.id ? { ...p, status: "generated", seo_page_id: seoPage.id } : p)));
-        toast.success(`Seite "${page.keyword}" wurde generiert`);
-      }
+          if (!job) return;
+
+          if (job.status === "completed") {
+            clearInterval(pollInterval);
+            // The edge function already saved to seo_pages and updated cluster_pages
+            if (job.page_id) {
+              setClusterPages((prev) => prev.map((p) => (p.id === page.id ? { ...p, status: "generated", seo_page_id: job.page_id } : p)));
+            }
+            toast.success(`Seite "${page.keyword}" wurde generiert`);
+            setGenerating(null);
+          }
+
+          if (job.status === "error") {
+            clearInterval(pollInterval);
+            toast.error(job.error_message || "Generierung fehlgeschlagen");
+            await updateStatus(page.id, "approved");
+            setGenerating(null);
+          }
+        } catch (pollErr) {
+          console.error("Poll error:", pollErr);
+        }
+      }, 5000);
+
+      // Safety timeout
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        setGenerating((prev) => {
+          if (prev) {
+            toast.error("Generierung dauert zu lange. Bitte Status prüfen.");
+          }
+          return null;
+        });
+      }, 600000);
     } catch (err) {
       console.error(err);
       toast.error("Generierung fehlgeschlagen");

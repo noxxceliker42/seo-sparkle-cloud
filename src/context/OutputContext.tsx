@@ -1,22 +1,34 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-interface OutputState {
+export interface OutputState {
   html: string;
+  bodyContent: string;
+  cssBlock: string;
   jsonLd: string;
   metaTitle: string;
   metaDesc: string;
+  metaKeywords: string;
   prompt: string;
   pageId: string;
+  tokensUsed: number;
+  duration: number;
+  stopReason: string;
 }
 
 const EMPTY_OUTPUT: OutputState = {
   html: "",
+  bodyContent: "",
+  cssBlock: "",
   jsonLd: "",
   metaTitle: "",
   metaDesc: "",
+  metaKeywords: "",
   prompt: "",
   pageId: "",
+  tokensUsed: 0,
+  duration: 0,
+  stopReason: "",
 };
 
 const OUTPUT_KEY = "seo_os_output_v2";
@@ -53,7 +65,6 @@ export function OutputProvider({ children }: { children: ReactNode }) {
         sessionStorage.setItem(OUTPUT_KEY, JSON.stringify(next));
       } catch {}
 
-      // Sync to saved_analyses if we have a savedAnalysisId
       if (data.html) {
         try {
           const analysisRaw = sessionStorage.getItem(ANALYSIS_KEY);

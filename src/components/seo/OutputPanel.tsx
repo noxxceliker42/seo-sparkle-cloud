@@ -75,6 +75,7 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
 
   const tabs = [
     { id: "html" as const, label: "HTML (vollständig)" },
+    { id: "preview" as const, label: "Vorschau" },
     { id: "prompt" as const, label: "Master-Prompt" },
     { id: "jsonld" as const, label: "JSON-LD Schema" },
     { id: "meta" as const, label: "Meta-Block" },

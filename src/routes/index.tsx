@@ -588,7 +588,7 @@ function Index() {
     await logger.log("Prompt aufbauen", "running", "Master-Prompt wird zusammengestellt...");
     const promptSize = JSON.stringify(data).length;
     await logger.log("Prompt aufbauen", "success", `Prompt bereit · ${promptSize} Zeichen Input`, {
-      designPreset: data.designPreset, activeSections: data.activeSections?.length || 0, contaoMode: data.contaoMode || false,
+      designPreset: data.designPreset, activeSections: data.activeSections?.length || 0, contaoMode: (data as any).contaoMode || false,
     });
 
     // SCHRITT 5: Anthropic Call

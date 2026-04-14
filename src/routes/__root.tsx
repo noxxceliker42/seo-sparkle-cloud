@@ -6,7 +6,12 @@ import { AnalysisProvider, useAnalysis } from "@/context/AnalysisContext";
 import { FormProvider } from "@/context/FormContext";
 import { OutputProvider } from "@/context/OutputContext";
 import { QaProvider } from "@/context/QaContext";
+import { LogProvider } from "@/context/LogContext";
+import { LogPanel } from "@/components/LogPanel";
 import { Toaster } from "@/components/ui/sonner";
+import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { LogOut, User, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LogOut, User, Users } from "lucide-react";
@@ -66,7 +71,10 @@ function RootComponent() {
         <FormProvider>
           <OutputProvider>
             <QaProvider>
-              <AuthGate />
+              <LogProvider>
+                <AuthGate />
+                <LogPanel />
+              </LogProvider>
             </QaProvider>
           </OutputProvider>
         </FormProvider>

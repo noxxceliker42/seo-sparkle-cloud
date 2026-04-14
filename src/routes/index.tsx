@@ -614,7 +614,7 @@ function Index() {
             "Authorization": `Bearer ${session?.access_token}`,
             "apikey": supabaseKey,
           },
-          body: JSON.stringify({ ...data, userId: authUser.id }),
+          body: JSON.stringify({ ...data, userId: authUser.id, ...(customPrompt ? { customPrompt } : {}) }),
         }
       );
 

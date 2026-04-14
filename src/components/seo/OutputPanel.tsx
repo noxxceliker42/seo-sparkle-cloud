@@ -120,6 +120,50 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
             </Button>
           </>
         )}
+        {tab === "preview" && (
+          <>
+            <div className="flex gap-2 mb-3">
+              <Button
+                variant={previewMode === "desktop" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setPreviewMode("desktop")}
+                className="gap-2"
+              >
+                <Monitor className="h-4 w-4" /> Desktop
+              </Button>
+              <Button
+                variant={previewMode === "mobile" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setPreviewMode("mobile")}
+                className="gap-2"
+              >
+                <Smartphone className="h-4 w-4" /> Mobile
+              </Button>
+            </div>
+            <div className="rounded-lg border border-border overflow-hidden h-[600px] bg-muted/30">
+              {page.htmlOutput ? (
+                <iframe
+                  srcDoc={page.htmlOutput
+                    .replace(/^```html\s*/i, '')
+                    .replace(/```\s*$/i, '')
+                    .trim()
+                  }
+                  className={`h-full border-none ${
+                    previewMode === "mobile"
+                      ? "w-[375px] mx-auto block"
+                      : "w-full"
+                  }`}
+                  title="SEO-Seite Live-Vorschau"
+                  sandbox="allow-same-origin allow-scripts"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  Seite generieren um Vorschau zu sehen
+                </div>
+              )}
+            </div>
+          </>
+        )}
         {tab === "prompt" && (
           <>
             <Textarea readOnly value={page.masterPrompt} className="min-h-[400px] font-mono text-xs" />

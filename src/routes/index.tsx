@@ -252,6 +252,7 @@ function Index() {
     }
   }, [activeJobId, isPolling, resumedKeyword, startPolling, applyJobResult, saveAnalysis]);
 
+  const handleAnalyze = useCallback(async () => {
     if (!keyword.trim()) return;
     const kw = keyword.trim();
 

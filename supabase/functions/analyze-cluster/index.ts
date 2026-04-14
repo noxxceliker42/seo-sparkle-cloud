@@ -5,6 +5,39 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function extractKieContent(data: Record<string, unknown>): string {
+  let content = '';
+
+  // Anthropic-Format (Kie.AI offiziell):
+  if (data?.content && Array.isArray(data.content)) {
+    const textBlock = (data.content as Array<{ type: string; text?: string }>).find((b) => b.type === "text");
+    if (textBlock?.text) content = textBlock.text;
+  }
+  // OpenAI-Format (Fallback):
+  if (!content) {
+    const choices = data?.choices as Array<{ message?: { content?: string } }> | undefined;
+    if (choices?.[0]?.message?.content) content = choices[0].message.content;
+  }
+  // Direct string:
+  if (!content && typeof data?.content === 'string') {
+    content = data.content;
+  }
+
+  if (!content || content.trim() === '') {
+    console.error('Leere Antwort von Kie.AI. Data:', JSON.stringify(data).substring(0, 500));
+    throw new Error(
+      'Kie.AI leere Antwort. stop_reason: ' + ((data?.stop_reason as string) || 'unbekannt') +
+      ' | Typ: ' + ((data?.type as string) || 'unbekannt')
+    );
+  }
+
+  return content
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -71,8 +104,8 @@ Regeln:
 - Alle Seiten müssen eigenständigen Mehrwert liefern
 - Keine Keyword-Kannibalisierung untereinander`;
 
-    // CALL 1: Kie.AI
-    const aiPromise = fetch("https://kieai.erweima.ai/api/v1/chat/completions", {
+    // CALL 1: Kie.AI (korrekter Anthropic-Endpoint)
+    const aiResponse = await fetch("https://api.kie.ai/claude/v1/messages", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
@@ -80,23 +113,43 @@ Regeln:
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 2000,
         messages: [{ role: "user", content: prompt }],
+        max_tokens: 8000,
+        stream: false,
       }),
     });
 
-    const aiResponse = await aiPromise;
     if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      console.error("Kie.AI error:", aiResponse.status, errText);
+      const errBody = await aiResponse.text();
+      console.error("Kie.AI error:", aiResponse.status, errBody);
+      if (aiResponse.status === 401) {
+        return new Response(
+          JSON.stringify({ error: "Kie.AI: Ungültiger API Key (401)" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (aiResponse.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "Kie.AI: Rate Limit erreicht (429) — 30 Sek warten" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       return new Response(
-        JSON.stringify({ error: `Kie.AI Fehler: ${aiResponse.status}` }),
+        JSON.stringify({ error: `Kie.AI HTTP ${aiResponse.status}: ${errBody}` }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const aiData = await aiResponse.json();
-    const rawContent = aiData?.choices?.[0]?.message?.content || aiData?.data?.choices?.[0]?.message?.content || "";
+    let rawContent: string;
+    try {
+      rawContent = extractKieContent(aiData);
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: (e as Error).message }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     let parsed: Record<string, unknown>;
     try {

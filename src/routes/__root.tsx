@@ -3,6 +3,9 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AuthProvider, useAuth, type AppRole } from "@/hooks/useAuth";
 import { AnalysisProvider, useAnalysis } from "@/context/AnalysisContext";
+import { FormProvider } from "@/context/FormContext";
+import { OutputProvider } from "@/context/OutputContext";
+import { QaProvider } from "@/context/QaContext";
 import { Toaster } from "@/components/ui/sonner";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -60,7 +63,13 @@ function RootComponent() {
   return (
     <AuthProvider>
       <AnalysisProvider>
-        <AuthGate />
+        <FormProvider>
+          <OutputProvider>
+            <QaProvider>
+              <AuthGate />
+            </QaProvider>
+          </OutputProvider>
+        </FormProvider>
       </AnalysisProvider>
       <Toaster />
     </AuthProvider>
@@ -168,7 +177,7 @@ function AuthGate() {
 
 function getMinRole(path: string): AppRole | null {
   if (path.startsWith("/benutzer")) return "admin";
-  if (path === "/" || path.startsWith("/firmen")) return "editor";
+  if (path === "/" || path.startsWith("/firmen") || path.startsWith("/analysen")) return "editor";
   // dashboard, cluster, settings, profil → viewer
   return "viewer";
 }

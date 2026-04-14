@@ -129,6 +129,7 @@ function Index() {
     startAnalysis,
     clearResult: clearAnalysisResult,
     clearError: clearAnalysisError,
+    savedAnalysisId,
   } = useAnalysis();
 
   useEffect(() => {
@@ -233,22 +234,24 @@ function Index() {
     }
   }, [selectedFirm]);
 
-  const applyJobResult = useCallback((result: Record<string, unknown>, kw: string) => {
-    const r = result as { analysis?: AnalysisResult; serp?: SerpResult; volume?: VolumeResult; rawJson?: string };
-    if (r.analysis) {
-      setAnalysis(r.analysis);
-      setSelectedLsi(new Set(r.analysis.lsi || []));
+  const applyJobResult = useCallback((result: { kieai: unknown; serp: unknown; volume: unknown }, kw: string) => {
+    const analysisData = result.kieai as AnalysisResult | null;
+    const serpData = result.serp as SerpResult | null;
+    const volumeData = result.volume as VolumeResult | null;
+
+    if (analysisData) {
+      setAnalysis(analysisData);
+      setSelectedLsi(new Set(analysisData.lsi || []));
       setAiState("done");
     }
-    if (r.serp) {
-      setSerp(r.serp);
+    if (serpData) {
+      setSerp(serpData);
       setSerpState("done");
     }
-    if (r.volume) {
-      setVolume(r.volume);
+    if (volumeData) {
+      setVolume(volumeData);
       setVolState("done");
     }
-    if (r.rawJson) setRawJson(r.rawJson as string);
     setKeyword(kw);
   }, []);
 
@@ -256,25 +259,9 @@ function Index() {
     const appliedKeyword = runningAnalysisKeyword || keyword.trim();
     if (!analysisJobResult || !appliedKeyword) return;
 
-    applyJobResult(analysisJobResult as Record<string, unknown>, appliedKeyword);
-    const r = analysisJobResult as {
-      analysis?: AnalysisResult;
-      serp?: SerpResult;
-      volume?: VolumeResult;
-      rawJson?: string;
-    };
-
-    void saveAnalysis(
-      appliedKeyword,
-      "kieai",
-      r.analysis || null,
-      r.volume || null,
-      r.serp || null,
-      r.rawJson || "",
-    );
-
+    applyJobResult(analysisJobResult, appliedKeyword);
     clearAnalysisResult();
-  }, [analysisJobResult, runningAnalysisKeyword, keyword, applyJobResult, saveAnalysis, clearAnalysisResult]);
+  }, [analysisJobResult, runningAnalysisKeyword, keyword, applyJobResult, clearAnalysisResult]);
 
   const handleAnalyze = useCallback(async () => {
     if (!keyword.trim()) return;

@@ -136,11 +136,12 @@ Deno.serve(async (req) => {
     console.log(`[${reqId}] Prompt Länge:`, prompt.length);
 
     // ═══════════════════════════════════════
-    // ANTHROPIC CALL — direkt await
-    // Kein EdgeRuntime.waitUntil, kein Fire-and-Forget
-    // Supabase erlaubt bis 150s, Anthropic braucht 30-90s
+    // ANTHROPIC STREAMING CALL
+    // Stream löst das 150s Supabase-Timeout:
+    // Response beginnt sofort beim ersten Token,
+    // Timeout gilt pro Chunk, nicht für Gesamtdauer.
     // ═══════════════════════════════════════
-    console.log(`[${reqId}] Anthropic Call startet...`);
+    console.log(`[${reqId}] Anthropic Streaming Call startet...`);
     const startTime = Date.now();
 
     let apiResponse: Response;
@@ -154,7 +155,8 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 64000,
+          max_tokens: 16000,
+          stream: true,
           messages: [{ role: "user", content: prompt }],
         }),
       });
@@ -166,8 +168,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const duration = Math.round((Date.now() - startTime) / 1000);
-    console.log(`[${reqId}] Anthropic Status:`, apiResponse.status, `(${duration}s)`);
+    console.log(`[${reqId}] Anthropic Status:`, apiResponse.status);
 
     if (!apiResponse.ok) {
       const errText = await apiResponse.text();
@@ -178,14 +179,66 @@ Deno.serve(async (req) => {
       );
     }
 
-    const apiData = await apiResponse.json();
-    const rawContent = apiData?.content?.[0]?.text || "";
-    const tokensUsed = apiData?.usage?.output_tokens || 0;
-    const stopReason = apiData?.stop_reason || "unknown";
+    // Stream lesen und vollständigen Text aufbauen
+    const reader = apiResponse.body!.getReader();
+    const decoder = new TextDecoder();
+    let rawContent = "";
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let stopReason = "unknown";
 
-    console.log(`[${reqId}] Content Länge:`, rawContent.length);
-    console.log(`[${reqId}] Tokens:`, tokensUsed);
+    console.log(`[${reqId}] Stream startet...`);
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split("\n");
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") break;
+        if (!data) continue;
+
+        try {
+          const parsed = JSON.parse(data);
+
+          // Text-Delta akkumulieren
+          if (parsed.type === "content_block_delta" &&
+              parsed.delta?.type === "text_delta") {
+            rawContent += parsed.delta.text || "";
+          }
+
+          // Token-Verbrauch aus message_delta
+          if (parsed.type === "message_delta") {
+            if (parsed.usage) {
+              outputTokens = parsed.usage.output_tokens;
+            }
+            if (parsed.delta?.stop_reason) {
+              stopReason = parsed.delta.stop_reason;
+            }
+          }
+
+          // Input-Tokens aus message_start
+          if (parsed.type === "message_start" &&
+              parsed.message?.usage) {
+            inputTokens = parsed.message.usage.input_tokens;
+          }
+        } catch {
+          // SSE parse error — skip
+        }
+      }
+    }
+
+    const duration = Math.round((Date.now() - startTime) / 1000);
+    const tokensUsed = outputTokens;
+
+    console.log(`[${reqId}] Stream fertig: ${rawContent.length} Zeichen (${duration}s)`);
+    console.log(`[${reqId}] Tokens: ${inputTokens} in / ${outputTokens} out`);
     console.log(`[${reqId}] Stop reason:`, stopReason);
+    console.log(`[${reqId}] Vollständig:`, rawContent.trim().endsWith("</html>"));
 
     if (!rawContent.trim()) {
       return new Response(

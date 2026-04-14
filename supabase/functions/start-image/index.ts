@@ -4,6 +4,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Content-Type": "application/json",
 };
 
 async function uploadToCloudinary(
@@ -57,10 +58,7 @@ Deno.serve(async (req) => {
       promptPositive, promptNegative, width, height,
       aspectRatio, resolution, slotLabel,
       slot, pageId, firmId, altText, userId, keyword,
-      // Image-to-image fields
-      mode,
-      referenceImageUrl,
-      editStrength,
+      mode, referenceImageUrl, editStrength,
     } = await req.json();
 
     const kieKey = Deno.env.get("KIE_AI_API_KEY");
@@ -74,15 +72,43 @@ Deno.serve(async (req) => {
     const prompt = (promptPositive || "").trim().substring(0, 20000);
     const genMode = mode || "text-to-image";
 
-    // Validate image-to-image modes
     if ((genMode === "image-to-image" || genMode === "image-edit") && !referenceImageUrl) {
       return new Response(
         JSON.stringify({ error: "referenceImageUrl fehlt für Image-to-Image" }),
-        { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
+        { status: 400, headers: cors }
       );
     }
 
-    // Build NanoBanana request based on mode
+    // Step 1: Insert job row first to get jobId
+    const { data: job, error: insertErr } = await supabase
+      .from("image_jobs")
+      .insert({
+        user_id: userId,
+        firm_id: firmId || null,
+        page_id: pageId || null,
+        slot: slot || "free",
+        slot_label: slotLabel || null,
+        prompt: prompt,
+        prompt_positive: promptPositive,
+        prompt_negative: promptNegative || "",
+        width: width || 1200,
+        height: height || 675,
+        alt_text: altText || "",
+        status: "generating",
+        mode: genMode,
+        reference_image_url: referenceImageUrl || null,
+        edit_strength: editStrength ?? null,
+      })
+      .select("id")
+      .single();
+
+    if (insertErr || !job) {
+      throw new Error("DB insert failed: " + (insertErr?.message || "no job"));
+    }
+
+    const jobId = job.id;
+
+    // Step 2: Build request based on mode
     let nanoEndpoint: string;
     let nanoBody: Record<string, unknown>;
 
@@ -98,17 +124,16 @@ Deno.serve(async (req) => {
         ...(resolution && { image_size: resolution }),
       };
     } else {
-      nanoEndpoint = "https://api.kie.ai/api/v1/jobs/createTask";
+      nanoEndpoint = "https://api.kie.ai/api/v1/images/generations";
       nanoBody = {
+        prompt,
+        negative_prompt: promptNegative || "",
         model: "nano-banana-2",
-        input: {
-          prompt,
-          negative_prompt: promptNegative || "",
-          image_input: [],
-          aspect_ratio: aspectRatio || (width === height ? "1:1" : "16:9"),
-          resolution: resolution || "1K",
-          output_format: "jpg",
-        },
+        width: width || 1200,
+        height: height || 675,
+        aspect_ratio: aspectRatio || "16:9",
+        image_size: resolution || "1K",
+        n: 1,
       };
     }
 
@@ -121,106 +146,98 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(nanoBody),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(60000),
     });
 
     if (!nanoRes.ok) {
-      const err = await nanoRes.text();
-      throw new Error(`NanoBanana ${nanoRes.status}: ${err}`);
+      const errText = await nanoRes.text();
+      console.error("NanoBanana error:", nanoRes.status, errText);
+      await supabase.from("image_jobs").update({ status: "failed" }).eq("id", jobId);
+      throw new Error(`NanoBanana ${nanoRes.status}: ${errText}`);
     }
 
     const nanoData = await nanoRes.json();
-    console.log("NanoBanana Response:", JSON.stringify(nanoData).substring(0, 500));
+    console.log("NanoBanana full response:", JSON.stringify(nanoData));
 
+    // Extract URL from all possible fields
+    const imageUrl =
+      nanoData?.data?.[0]?.url ||
+      nanoData?.data?.[0]?.imageUrl ||
+      nanoData?.data?.[0]?.image_url ||
+      nanoData?.images?.[0]?.url ||
+      nanoData?.images?.[0] ||
+      nanoData?.result?.[0]?.url ||
+      nanoData?.result?.url ||
+      nanoData?.url ||
+      nanoData?.imageUrl ||
+      nanoData?.image_url ||
+      nanoData?.output?.[0] ||
+      nanoData?.output?.[0]?.url ||
+      nanoData?.data?.output?.[0] ||
+      nanoData?.data?.url ||
+      null;
+
+    // taskId only as fallback
     const taskId =
+      nanoData?.data?.[0]?.taskId ||
+      nanoData?.data?.[0]?.task_id ||
       nanoData?.data?.taskId ||
       nanoData?.taskId ||
       nanoData?.task_id ||
       nanoData?.id ||
       null;
 
-    const directUrl =
-      nanoData?.data?.output?.[0] ||
-      nanoData?.data?.url ||
-      nanoData?.url ||
-      nanoData?.imageUrl ||
-      null;
+    console.log("Extracted imageUrl:", imageUrl);
+    console.log("Extracted taskId:", taskId);
 
-    if (directUrl) {
-      const cloudUrl = await uploadToCloudinary(directUrl, slot || "free", keyword || "", "direct");
+    // FALL A — URL directly available (synchronous)
+    if (imageUrl) {
+      console.log("Synchrone URL — direkt zu Cloudinary");
+      const cloudinaryUrl = await uploadToCloudinary(imageUrl, slot || "free", keyword || "", jobId);
 
-      const { data: job } = await supabase
+      await supabase
         .from("image_jobs")
-        .insert({
-          user_id: userId,
-          firm_id: firmId || null,
-          page_id: pageId || null,
-          slot: slot || "free",
-          slot_label: slotLabel || null,
-          prompt: prompt,
-          prompt_positive: promptPositive,
-          prompt_negative: promptNegative || "",
-          width: width || 1200,
-          height: height || 675,
-          alt_text: altText || "",
-          nano_url: directUrl,
-          cloudinary_url: cloudUrl,
+        .update({
+          nano_url: imageUrl,
+          cloudinary_url: cloudinaryUrl,
           status: "completed",
           completed_at: new Date().toISOString(),
-          mode: genMode,
-          reference_image_url: referenceImageUrl || null,
-          edit_strength: editStrength ?? null,
         })
-        .select("id")
-        .single();
+        .eq("id", jobId);
 
       return new Response(
-        JSON.stringify({
-          jobId: job?.id,
-          status: "completed",
-          imageUrl: directUrl,
-          cloudinaryUrl: cloudUrl,
-        }),
-        { headers: { ...cors, "Content-Type": "application/json" } }
+        JSON.stringify({ jobId, status: "completed", imageUrl, cloudinaryUrl }),
+        { headers: cors }
       );
     }
 
-    if (!taskId) {
-      throw new Error("Keine taskId und keine URL: " + JSON.stringify(nanoData).slice(0, 200));
+    // FALL B — Only taskId (asynchronous, polling needed)
+    if (taskId) {
+      console.log("Asynchrone taskId:", taskId);
+      await supabase
+        .from("image_jobs")
+        .update({ task_id: taskId, status: "generating" })
+        .eq("id", jobId);
+
+      return new Response(
+        JSON.stringify({ jobId, taskId, status: "generating" }),
+        { headers: cors }
+      );
     }
 
-    const { data: job } = await supabase
-      .from("image_jobs")
-      .insert({
-        user_id: userId,
-        firm_id: firmId || null,
-        page_id: pageId || null,
-        slot: slot || "free",
-        slot_label: slotLabel || null,
-        prompt: prompt,
-        prompt_positive: promptPositive,
-        prompt_negative: promptNegative || "",
-        width: width || 1200,
-        height: height || 675,
-        alt_text: altText || "",
-        task_id: taskId,
-        status: "generating",
-        mode: genMode,
-        reference_image_url: referenceImageUrl || null,
-        edit_strength: editStrength ?? null,
-      })
-      .select("id")
-      .single();
+    // FALL C — Neither URL nor taskId
+    console.error("Kein imageUrl und keine taskId:", JSON.stringify(nanoData));
+    await supabase.from("image_jobs").update({ status: "failed" }).eq("id", jobId);
 
     return new Response(
-      JSON.stringify({ jobId: job?.id, taskId, status: "generating" }),
-      { headers: { ...cors, "Content-Type": "application/json" } }
+      JSON.stringify({ error: "Keine URL und keine taskId in Response", rawResponse: nanoData }),
+      { status: 500, headers: cors }
     );
   } catch (err) {
     console.error("start-image error:", err);
     return new Response(
       JSON.stringify({ error: (err as Error).message }),
-      { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
+      { status: 500, headers: cors }
     );
   }
 });

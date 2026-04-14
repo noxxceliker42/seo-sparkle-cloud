@@ -97,6 +97,18 @@ COMPARATIVE VALUE CHECK: ${f.comparativeCheck || "Noch ausstehend"}
 
 AKTIVE SEKTIONEN: ${sectionList}
 
+BILD-PLATZHALTER:
+Setze an sinnvollen Stellen Bild-Platzhalter mit data-img-slot Attributen.
+Nur dort wo ein Bild den Inhalt wirklich verstärkt (nicht überall).
+Format exakt so:
+<img src="PLACEHOLDER_[SLOT]" data-img-slot="[SLOT]" data-img-context="[1-Satz Kontext auf Englisch]" alt="PLACEHOLDER_ALT_[SLOT]" width="[BREITE]" height="[HOEHE]" loading="[eager für Hero, lazy für Rest]">
+Erlaubte Slots und Dimensionen:
+  hero: 1200x675 (Pflicht, immer setzen, fetchpriority="high")
+  howto: 800x450 (wenn Selbsthilfe-Sektion aktiv)
+  ablauf: 800x450 (wenn Ablauf-Sektion aktiv)
+  unique: 800x450 (wenn Unique Data Sektion aktiv)
+  autor: 80x80 (für Autorbox, quadratisch)
+
 SEO-REGELN (alle einhalten):
 1. Keyword "${f.keyword}" NUR in H1 + URL-Slug + Title + Erster Hero-Satz. Danach nur Synonyme.
 2. Reiner Intent, kein Mix.
@@ -123,7 +135,7 @@ Description: [140-155 Zeichen]
 Keywords: [kommasepariert]
 
 2. \`\`\`html
-[vollständiger Body mit allen aktiven Sektionen, Inline CSS]
+[vollständiger Body mit allen aktiven Sektionen, Inline CSS, Bild-Platzhalter]
 \`\`\`
 
 3. \`\`\`html

@@ -534,6 +534,8 @@ function Index() {
         street: data.street,
         city: data.city,
         phone: data.phone,
+        pageId: result.pageId || undefined,
+        keyword: data.keyword,
       });
       setShowQaGate(false);
       setShowOutput(true);

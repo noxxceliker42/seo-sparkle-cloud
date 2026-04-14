@@ -121,11 +121,11 @@ export function useAnalysisJob() {
 
   const completeJob = useCallback(async (jobId: string, result: JobResult) => {
     try {
-      await supabase
-        .from("analysis_jobs")
+      await (supabase
+        .from("analysis_jobs") as any)
         .update({
           status: "completed",
-          result_json: result as unknown as Record<string, unknown>,
+          result_json: result,
           completed_at: new Date().toISOString(),
         })
         .eq("id", jobId);

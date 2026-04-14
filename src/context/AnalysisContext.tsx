@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { storage } from "@/lib/storage";
 import { toast } from "sonner";
 
 /* ── Types ── */
@@ -45,40 +46,6 @@ const EMPTY_STATE: AnalysisState = {
   savedAnalysisId: null,
 };
 
-const SESSION_KEY = "seo_os_analysis_v2";
-
-function readStorage(): Partial<AnalysisState> {
-  try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    if (!raw) return {};
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
-}
-
-function writeStorage(state: AnalysisState) {
-  try {
-    sessionStorage.setItem(
-      SESSION_KEY,
-      JSON.stringify({
-        keyword: state.keyword,
-        mode: state.mode,
-        isRunning: state.isRunning,
-        jobId: state.jobId,
-        savedAnalysisId: state.savedAnalysisId,
-        // Don't persist full result to avoid quota issues
-      }),
-    );
-  } catch {}
-}
-
-function clearStorage() {
-  try {
-    sessionStorage.removeItem(SESSION_KEY);
-  } catch {}
-}
-
 const AnalysisContext = createContext<AnalysisContextValue>({
   ...EMPTY_STATE,
   startAnalysis: async () => {},
@@ -92,7 +59,8 @@ const AnalysisContext = createContext<AnalysisContextValue>({
 
 export function AnalysisProvider({ children }: { children: ReactNode }) {
   const [state, _setState] = useState<AnalysisState>(() => {
-    const stored = readStorage();
+    const stored = storage.get<AnalysisState>("analysis", EMPTY_STATE);
+    // If was running, keep that state so polling resumes
     if (stored.isRunning && stored.jobId) {
       return {
         ...EMPTY_STATE,
@@ -101,11 +69,15 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
         mode: stored.mode || "standard",
         jobId: stored.jobId,
         savedAnalysisId: stored.savedAnalysisId || null,
+        // Restore result if it was persisted
+        result: stored.result || null,
       };
     }
     return {
       ...EMPTY_STATE,
+      keyword: stored.keyword || "",
       savedAnalysisId: stored.savedAnalysisId || null,
+      result: stored.result || null,
     };
   });
 
@@ -116,14 +88,18 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     _setState((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
       stateRef.current = next;
-      writeStorage(next);
+      // Persist to sessionStorage — include result for reload survival
+      storage.set("analysis", next);
       return next;
     });
   }, []);
 
-  const update = useCallback((partial: Partial<AnalysisState>) => {
-    setState((prev) => ({ ...prev, ...partial }));
-  }, [setState]);
+  const update = useCallback(
+    (partial: Partial<AnalysisState>) => {
+      setState((prev) => ({ ...prev, ...partial }));
+    },
+    [setState],
+  );
 
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
@@ -135,14 +111,12 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   /* Auto-save completed analysis to saved_analyses */
   const autoSaveAnalysis = useCallback(async (kw: string, result: AnalysisResult, mode: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return null;
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("firm_id")
-        .eq("id", user.id)
-        .maybeSingle();
+      const { data: profile } = await supabase.from("profiles").select("firm_id").eq("id", user.id).maybeSingle();
 
       const { data: saved } = await supabase
         .from("saved_analyses")
@@ -169,100 +143,109 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     return null;
   }, []);
 
-  const applyCompleted = useCallback(async (keyword: string, resultJson: unknown, mode: string, notify = true) => {
-    stopPolling();
+  const applyCompleted = useCallback(
+    async (keyword: string, resultJson: unknown, mode: string, notify = true) => {
+      stopPolling();
 
-    // Parse result_json from analysis_jobs format (old) or structured format
-    const raw = resultJson as Record<string, unknown>;
-    const result: AnalysisResult = {
-      kieai: raw?.analysis || raw?.kieai || null,
-      serp: raw?.serp || null,
-      volume: raw?.volume || null,
-    };
+      const raw = resultJson as Record<string, unknown>;
+      const result: AnalysisResult = {
+        kieai: raw?.analysis || raw?.kieai || null,
+        serp: raw?.serp || null,
+        volume: raw?.volume || null,
+      };
 
-    // Auto-save to saved_analyses
-    const savedId = await autoSaveAnalysis(keyword, result, mode);
+      const savedId = await autoSaveAnalysis(keyword, result, mode);
 
-    setState({
-      isRunning: false,
-      jobId: "",
-      keyword,
-      mode,
-      result,
-      error: "",
-      savedAnalysisId: savedId || null,
-    });
+      setState({
+        isRunning: false,
+        jobId: "",
+        keyword,
+        mode,
+        result,
+        error: "",
+        savedAnalysisId: savedId || null,
+      });
 
-    if (notify) toast.success("Analyse abgeschlossen — Ergebnisse wurden geladen");
-  }, [stopPolling, setState, autoSaveAnalysis]);
+      if (notify) toast.success("Analyse abgeschlossen — Ergebnisse wurden geladen");
+    },
+    [stopPolling, setState, autoSaveAnalysis],
+  );
 
-  const applyError = useCallback((keyword: string, message: string, notify = true) => {
-    stopPolling();
-    clearStorage();
-    setState({
-      ...EMPTY_STATE,
-      keyword,
-      error: message,
-    });
-    if (notify) toast.error(message);
-  }, [stopPolling, setState]);
+  const applyError = useCallback(
+    (keyword: string, message: string, notify = true) => {
+      stopPolling();
+      setState({
+        ...EMPTY_STATE,
+        keyword,
+        error: message,
+      });
+      if (notify) toast.error(message);
+    },
+    [stopPolling, setState],
+  );
 
-  const pollJob = useCallback(async (jobId: string) => {
-    const { data, error } = await supabase
-      .from("analysis_jobs")
-      .select("status, keyword, mode, result_json, error_message")
-      .eq("id", jobId)
-      .maybeSingle();
+  const pollJob = useCallback(
+    async (jobId: string) => {
+      const { data, error } = await supabase
+        .from("analysis_jobs")
+        .select("status, keyword, mode, result_json, error_message")
+        .eq("id", jobId)
+        .maybeSingle();
 
-    if (error || !data) return null;
+      if (error || !data) return null;
 
-    const jobKeyword = data.keyword || stateRef.current.keyword;
+      const jobKeyword = data.keyword || stateRef.current.keyword;
 
-    if (data.status === "completed" && data.result_json) {
-      void applyCompleted(jobKeyword, data.result_json, data.mode || stateRef.current.mode);
+      if (data.status === "completed" && data.result_json) {
+        void applyCompleted(jobKeyword, data.result_json, data.mode || stateRef.current.mode);
+        return data;
+      }
+
+      if (data.status === "error") {
+        applyError(jobKeyword, data.error_message || "Fehler bei der Analyse");
+        return data;
+      }
+
       return data;
-    }
+    },
+    [applyCompleted, applyError],
+  );
 
-    if (data.status === "error") {
-      applyError(jobKeyword, data.error_message || "Fehler bei der Analyse");
-      return data;
-    }
+  const startPolling = useCallback(
+    (jobId: string) => {
+      if (pollingRef.current) return;
+      pollingRef.current = setInterval(() => {
+        void pollJob(jobId);
+      }, 2500);
+    },
+    [pollJob],
+  );
 
-    return data;
-  }, [applyCompleted, applyError]);
-
-  const startPolling = useCallback((jobId: string) => {
-    if (pollingRef.current) return;
-    pollingRef.current = setInterval(() => {
-      void pollJob(jobId);
-    }, 2500);
-  }, [pollJob]);
-
-  // Restore on mount
+  // Restore on mount — resume polling or check final status
   useEffect(() => {
-    const stored = readStorage();
-    if (stored.isRunning && stored.jobId) {
+    const cur = stateRef.current;
+    if (cur.isRunning && cur.jobId) {
+      console.log("Resuming job after mount:", cur.jobId);
       void (async () => {
         const { data } = await supabase
           .from("analysis_jobs")
           .select("status, keyword, mode, result_json, error_message")
-          .eq("id", stored.jobId as string)
+          .eq("id", cur.jobId)
           .maybeSingle();
 
         if (!data) {
-          clearStorage();
           setState(EMPTY_STATE);
           return;
         }
 
-        const kw = stored.keyword || data.keyword || "";
+        const kw = cur.keyword || data.keyword || "";
 
         if (data.status === "completed" && data.result_json) {
           void applyCompleted(kw, data.result_json, data.mode || "standard", false);
         } else if (data.status === "error") {
           applyError(kw, data.error_message || "Fehler", false);
         } else {
-          startPolling(stored.jobId!);
+          startPolling(cur.jobId);
         }
       })();
     }
@@ -284,72 +267,75 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("visibilitychange", handler);
   }, [startPolling, pollJob]);
 
-  const startAnalysis = useCallback(async ({ keyword, mode, firm, city }: StartAnalysisInput) => {
-    const trimmed = keyword.trim();
-    if (!trimmed) return;
+  const startAnalysis = useCallback(
+    async ({ keyword, mode, firm, city }: StartAnalysisInput) => {
+      const trimmed = keyword.trim();
+      if (!trimmed) return;
 
-    stopPolling();
+      stopPolling();
 
-    const { data: authData } = await supabase.auth.getUser();
-    const user = authData.user;
-    if (!user) {
-      setState((prev) => ({ ...prev, error: "Bitte melde dich an." }));
-      return;
-    }
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData.user;
+      if (!user) {
+        setState((prev) => ({ ...prev, error: "Bitte melde dich an." }));
+        return;
+      }
 
-    const { data: job, error: jobError } = await supabase
-      .from("analysis_jobs")
-      .insert({ user_id: user.id, keyword: trimmed, mode, status: "running" })
-      .select("id, keyword")
-      .single();
+      const { data: job, error: jobError } = await supabase
+        .from("analysis_jobs")
+        .insert({ user_id: user.id, keyword: trimmed, mode, status: "running" })
+        .select("id, keyword")
+        .single();
 
-    if (jobError || !job) {
-      setState((prev) => ({ ...prev, error: jobError?.message || "Job konnte nicht angelegt werden." }));
-      return;
-    }
+      if (jobError || !job) {
+        setState((prev) => ({ ...prev, error: jobError?.message || "Job konnte nicht angelegt werden." }));
+        return;
+      }
 
-    setState({
-      isRunning: true,
-      keyword: trimmed,
-      mode,
-      jobId: job.id,
-      result: null,
-      error: "",
-      savedAnalysisId: null,
-    });
+      setState({
+        isRunning: true,
+        keyword: trimmed,
+        mode,
+        jobId: job.id,
+        result: null,
+        error: "",
+        savedAnalysisId: null,
+      });
 
-    startPolling(job.id);
+      startPolling(job.id);
 
-    // Fire-and-forget
-    supabase.functions
-      .invoke("analyze-orchestrator", {
-        body: { jobId: job.id, keyword: trimmed, firm: firm || undefined, city: city || undefined },
-      })
-      .then(({ error, data }) => {
-        if (error || data?.error) {
-          const msg = error?.message || data?.error || "Analyse fehlgeschlagen";
+      // Fire-and-forget
+      supabase.functions
+        .invoke("analyze-orchestrator", {
+          body: { jobId: job.id, keyword: trimmed, firm: firm || undefined, city: city || undefined },
+        })
+        .then(({ error, data }) => {
+          if (error || data?.error) {
+            const msg = error?.message || data?.error || "Analyse fehlgeschlagen";
+            void supabase
+              .from("analysis_jobs")
+              .update({
+                status: "error",
+                error_message: msg,
+                completed_at: new Date().toISOString(),
+              })
+              .eq("id", job.id);
+          }
+        })
+        .catch((err) => {
+          console.error("Orchestrator invoke error:", err);
           void supabase
             .from("analysis_jobs")
             .update({
               status: "error",
-              error_message: msg,
+              error_message: (err as Error).message,
               completed_at: new Date().toISOString(),
             })
             .eq("id", job.id);
-        }
-      })
-      .catch((err) => {
-        console.error("Orchestrator invoke error:", err);
-        void supabase
-          .from("analysis_jobs")
-          .update({
-            status: "error",
-            error_message: (err as Error).message,
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", job.id);
-      });
-  }, [stopPolling, startPolling, setState]);
+        });
+    },
+    [stopPolling, startPolling, setState],
+  );
 
   const clearResult = useCallback(() => {
     setState((prev) => ({ ...prev, result: null }));
@@ -361,7 +347,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
 
   const clearAnalysis = useCallback(() => {
     stopPolling();
-    clearStorage();
+    storage.remove("analysis");
     _setState(EMPTY_STATE);
     stateRef.current = EMPTY_STATE;
   }, [stopPolling]);

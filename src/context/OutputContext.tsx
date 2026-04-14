@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { storage } from "@/lib/storage";
 
 export interface OutputState {
   html: string;
@@ -31,9 +32,6 @@ const EMPTY_OUTPUT: OutputState = {
   stopReason: "",
 };
 
-const OUTPUT_KEY = "seo_os_output_v2";
-const ANALYSIS_KEY = "seo_os_analysis_v2";
-
 interface OutputContextValue {
   output: OutputState;
   setOutput: (data: Partial<OutputState>) => void;
@@ -46,31 +44,23 @@ const OutputContext = createContext<OutputContextValue>({
   clearOutput: () => {},
 });
 
-function readOutputStorage(): OutputState {
-  try {
-    const s = sessionStorage.getItem(OUTPUT_KEY);
-    return s ? { ...EMPTY_OUTPUT, ...JSON.parse(s) } : EMPTY_OUTPUT;
-  } catch {
-    return EMPTY_OUTPUT;
-  }
-}
-
 export function OutputProvider({ children }: { children: ReactNode }) {
-  const [output, _setOutput] = useState<OutputState>(readOutputStorage);
+  const [output, _setOutput] = useState<OutputState>(() =>
+    storage.get<OutputState>("output", EMPTY_OUTPUT),
+  );
 
   const setOutput = useCallback((data: Partial<OutputState>) => {
     _setOutput((prev) => {
       const next = { ...prev, ...data };
-      try {
-        sessionStorage.setItem(OUTPUT_KEY, JSON.stringify(next));
-      } catch {}
+      storage.set("output", next);
 
+      // Sync HTML to saved_analyses via analysis context storage
       if (data.html) {
         try {
-          const analysisRaw = sessionStorage.getItem(ANALYSIS_KEY);
-          const analysisId = analysisRaw ? JSON.parse(analysisRaw).savedAnalysisId : null;
+          const analysisState = storage.get<{ savedAnalysisId?: string | null }>("analysis", {});
+          const analysisId = analysisState?.savedAnalysisId;
           if (analysisId) {
-            void (supabase
+            void supabase
               .from("saved_analyses")
               .update({
                 generated_html: data.html,
@@ -80,7 +70,7 @@ export function OutputProvider({ children }: { children: ReactNode }) {
                 page_id: data.pageId || null,
               })
               .eq("id", analysisId)
-              .then(() => console.log("HTML in Analyse gespeichert")));
+              .then(() => console.log("HTML in Analyse gespeichert"));
           }
         } catch {}
       }
@@ -90,7 +80,7 @@ export function OutputProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearOutput = useCallback(() => {
-    sessionStorage.removeItem(OUTPUT_KEY);
+    storage.remove("output");
     _setOutput(EMPTY_OUTPUT);
   }, []);
 

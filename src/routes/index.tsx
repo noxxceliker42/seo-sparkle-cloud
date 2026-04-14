@@ -20,6 +20,7 @@ import { OutputPanel, type GeneratedPage } from "@/components/seo/OutputPanel";
 import { QaGate } from "@/components/seo/QaGate";
 import { useAnalysis } from "@/context/AnalysisContext";
 import { toast } from "sonner";
+import { buildMasterPrompt } from "@/lib/buildMasterPrompt";
 
 export const Route = createFileRoute("/")({
   component: Index,

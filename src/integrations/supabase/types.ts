@@ -189,6 +189,59 @@ export type Database = {
           },
         ]
       }
+      firm_style_profiles: {
+        Row: {
+          camera_style: string | null
+          color_palette: string | null
+          created_at: string | null
+          firm_id: string
+          forbidden: string | null
+          hero_style: string | null
+          id: string
+          lighting: string | null
+          mood: string | null
+          section_style: string | null
+          setting: string | null
+          style_type: string
+        }
+        Insert: {
+          camera_style?: string | null
+          color_palette?: string | null
+          created_at?: string | null
+          firm_id: string
+          forbidden?: string | null
+          hero_style?: string | null
+          id?: string
+          lighting?: string | null
+          mood?: string | null
+          section_style?: string | null
+          setting?: string | null
+          style_type?: string
+        }
+        Update: {
+          camera_style?: string | null
+          color_palette?: string | null
+          created_at?: string | null
+          firm_id?: string
+          forbidden?: string | null
+          hero_style?: string | null
+          id?: string
+          lighting?: string | null
+          mood?: string | null
+          section_style?: string | null
+          setting?: string | null
+          style_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firm_style_profiles_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: true
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       firms: {
         Row: {
           city: string | null
@@ -299,42 +352,91 @@ export type Database = {
       }
       image_jobs: {
         Row: {
+          alt_text: string | null
+          cloudinary_public_id: string | null
+          cloudinary_url: string | null
           completed_at: string | null
           created_at: string | null
+          firm_id: string | null
+          height: number | null
+          html_inserted: boolean | null
           id: string
           image_url: string | null
+          is_selected: boolean | null
+          nano_url: string | null
           page_id: string | null
           prompt: string
+          prompt_negative: string | null
+          prompt_positive: string | null
           slot: string | null
+          slot_label: string | null
           status: string | null
+          style_type: string | null
           task_id: string | null
           user_id: string
+          variant_index: number | null
+          width: number | null
         }
         Insert: {
+          alt_text?: string | null
+          cloudinary_public_id?: string | null
+          cloudinary_url?: string | null
           completed_at?: string | null
           created_at?: string | null
+          firm_id?: string | null
+          height?: number | null
+          html_inserted?: boolean | null
           id?: string
           image_url?: string | null
+          is_selected?: boolean | null
+          nano_url?: string | null
           page_id?: string | null
           prompt: string
+          prompt_negative?: string | null
+          prompt_positive?: string | null
           slot?: string | null
+          slot_label?: string | null
           status?: string | null
+          style_type?: string | null
           task_id?: string | null
           user_id: string
+          variant_index?: number | null
+          width?: number | null
         }
         Update: {
+          alt_text?: string | null
+          cloudinary_public_id?: string | null
+          cloudinary_url?: string | null
           completed_at?: string | null
           created_at?: string | null
+          firm_id?: string | null
+          height?: number | null
+          html_inserted?: boolean | null
           id?: string
           image_url?: string | null
+          is_selected?: boolean | null
+          nano_url?: string | null
           page_id?: string | null
           prompt?: string
+          prompt_negative?: string | null
+          prompt_positive?: string | null
           slot?: string | null
+          slot_label?: string | null
           status?: string | null
+          style_type?: string | null
           task_id?: string | null
           user_id?: string
+          variant_index?: number | null
+          width?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "image_jobs_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "image_jobs_page_id_fkey"
             columns: ["page_id"]

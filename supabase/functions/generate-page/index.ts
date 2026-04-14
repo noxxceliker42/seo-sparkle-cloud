@@ -84,13 +84,13 @@ Deno.serve(async (req) => {
           stream: false,
           messages: [{ role: "user", content: prompt }],
         }),
-        signal: AbortSignal.timeout(55000),
+        signal: AbortSignal.timeout(120000),
       });
     } catch (fetchErr: unknown) {
       const err = fetchErr as Error;
       console.error(`[${reqId}] Kie.AI fetch FAILED:`, err.name, err.message);
       if (err.name === "AbortError" || err.name === "TimeoutError") {
-        return new Response(JSON.stringify({ error: "Kie.AI Timeout nach 55 Sekunden" }), {
+        return new Response(JSON.stringify({ error: "Kie.AI Timeout nach 120 Sekunden" }), {
           status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

@@ -17,6 +17,7 @@ import { SeoForm, type SeoFormData } from "@/components/seo/SeoForm";
 import { OutputPanel, type GeneratedPage } from "@/components/seo/OutputPanel";
 import { QaGate } from "@/components/seo/QaGate";
 import { useAnalysis } from "@/context/AnalysisContext";
+import { useGenerationJob } from "@/hooks/useGenerationJob";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -108,9 +109,15 @@ function Index() {
   const [showQaGate, setShowQaGate] = useState(false);
   const [qaFormData, setQaFormData] = useState<SeoFormData | null>(null);
   const [generatedPage, setGeneratedPage] = useState<GeneratedPage | null>(null);
-  const [htmlWarning, setHtmlWarning] = useState("");
-  const [generating, setGenerating] = useState(false);
-  const [generateError, setGenerateError] = useState("");
+
+  const {
+    generating,
+    error: generateError,
+    htmlWarning,
+    result: generationResult,
+    startGeneration,
+    clearResult: clearGenerationResult,
+  } = useGenerationJob();
 
   const isLoading = aiState === "loading" || serpState === "loading" || volState === "loading";
 

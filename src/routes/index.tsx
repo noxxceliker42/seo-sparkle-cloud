@@ -139,31 +139,6 @@ function Index() {
     }
   }, [isAnalysisRunning, runningAnalysisKeyword]);
 
-  // Apply completed job results after resume or tab switch
-  useEffect(() => {
-    const appliedKeyword = runningAnalysisKeyword || keyword.trim();
-    if (!analysisJobResult || !appliedKeyword) return;
-
-    applyJobResult(analysisJobResult as Record<string, unknown>, appliedKeyword);
-    const r = analysisJobResult as {
-      analysis?: AnalysisResult;
-      serp?: SerpResult;
-      volume?: VolumeResult;
-      rawJson?: string;
-    };
-
-    void saveAnalysis(
-      appliedKeyword,
-      "kieai",
-      r.analysis || null,
-      r.volume || null,
-      r.serp || null,
-      r.rawJson || "",
-    );
-
-    clearAnalysisResult();
-  }, [analysisJobResult, runningAnalysisKeyword, keyword, applyJobResult, saveAnalysis, clearAnalysisResult]);
-
   useEffect(() => {
     if (!analysisJobError) return;
 
@@ -250,6 +225,49 @@ function Index() {
       console.error("Analyse speichern fehlgeschlagen:", err);
     }
   }, [selectedFirm]);
+
+  const applyJobResult = useCallback((result: Record<string, unknown>, kw: string) => {
+    const r = result as { analysis?: AnalysisResult; serp?: SerpResult; volume?: VolumeResult; rawJson?: string };
+    if (r.analysis) {
+      setAnalysis(r.analysis);
+      setSelectedLsi(new Set(r.analysis.lsi || []));
+      setAiState("done");
+    }
+    if (r.serp) {
+      setSerp(r.serp);
+      setSerpState("done");
+    }
+    if (r.volume) {
+      setVolume(r.volume);
+      setVolState("done");
+    }
+    if (r.rawJson) setRawJson(r.rawJson as string);
+    setKeyword(kw);
+  }, []);
+
+  useEffect(() => {
+    const appliedKeyword = runningAnalysisKeyword || keyword.trim();
+    if (!analysisJobResult || !appliedKeyword) return;
+
+    applyJobResult(analysisJobResult as Record<string, unknown>, appliedKeyword);
+    const r = analysisJobResult as {
+      analysis?: AnalysisResult;
+      serp?: SerpResult;
+      volume?: VolumeResult;
+      rawJson?: string;
+    };
+
+    void saveAnalysis(
+      appliedKeyword,
+      "kieai",
+      r.analysis || null,
+      r.volume || null,
+      r.serp || null,
+      r.rawJson || "",
+    );
+
+    clearAnalysisResult();
+  }, [analysisJobResult, runningAnalysisKeyword, keyword, applyJobResult, saveAnalysis, clearAnalysisResult]);
 
   const handleAnalyze = useCallback(async () => {
     if (!keyword.trim()) return;

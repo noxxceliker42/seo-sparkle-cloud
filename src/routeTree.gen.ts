@@ -18,6 +18,8 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ClusterRouteImport } from './routes/cluster'
 import { Route as BenutzerRouteImport } from './routes/benutzer'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ClusterNeuRouteImport } from './routes/cluster.neu'
+import { Route as ClusterIdRouteImport } from './routes/cluster.$id'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -64,40 +66,56 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClusterNeuRoute = ClusterNeuRouteImport.update({
+  id: '/neu',
+  path: '/neu',
+  getParentRoute: () => ClusterRoute,
+} as any)
+const ClusterIdRoute = ClusterIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ClusterRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/benutzer': typeof BenutzerRoute
-  '/cluster': typeof ClusterRoute
+  '/cluster': typeof ClusterRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/firmen': typeof FirmenRoute
   '/login': typeof LoginRoute
   '/profil': typeof ProfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/cluster/$id': typeof ClusterIdRoute
+  '/cluster/neu': typeof ClusterNeuRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/benutzer': typeof BenutzerRoute
-  '/cluster': typeof ClusterRoute
+  '/cluster': typeof ClusterRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/firmen': typeof FirmenRoute
   '/login': typeof LoginRoute
   '/profil': typeof ProfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/cluster/$id': typeof ClusterIdRoute
+  '/cluster/neu': typeof ClusterNeuRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/benutzer': typeof BenutzerRoute
-  '/cluster': typeof ClusterRoute
+  '/cluster': typeof ClusterRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/firmen': typeof FirmenRoute
   '/login': typeof LoginRoute
   '/profil': typeof ProfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/cluster/$id': typeof ClusterIdRoute
+  '/cluster/neu': typeof ClusterNeuRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +129,8 @@ export interface FileRouteTypes {
     | '/profil'
     | '/reset-password'
     | '/settings'
+    | '/cluster/$id'
+    | '/cluster/neu'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +142,8 @@ export interface FileRouteTypes {
     | '/profil'
     | '/reset-password'
     | '/settings'
+    | '/cluster/$id'
+    | '/cluster/neu'
   id:
     | '__root__'
     | '/'
@@ -133,12 +155,14 @@ export interface FileRouteTypes {
     | '/profil'
     | '/reset-password'
     | '/settings'
+    | '/cluster/$id'
+    | '/cluster/neu'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BenutzerRoute: typeof BenutzerRoute
-  ClusterRoute: typeof ClusterRoute
+  ClusterRoute: typeof ClusterRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   FirmenRoute: typeof FirmenRoute
   LoginRoute: typeof LoginRoute
@@ -212,13 +236,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cluster/neu': {
+      id: '/cluster/neu'
+      path: '/neu'
+      fullPath: '/cluster/neu'
+      preLoaderRoute: typeof ClusterNeuRouteImport
+      parentRoute: typeof ClusterRoute
+    }
+    '/cluster/$id': {
+      id: '/cluster/$id'
+      path: '/$id'
+      fullPath: '/cluster/$id'
+      preLoaderRoute: typeof ClusterIdRouteImport
+      parentRoute: typeof ClusterRoute
+    }
   }
 }
+
+interface ClusterRouteChildren {
+  ClusterIdRoute: typeof ClusterIdRoute
+  ClusterNeuRoute: typeof ClusterNeuRoute
+}
+
+const ClusterRouteChildren: ClusterRouteChildren = {
+  ClusterIdRoute: ClusterIdRoute,
+  ClusterNeuRoute: ClusterNeuRoute,
+}
+
+const ClusterRouteWithChildren =
+  ClusterRoute._addFileChildren(ClusterRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BenutzerRoute: BenutzerRoute,
-  ClusterRoute: ClusterRoute,
+  ClusterRoute: ClusterRouteWithChildren,
   DashboardRoute: DashboardRoute,
   FirmenRoute: FirmenRoute,
   LoginRoute: LoginRoute,

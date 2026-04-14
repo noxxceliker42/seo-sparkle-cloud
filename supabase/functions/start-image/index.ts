@@ -55,6 +55,7 @@ Deno.serve(async (req) => {
   try {
     const {
       promptPositive, promptNegative, width, height,
+      aspectRatio, resolution, slotLabel,
       slot, pageId, firmId, altText, userId, keyword
     } = await req.json();
 

@@ -133,6 +133,39 @@ Keywords: [kommasepariert]
 Antworte SOFORT mit dem Output, keine Erklärungen vorher.`;
 }
 
+function extractKieContent(data: Record<string, unknown>): string {
+  let content = '';
+
+  // Anthropic-Format (Kie.AI offiziell):
+  if (data?.content && Array.isArray(data.content)) {
+    const textBlock = (data.content as Array<{ type: string; text?: string }>).find((b) => b.type === "text");
+    if (textBlock?.text) content = textBlock.text;
+  }
+  // OpenAI-Format (Fallback):
+  if (!content) {
+    const choices = data?.choices as Array<{ message?: { content?: string } }> | undefined;
+    if (choices?.[0]?.message?.content) content = choices[0].message.content;
+  }
+  // Direct string:
+  if (!content && typeof data?.content === 'string') {
+    content = data.content;
+  }
+
+  if (!content || content.trim() === '') {
+    console.error('Leere Antwort von Kie.AI. Data:', JSON.stringify(data).substring(0, 500));
+    throw new Error(
+      'Kie.AI leere Antwort. stop_reason: ' + ((data?.stop_reason as string) || 'unbekannt') +
+      ' | Typ: ' + ((data?.type as string) || 'unbekannt')
+    );
+  }
+
+  return content
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -158,8 +191,8 @@ Deno.serve(async (req) => {
 
     const masterPrompt = buildMasterPrompt(formData);
 
-    // Call Kie.AI (OpenAI-compatible format)
-    const aiResponse = await fetch("https://kieai.erweima.ai/api/v1/chat/completions", {
+    // Call Kie.AI (Anthropic-Format — korrekter Endpoint)
+    const aiResponse = await fetch("https://api.kie.ai/claude/v1/messages", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
@@ -167,28 +200,40 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
+        messages: [{ role: "user", content: masterPrompt }],
         max_tokens: 8000,
-        messages: [
-          { role: "user", content: masterPrompt },
-        ],
+        stream: false,
       }),
     });
 
     if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("Kie.AI error:", aiResponse.status, errorText);
+      const errBody = await aiResponse.text();
+      console.error("Kie.AI error:", aiResponse.status, errBody);
+      if (aiResponse.status === 401) {
+        return new Response(
+          JSON.stringify({ error: "Kie.AI: Ungültiger API Key (401)" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (aiResponse.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "Kie.AI: Rate Limit erreicht (429) — 30 Sek warten" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       return new Response(
-        JSON.stringify({ error: `Kie.AI Fehler: ${aiResponse.status}`, details: errorText, masterPrompt }),
+        JSON.stringify({ error: `Kie.AI HTTP ${aiResponse.status}: ${errBody}`, masterPrompt }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const aiData = await aiResponse.json();
-    const rawContent = aiData?.choices?.[0]?.message?.content || "";
-
-    if (!rawContent) {
+    let rawContent: string;
+    try {
+      rawContent = extractKieContent(aiData);
+    } catch (e) {
       return new Response(
-        JSON.stringify({ error: "Leere Antwort von Kie.AI", masterPrompt }),
+        JSON.stringify({ error: (e as Error).message, masterPrompt }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -201,7 +246,6 @@ Deno.serve(async (req) => {
     let htmlOutput = "";
     let jsonLd = "";
 
-    // Extract meta block
     for (const line of lines) {
       const l = line.trim();
       if (l.toLowerCase().startsWith("title:")) metaTitle = l.replace(/^title:\s*/i, "").trim();
@@ -209,7 +253,6 @@ Deno.serve(async (req) => {
       else if (l.toLowerCase().startsWith("keywords:")) metaKeywords = l.replace(/^keywords:\s*/i, "").trim();
     }
 
-    // Extract HTML blocks
     const htmlBlocks: string[] = [];
     const htmlRegex = /```html\s*\n([\s\S]*?)```/g;
     let match;
@@ -221,7 +264,6 @@ Deno.serve(async (req) => {
       htmlOutput = htmlBlocks[0];
       jsonLd = htmlBlocks.slice(1).join("\n\n");
     } else if (htmlBlocks.length === 1) {
-      // Try to separate JSON-LD from HTML
       const block = htmlBlocks[0];
       const jsonLdIdx = block.indexOf('<script type="application/ld+json">');
       if (jsonLdIdx > -1) {

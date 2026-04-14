@@ -177,7 +177,7 @@ function AuthGate() {
 
 function getMinRole(path: string): AppRole | null {
   if (path.startsWith("/benutzer")) return "admin";
-  if (path === "/" || path.startsWith("/firmen")) return "editor";
+  if (path === "/" || path.startsWith("/firmen") || path.startsWith("/analysen")) return "editor";
   // dashboard, cluster, settings, profil → viewer
   return "viewer";
 }

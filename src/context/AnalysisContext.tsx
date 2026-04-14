@@ -178,7 +178,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
         const { data } = await supabase
           .from("analysis_jobs")
           .select("status, keyword, result_json, error_message")
-          .eq("id", stored.jobId)
+          .eq("id", stored.jobId as string)
           .single();
 
         if (!data) {

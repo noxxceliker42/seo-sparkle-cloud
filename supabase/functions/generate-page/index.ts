@@ -1,132 +1,289 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SECTION_LABELS: Record<string, string> = {
-  "01": "Hero-Sektion",
-  "02": "Problem-Spiegelung",
-  "03": "TOC (Inhaltsverzeichnis)",
-  "04": "Symptome + Ursachen",
-  "05": "Selbsthilfe (HowTo)",
-  "06": "Fehlercode-Liste",
-  "07": "Unique Data Sektion",
-  "08": "Information Gain (NEU 2026)",
-  "09": "Ablauf vor Ort",
-  "10": "Preise / Risikoumkehr",
-  "11": "Reparatur vs. Neukauf",
-  "12": "Qualität",
-  "13": "Marken",
-  "14": "FAQ",
-  "15": "Autor + Kontakt",
-};
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { status: 200, headers: corsHeaders });
+  }
 
-function buildDesignTokens(preset: string, primaryColor: string): string {
-  const presets: Record<string, { heroBg: string; faqBg: string; radius: string }> = {
-    trust: { heroBg: "#eff6ff", faqBg: "#f8fafc", radius: "12px" },
-    professional: { heroBg: "#f9fafb", faqBg: "#f3f4f6", radius: "8px" },
-    eco: { heroBg: "#f0fdf4", faqBg: "#f7fef9", radius: "16px" },
-    premium: { heroBg: "#faf5ff", faqBg: "#fdf4ff", radius: "10px" },
-    warm: { heroBg: "#fff7ed", faqBg: "#fffbeb", radius: "14px" },
-    minimal: { heroBg: "#fafafa", faqBg: "#f5f5f5", radius: "4px" },
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const reqId = Math.random().toString(36).slice(2, 9);
+  console.log(`[${reqId}] === GENERATE-PAGE START ===`);
+
+  try {
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Test ping
+    if ((body as Record<string, unknown>)?.test === true) {
+      const kieKey = Deno.env.get("KIE_AI_API_KEY");
+      return new Response(JSON.stringify({
+        ok: true, message: "generate-page läuft",
+        keyPresent: !!kieKey, keyPrefix: kieKey?.slice(0, 8) + "...",
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const kieKey = Deno.env.get("KIE_AI_API_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    console.log(`[${reqId}] KIE_KEY:`, !!kieKey, "SUPA_URL:", !!supabaseUrl, "SVC_KEY:", !!serviceKey);
+
+    if (!kieKey) {
+      return new Response(JSON.stringify({
+        error: "KIE_AI_API_KEY nicht konfiguriert",
+        hint: "Lovable Cloud → Secrets → KIE_AI_API_KEY eintragen",
+      }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Dynamic import to avoid top-level crash
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.39.0");
+    const supabase = createClient(supabaseUrl ?? "", serviceKey ?? "");
+
+    const prompt = buildPrompt(body);
+    console.log(`[${reqId}] Prompt length: ${prompt.length}`);
+
+    // Kie.AI call with timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 55000);
+
+    let kieResponse: Response;
+    try {
+      kieResponse = await fetch("https://api.kie.ai/claude/v1/messages", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${kieKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 16000,
+          stream: false,
+          messages: [{ role: "user", content: prompt }],
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+    } catch (fetchErr: unknown) {
+      clearTimeout(timeout);
+      const err = fetchErr as Error;
+      if (err.name === "AbortError") {
+        return new Response(JSON.stringify({ error: "Kie.AI Timeout nach 55 Sekunden" }), {
+          status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw fetchErr;
+    }
+
+    console.log(`[${reqId}] Kie.AI status: ${kieResponse.status}`);
+
+    if (!kieResponse.ok) {
+      const errText = await kieResponse.text();
+      console.error(`[${reqId}] Kie.AI error:`, errText.slice(0, 300));
+      return new Response(JSON.stringify({
+        error: `Kie.AI HTTP ${kieResponse.status}`, detail: errText.slice(0, 500),
+      }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const kieData = await kieResponse.json();
+    const rawContent: string = kieData?.content?.[0]?.text || "";
+
+    console.log(`[${reqId}] Content length: ${rawContent.length}`);
+
+    if (!rawContent.trim()) {
+      return new Response(JSON.stringify({
+        error: "Leere Antwort von Kie.AI", stopReason: kieData?.stop_reason,
+      }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const { htmlOutput, jsonLdOutput, metaTitle, metaDesc } = parseResponse(rawContent);
+    console.log(`[${reqId}] HTML: ${htmlOutput.length}, JSON-LD: ${jsonLdOutput.length}`);
+
+    // Save to DB
+    let pageId: string | null = null;
+    const authHeader = req.headers.get("authorization") || "";
+    if (supabaseUrl && authHeader) {
+      try {
+        const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: { user } } = await userClient.auth.getUser();
+        if (user) {
+          const { data: savedPage, error: saveError } = await supabase
+            .from("seo_pages")
+            .insert({
+              keyword: (body.keyword as string) || "",
+              firm: (body.firmName as string) || (body.firm as string) || "",
+              city: (body.city as string) || "",
+              html_output: htmlOutput,
+              json_ld: jsonLdOutput,
+              meta_title: metaTitle,
+              meta_desc: metaDesc,
+              intent: (body.intent as string) || null,
+              page_type: (body.pageType as string) || null,
+              status: "draft",
+              design_preset: (body.designPreset as string) || "trust",
+              active_sections: (body.activeSections as string[]) || [],
+              user_id: user.id,
+              score: 0,
+            })
+            .select("id")
+            .single();
+          if (saveError) console.error(`[${reqId}] DB save error:`, saveError);
+          pageId = savedPage?.id || null;
+
+          if (body.clusterPageId && pageId) {
+            await supabase.from("cluster_pages").update({
+              seo_page_id: pageId, status: "generated", updated_at: new Date().toISOString(),
+            }).eq("id", body.clusterPageId);
+          }
+        }
+      } catch (dbErr) {
+        console.error(`[${reqId}] DB error (non-fatal):`, dbErr);
+      }
+    }
+
+    console.log(`[${reqId}] === GENERATE-PAGE SUCCESS ===`);
+
+    return new Response(JSON.stringify({
+      success: true, pageId, metaTitle, metaDesc,
+      htmlOutput, jsonLd: jsonLdOutput, masterPrompt: prompt,
+    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error(`[${reqId}] UNHANDLED:`, error.message, error.stack?.slice(0, 500));
+    return new Response(JSON.stringify({
+      error: error.message || "Unbekannter Fehler", success: false,
+    }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+});
+
+// --- Helper functions ---
+
+function parseResponse(raw: string): {
+  htmlOutput: string; jsonLdOutput: string; metaTitle: string; metaDesc: string;
+} {
+  const htmlBlocks = [...raw.matchAll(/```(?:html)?\s*\n?([\s\S]*?)```/gi)]
+    .map((m) => m[1].trim()).filter((b) => b.length > 0);
+
+  const titleMatch = raw.match(/(?:Title|Titel|SEO-Titel):\s*(.+)/i);
+  const descMatch = raw.match(/(?:Description|Beschreibung|Meta-Desc):\s*(.+)/i);
+
+  let htmlOutput = htmlBlocks[0] || "";
+  if (!htmlOutput) {
+    const bodyMatch = raw.match(/(<!DOCTYPE[\s\S]*?<\/html>)/i);
+    htmlOutput = bodyMatch?.[1] || raw;
+  }
+
+  const jsonLdOutput = htmlBlocks[1] || extractJsonLd(htmlOutput);
+
+  return {
+    htmlOutput,
+    jsonLdOutput,
+    metaTitle: titleMatch?.[1]?.trim()?.slice(0, 60) || "",
+    metaDesc: descMatch?.[1]?.trim()?.slice(0, 155) || "",
   };
-  const p = presets[preset] || presets.trust;
-  return `:root { --c-primary: ${primaryColor}; --c-hero-bg: ${p.heroBg}; --faq-bg: ${p.faqBg}; --radius-card: ${p.radius}; }`;
 }
 
-function buildMasterPrompt(f: Record<string, unknown>): string {
-  const activeSections = (f.activeSections as string[]) || [];
-  const sectionList = activeSections
-    .map((id) => `${id} ${SECTION_LABELS[id] || id}`)
-    .join(" · ");
+function extractJsonLd(html: string): string {
+  const match = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/i);
+  return match?.[0] || "";
+}
 
-  const designTokens = buildDesignTokens(
-    (f.designPreset as string) || "trust",
-    (f.primaryColor as string) || "#1d4ed8"
-  );
+function buildPrompt(data: Record<string, unknown>): string {
+  const sections = Array.isArray(data.activeSections)
+    ? (data.activeSections as string[]).join(" · ")
+    : "01 Hero · 02 Problem · 04 Symptome · 05 Selbsthilfe · 07 Unique Data · 08 Info Gain · 09 Ablauf · 10 Preise · 14 FAQ · 15 Autor";
 
   return `Du bist SEO-Experte. Erstelle eine vollständige SEO-Seite.
 
-KEYWORD: "${f.keyword}"
-INTENT: ${f.intent}
-SEITENTYP: ${f.pageType}
-SEKUNDÄR-KEYWORDS: ${f.secondaryKeywords || "keine"}
-LSI-BEGRIFFE: ${f.lsiTerms || "keine"}
-NEGATIVE KEYWORDS: ${f.negativeKeywords || "keine"}
-PILLAR-URL: ${f.pillarUrl || "keine"}
-PILLAR-TITEL: ${f.pillarTitle || "keine"}
-GESCHWISTER-SEITEN: ${f.siblingPages || "keine"}
-DEEP PAGES: ${f.deepPages || "keine"}
-CONTENT-GAP: ${f.contentGap || "keine"}
-PAA-FRAGEN: ${f.paaQuestions || "keine"}
+KEYWORD: "${data.keyword || "Keyword"}"
+INTENT: ${data.intent || "Informational"}
+SEITENTYP: ${data.pageType || "Supporting Info"}
+SEKUNDÄR-KEYWORDS: ${data.secondaryKeywords || "keine"}
+LSI-BEGRIFFE: ${data.lsiTerms || data.lsi || "keine"}
+NEGATIVE KEYWORDS: ${data.negativeKeywords || "keine"}
+PILLAR-URL: ${data.pillarUrl || "keine"}
+PILLAR-TITEL: ${data.pillarTitle || "keine"}
+GESCHWISTER-SEITEN: ${data.siblingPages || "keine"}
+DEEP PAGES: ${data.deepPages || "keine"}
+CONTENT-GAP: ${data.contentGap || "keine"}
+PAA-FRAGEN: ${data.paaQuestions || data.paa || "keine"}
 
-FIRMA: ${f.firmName}
-STRASSE: ${f.street || ""}
-PLZ: ${f.zip || ""} STADT: ${f.city || ""}
-TELEFON: ${f.phone || ""}
-WEBSITE: ${f.website || ""}
-SERVICEGEBIET: ${f.serviceArea || ""}
-UNIQUE DATA: ${f.uniqueData || "keine"}
+FIRMA: ${data.firmName || data.firm || ""}
+STRASSE: ${data.street || ""}
+PLZ: ${data.zip || ""} STADT: ${data.city || "Berlin"}
+TELEFON: ${data.phone || ""}
+WEBSITE: ${data.website || ""}
+SERVICEGEBIET: ${data.serviceArea || ""}
+UNIQUE DATA: ${data.uniqueData || "keine"}
 
-AUTOR: ${f.authorName || ""}
-BERUFSBEZEICHNUNG: ${f.authorTitle || ""}
-ERFAHRUNG: ${f.experienceYears || ""} Jahre
-ZERTIFIKATE: ${f.certificates || ""}
-REVIEWER: ${f.reviewer || ""}
-FALLSTUDIE: ${f.caseStudy || "keine"}
+AUTOR: ${data.authorName || data.author || ""}
+BERUFSBEZEICHNUNG: ${data.authorTitle || data.role || ""}
+ERFAHRUNG: ${data.experienceYears || data.experience || ""} Jahre
+ZERTIFIKATE: ${data.certificates || ""}
+REVIEWER: ${data.reviewer || ""}
+FALLSTUDIE: ${data.caseStudy || "keine"}
 
-KVA-PREIS: ${f.kvaPrice || "k.A."} €
-PREISSPANNE: ${f.priceRange || "k.A."}
-PREISKARTE 1: ${f.priceCard1 || "keine"}
-PREISKARTE 2: ${f.priceCard2 || "keine"}
-PREISKARTE 3: ${f.priceCard3 || "keine"}
-REPARATUR VS NEUKAUF: ${f.repairVsBuy || "keine"}
+KVA-PREIS: ${data.kvaPrice || "k.A."} €
+PREISSPANNE: ${data.priceRange || "k.A."}
+PREISKARTE 1: ${data.priceCard1 || "keine"}
+PREISKARTE 2: ${data.priceCard2 || "keine"}
+PREISKARTE 3: ${data.priceCard3 || "keine"}
+REPARATUR VS NEUKAUF: ${data.repairVsBuy || "keine"}
 
-TONE OF VOICE: ${f.toneOfVoice || "Sachlich-kompetent"}
-BILD-STRATEGIE: ${f.imageStrategy || "Platzhalter"}
-RATING: ${f.rating || "4.9"} / 5 (${f.reviewCount || "0"} Bewertungen)
-BREADCRUMB: ${f.breadcrumb || "Start > Seite"}
-SCHEMA-BLÖCKE: ${((f.schemaBlocks as string[]) || []).join(", ")}
+TONE OF VOICE: ${data.toneOfVoice || "Sachlich-kompetent"}
+BILD-STRATEGIE: ${data.imageStrategy || "Platzhalter"}
+RATING: ${data.rating || "4.9"} / 5 (${data.reviewCount || "0"} Bewertungen)
+BREADCRUMB: ${data.breadcrumb || "Start > Seite"}
+SCHEMA-BLÖCKE: ${Array.isArray(data.schemaBlocks) ? (data.schemaBlocks as string[]).join(", ") : "FAQPage, HowTo, LocalBusiness"}
 
-INFORMATION GAIN (2026): ${f.informationGain || "keine"}
-DISCOVER-READY: ${f.discoverReady || "Platzhalter"}
-COMPARATIVE VALUE CHECK: ${f.comparativeCheck || "Noch ausstehend"}
+INFORMATION GAIN (2026): ${data.informationGain || data.infoGain || "keine"}
+DISCOVER-READY: ${data.discoverReady || "Platzhalter"}
 
-AKTIVE SEKTIONEN: ${sectionList}
+DESIGN-TOKENS (Inline CSS, Pre-Set: "${data.designPreset || "trust"}"):
+:root {
+  --c-primary: ${data.primaryColor || "#dc2626"};
+  --c-hero-bg: ${data.heroBg || "#fff5f5"};
+  --faq-bg: #f8fafc;
+  --radius-card: 12px;
+}
+
+AKTIVE SEKTIONEN: ${sections}
 
 BILD-PLATZHALTER:
 Setze an sinnvollen Stellen Bild-Platzhalter mit data-img-slot Attributen.
-Nur dort wo ein Bild den Inhalt wirklich verstärkt (nicht überall).
-Format exakt so:
-<img src="PLACEHOLDER_[SLOT]" data-img-slot="[SLOT]" data-img-context="[1-Satz Kontext auf Englisch]" alt="PLACEHOLDER_ALT_[SLOT]" width="[BREITE]" height="[HOEHE]" loading="[eager für Hero, lazy für Rest]">
-Erlaubte Slots und Dimensionen:
-  hero: 1200x675 (Pflicht, immer setzen, fetchpriority="high")
-  howto: 800x450 (wenn Selbsthilfe-Sektion aktiv)
-  ablauf: 800x450 (wenn Ablauf-Sektion aktiv)
-  unique: 800x450 (wenn Unique Data Sektion aktiv)
-  autor: 80x80 (für Autorbox, quadratisch)
+Format: <img src="PLACEHOLDER_[SLOT]" data-img-slot="[SLOT]" data-img-context="[Kontext]" alt="PLACEHOLDER_ALT_[SLOT]" width="[W]" height="[H]" loading="[eager/lazy]">
+Erlaubte Slots: hero (1200x675, eager), howto (800x450, lazy), ablauf (800x450, lazy), unique (800x450, lazy), autor (80x80, lazy)
 
 SEO-REGELN (alle einhalten):
-1. Keyword "${f.keyword}" NUR in H1 + URL-Slug + Title + Erster Hero-Satz. Danach nur Synonyme.
+1. Keyword nur in H1 + Title + URL-Slug + erster Hero-Satz. Danach Synonyme.
 2. Reiner Intent, kein Mix.
 3. Interne Links zu Pillar + Geschwister.
 4. AIDA+T: Problem zuerst, CTA nach Sek.9.
 5. E-E-A-T: Modellnummer, Fachbegriffe, Autorbox.
-6. Information Gain Sektion: "${f.informationGain || ""}" — prominente eigene Sektion.
+6. Information Gain Sektion prominent.
 7. Mount-AI-Schutz: Jede Sektion hat echten Informationsgehalt.
-8. Schema: ${((f.schemaBlocks as string[]) || []).join("+")} in JSON-LD.
+8. Schema in JSON-LD.
 9. CWV: Inline CSS, width/height fix, ein Script.
 10. Discover-Ready: Hero-Bild 1200x675, max-image-preview:large im Head.
-11. Comparative Value: besser als Top-3 für "${f.keyword}".
-12. Voice Search: Fragesätze in H2.
-13. NAP: "${f.firmName}" + "${f.street || ""}" + "${f.city || ""}" + "${f.phone || ""}" überall identisch.
-14. Duplikat-Schutz: page-uid Kommentar, variierte Micro-Texte.
-
-DESIGN-TOKENS (Inline CSS, Pre-Set: "${f.designPreset}"):
-${designTokens}
+11. Voice Search: Fragesätze in H2.
+12. NAP überall identisch.
+13. Duplikat-Schutz: page-uid Kommentar, variierte Micro-Texte.
 
 AUSGABE-FORMAT:
 1. META-BLOCK (3 Zeilen Plaintext):
@@ -139,280 +296,8 @@ Keywords: [kommasepariert]
 \`\`\`
 
 3. \`\`\`html
-[JSON-LD Schema-Blöcke: ${((f.schemaBlocks as string[]) || []).join(", ")}]
+[JSON-LD Schema-Blöcke]
 \`\`\`
 
 Antworte SOFORT mit dem Output, keine Erklärungen vorher.`;
 }
-
-function extractKieContent(data: Record<string, unknown>): string {
-  let content = '';
-
-  // Anthropic-Format (Kie.AI offiziell):
-  if (data?.content && Array.isArray(data.content)) {
-    const textBlock = (data.content as Array<{ type: string; text?: string }>).find((b) => b.type === "text");
-    if (textBlock?.text) content = textBlock.text;
-  }
-  // OpenAI-Format (Fallback):
-  if (!content) {
-    const choices = data?.choices as Array<{ message?: { content?: string } }> | undefined;
-    if (choices?.[0]?.message?.content) content = choices[0].message.content;
-  }
-  // Direct string:
-  if (!content && typeof data?.content === 'string') {
-    content = data.content;
-  }
-
-  if (!content || content.trim() === '') {
-    console.error('Leere Antwort von Kie.AI. Data:', JSON.stringify(data).substring(0, 500));
-    throw new Error(
-      'Kie.AI leere Antwort. stop_reason: ' + ((data?.stop_reason as string) || 'unbekannt') +
-      ' | Typ: ' + ((data?.type as string) || 'unbekannt')
-    );
-  }
-
-  return content.trim();
-}
-
-function parseKieAiResponse(rawContent: string): {
-  htmlOutput: string;
-  jsonLdOutput: string;
-  metaTitle: string;
-  metaDesc: string;
-  metaKeywords: string;
-} {
-  console.log('=== PARSING START ===');
-  console.log('Raw content length:', rawContent.length);
-  console.log('Raw content preview (first 500):', rawContent.substring(0, 500));
-
-  // META-BLOCK extraction (lines before first ```)
-  const metaMatch = rawContent.match(/^([\s\S]*?)```/);
-  const metaBlock = metaMatch?.[1]?.trim() || '';
-  console.log('META-BLOCK:', metaBlock);
-
-  // Title extraction
-  const titleMatch = metaBlock.match(/(?:SEO-Titel|Title|Titel):\s*(.+)/i);
-  const metaTitle = titleMatch?.[1]?.trim() || '';
-
-  // Description extraction
-  const descMatch = metaBlock.match(/(?:Meta-Desc|Description|Beschreibung):\s*(.+)/i);
-  const metaDesc = descMatch?.[1]?.trim() || '';
-
-  // Keywords extraction
-  const kwMatch = metaBlock.match(/(?:Keywords|Meta-Keywords):\s*(.+)/i);
-  const metaKeywords = kwMatch?.[1]?.trim() || '';
-
-  // HTML blocks extraction (all ```html ... ``` or ``` ... ```)
-  const htmlBlocks = [...rawContent.matchAll(/```(?:html)?\s*\n?([\s\S]*?)```/gi)]
-    .map(m => m[1].trim())
-    .filter(b => b.length > 0);
-
-  console.log('Found HTML blocks:', htmlBlocks.length);
-  htmlBlocks.forEach((b, i) => console.log(`Block ${i} length: ${b.length}, preview: ${b.substring(0, 100)}`));
-
-  let htmlOutput = '';
-  let jsonLdOutput = '';
-
-  if (htmlBlocks.length >= 2) {
-    htmlOutput = htmlBlocks[0];
-    jsonLdOutput = htmlBlocks[1];
-  } else if (htmlBlocks.length === 1) {
-    const block = htmlBlocks[0];
-    // Check if JSON-LD is embedded in the single block
-    const jsonLdMatch = block.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
-    if (jsonLdMatch) {
-      // Extract JSON-LD separately
-      jsonLdOutput = jsonLdMatch[0];
-      htmlOutput = block;
-    } else {
-      htmlOutput = block;
-    }
-  } else {
-    // No code blocks found — try to use the entire content as HTML (minus meta block)
-    console.warn('No code blocks found in Kie.AI response');
-    const afterMeta = rawContent.replace(metaBlock, '').trim();
-    if (afterMeta.includes('<')) {
-      htmlOutput = afterMeta;
-    }
-  }
-
-  console.log('Parsed metaTitle:', metaTitle);
-  console.log('Parsed metaDesc length:', metaDesc.length);
-  console.log('Parsed htmlOutput length:', htmlOutput.length);
-  console.log('Parsed jsonLdOutput length:', jsonLdOutput.length);
-  console.log('=== PARSING END ===');
-
-  return { htmlOutput, jsonLdOutput, metaTitle, metaDesc, metaKeywords };
-}
-
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  try {
-    const formData = await req.json();
-    console.log('=== GENERATE-PAGE START ===');
-    console.log('Empfangene Daten:', JSON.stringify({
-      keyword: formData?.keyword,
-      firm: formData?.firmName,
-      hasActiveSections: !!(formData?.activeSections?.length),
-      activeSectionsCount: formData?.activeSections?.length,
-    }));
-
-    if (!formData.keyword || typeof formData.keyword !== "string") {
-      return new Response(
-        JSON.stringify({ error: "Keyword ist erforderlich." }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const apiKey = Deno.env.get("KIE_AI_API_KEY");
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: "KIE_AI_API_KEY ist nicht konfiguriert." }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const masterPrompt = buildMasterPrompt(formData);
-
-    // Call Kie.AI (Anthropic-Format)
-    console.log('Calling Kie.AI...');
-    const aiResponse = await fetch("https://api.kie.ai/claude/v1/messages", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        messages: [{ role: "user", content: masterPrompt }],
-        max_tokens: 16000,
-        stream: false,
-      }),
-    });
-
-    console.log('Kie.AI Response Status:', aiResponse.status);
-
-    if (!aiResponse.ok) {
-      const errBody = await aiResponse.text();
-      console.error("Kie.AI error:", aiResponse.status, errBody);
-      if (aiResponse.status === 401) {
-        return new Response(
-          JSON.stringify({ error: "Kie.AI: Ungültiger API Key (401)" }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Kie.AI: Rate Limit erreicht (429) — 30 Sek warten" }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (aiResponse.status === 400) {
-        return new Response(
-          JSON.stringify({ error: `Kie.AI: Ungültige Anfrage (400) — ${errBody}` }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      return new Response(
-        JSON.stringify({ error: `Kie.AI HTTP ${aiResponse.status}: ${errBody}`, masterPrompt }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const aiData = await aiResponse.json();
-    let rawContent: string;
-    try {
-      rawContent = extractKieContent(aiData);
-    } catch (e) {
-      return new Response(
-        JSON.stringify({ error: (e as Error).message, masterPrompt }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log('Kie.AI content length:', rawContent.length);
-    console.log('Kie.AI content preview:', rawContent.substring(0, 300));
-
-    // Parse output using robust parser
-    const { htmlOutput, jsonLdOutput, metaTitle, metaDesc, metaKeywords } = parseKieAiResponse(rawContent);
-
-    // Save to Supabase
-    const authHeader = req.headers.get("authorization") || "";
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-
-    let pageId: string | null = null;
-    if (supabaseUrl && supabaseKey && authHeader) {
-      try {
-        const supabase = createClient(supabaseUrl, supabaseKey, {
-          global: { headers: { Authorization: authHeader } },
-        });
-
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: insertData, error: saveError } = await supabase.from("seo_pages").insert({
-            user_id: user.id,
-            keyword: formData.keyword,
-            firm: formData.firmName || null,
-            city: formData.city || null,
-            intent: formData.intent || null,
-            page_type: formData.pageType || null,
-            html_output: htmlOutput,
-            json_ld: jsonLdOutput,
-            meta_title: metaTitle,
-            meta_desc: metaDesc,
-            score: 0,
-            status: "draft",
-            design_preset: formData.designPreset || "trust",
-            active_sections: formData.activeSections || [],
-          }).select("id").single();
-
-          if (saveError) {
-            console.error("DB save error (non-fatal):", saveError);
-          }
-          pageId = insertData?.id || null;
-
-          // If cluster context: link seo_page to cluster_page
-          if (formData.clusterPageId && pageId) {
-            const { error: clusterErr } = await supabase.from("cluster_pages").update({
-              seo_page_id: pageId,
-              status: "generated",
-              updated_at: new Date().toISOString(),
-            }).eq("id", formData.clusterPageId);
-            if (clusterErr) console.error("Cluster page link error (non-fatal):", clusterErr);
-          }
-        }
-      } catch (dbErr) {
-        console.error("DB save error (non-fatal):", dbErr);
-      }
-    }
-
-    const responsePayload = {
-      success: true,
-      pageId,
-      metaTitle,
-      metaDesc,
-      metaKeywords,
-      htmlOutput,
-      jsonLd: jsonLdOutput,
-      masterPrompt,
-    };
-
-    console.log('=== GENERATE-PAGE END ===');
-    console.log('Response: success=true, htmlLength=', htmlOutput.length, ', jsonLdLength=', jsonLdOutput.length, ', metaTitle=', metaTitle);
-
-    return new Response(
-      JSON.stringify(responsePayload),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (err) {
-    console.error("generate-page error:", err);
-    return new Response(
-      JSON.stringify({ error: `Interner Fehler: ${(err as Error).message}` }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-});

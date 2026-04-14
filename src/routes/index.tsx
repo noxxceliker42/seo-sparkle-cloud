@@ -17,7 +17,7 @@ import { SeoForm, type SeoFormData } from "@/components/seo/SeoForm";
 import { OutputPanel, type GeneratedPage } from "@/components/seo/OutputPanel";
 import { QaGate } from "@/components/seo/QaGate";
 import { useAnalysis } from "@/context/AnalysisContext";
-import { useGenerationJob } from "@/hooks/useGenerationJob";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
   component: Index,

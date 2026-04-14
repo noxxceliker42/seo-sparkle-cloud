@@ -110,14 +110,10 @@ function Index() {
   const [qaFormData, setQaFormData] = useState<SeoFormData | null>(null);
   const [generatedPage, setGeneratedPage] = useState<GeneratedPage | null>(null);
 
-  const {
-    generating,
-    error: generateError,
-    htmlWarning,
-    result: generationResult,
-    startGeneration,
-    clearResult: clearGenerationResult,
-  } = useGenerationJob();
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState("");
+  const [htmlWarning, setHtmlWarning] = useState("");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const isLoading = aiState === "loading" || serpState === "loading" || volState === "loading";
 

@@ -1,65 +1,31 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const cors = {
+const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Content-Type": "application/json",
 };
 
-async function uploadToCloudinary(
-  imageUrl: string, slot: string, keyword: string, jobId: string
-): Promise<string | null> {
-  const cloudName = Deno.env.get("CLOUDINARY_CLOUD_NAME");
-  const uploadPreset = Deno.env.get("CLOUDINARY_UPLOAD_PRESET");
-  if (!cloudName || !uploadPreset) return null;
-
-  const slug = (keyword || "image")
-    .toLowerCase()
-    .replace(/[äöüß]/g, (c: string) => ({ ä: "ae", ö: "oe", ü: "ue", ß: "ss" }[c] || c))
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .slice(0, 40);
-
-  const fd = new FormData();
-  fd.append("file", imageUrl);
-  fd.append("upload_preset", uploadPreset);
-  fd.append("folder", "seo-os");
-  fd.append("public_id", `${slug}-${slot}-${jobId.slice(0, 8)}`);
-  fd.append("tags", `seo-os,${slot}`);
-
-  try {
-    const res = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-      { method: "POST", body: fd }
-    );
-    const data = await res.json();
-    return data.secure_url
-      ? data.secure_url.replace("/upload/", "/upload/f_auto,q_auto/")
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: cors });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { jobId, taskId, slot, keyword } = await req.json();
-
-    const kieKey = Deno.env.get("KIE_AI_API_KEY")!;
+    const kieKey = Deno.env.get("KIE_AI_API_KEY");
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Poll task status
+    const { jobId, taskId, slot, keyword } = await req.json();
+
+    // KORREKTER STATUS ENDPOINT
     const statusRes = await fetch(
-      `https://api.kie.ai/api/v1/task/${taskId}`,
+      `https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`,
       {
+        method: "GET",
         headers: {
           Authorization: `Bearer ${kieKey}`,
         },
@@ -67,81 +33,109 @@ Deno.serve(async (req) => {
       }
     );
 
-    console.log("Task status HTTP:", statusRes.status);
+    const statusData = await statusRes.json();
+    console.log("recordInfo response:", JSON.stringify(statusData));
 
-    if (!statusRes.ok) {
-      console.error("Task status check failed:", statusRes.status);
+    const status =
+      statusData?.data?.status ||
+      statusData?.status ||
+      "";
+
+    const isDone =
+      status === "SUCCESS" ||
+      status === "success" ||
+      status === "completed" ||
+      status === "COMPLETED" ||
+      status === "finished";
+
+    const isFailed =
+      status === "FAILED" ||
+      status === "failed" ||
+      status === "error" ||
+      status === "ERROR";
+
+    // Bild-URL aus Response
+    const imageUrl =
+      statusData?.data?.output?.[0]?.url ||
+      statusData?.data?.output?.[0] ||
+      statusData?.data?.images?.[0]?.url ||
+      statusData?.data?.images?.[0] ||
+      statusData?.data?.url ||
+      statusData?.data?.imageUrl ||
+      statusData?.output?.[0]?.url ||
+      statusData?.output?.[0] ||
+      null;
+
+    console.log("Status:", status, "isDone:", isDone, "imageUrl:", imageUrl);
+
+    if (isFailed) {
+      await supabase.from("image_jobs").update({ status: "failed" }).eq("id", jobId);
       return new Response(
-        JSON.stringify({ status: "generating" }),
-        { headers: cors }
+        JSON.stringify({ status: "failed" }),
+        { headers: corsHeaders }
       );
     }
 
-    const statusData = await statusRes.json();
-    console.log("Task status data:", JSON.stringify(statusData));
-
-    // Extract URL from all possible fields
-    const imageUrl =
-      statusData?.data?.[0]?.url ||
-      statusData?.data?.[0]?.imageUrl ||
-      statusData?.data?.[0]?.image_url ||
-      statusData?.images?.[0]?.url ||
-      statusData?.images?.[0] ||
-      statusData?.result?.[0]?.url ||
-      statusData?.result?.url ||
-      statusData?.imageUrl ||
-      statusData?.image_url ||
-      statusData?.url ||
-      statusData?.output?.[0] ||
-      statusData?.data?.output?.[0] ||
-      statusData?.data?.url ||
-      null;
-
-    const state = statusData?.data?.status || statusData?.status || statusData?.state || "";
-    const isDone =
-      ["SUCCESS", "success", "completed", "COMPLETED", "finished", "FINISHED", "done", "DONE"].includes(state) ||
-      !!imageUrl; // URL present = done
-
-    const isFailed = ["FAILED", "failed", "error", "ERROR"].includes(state);
-
-    console.log("isDone:", isDone, "isFailed:", isFailed, "imageUrl:", imageUrl);
-
     if (isDone && imageUrl) {
-      const cloudUrl = await uploadToCloudinary(imageUrl, slot || "free", keyword || "", jobId);
+      // Cloudinary Upload
+      const cloudName = Deno.env.get("CLOUDINARY_CLOUD_NAME");
+      const uploadPreset = Deno.env.get("CLOUDINARY_UPLOAD_PRESET");
+
+      const slug = (keyword || slot || "image")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "-")
+        .slice(0, 40);
+
+      const fd = new FormData();
+      fd.append("file", imageUrl);
+      fd.append("upload_preset", uploadPreset!);
+      fd.append("folder", "seo-os");
+      fd.append("public_id", `${slug}-${slot}-${jobId?.slice(0, 8)}`);
+
+      const cloudRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        { method: "POST", body: fd }
+      );
+      const cloudData = await cloudRes.json();
+      console.log("Cloudinary response:", JSON.stringify(cloudData));
+
+      const cloudinaryUrl =
+        cloudData.secure_url?.replace("/upload/", "/upload/f_auto,q_auto/") || null;
+
+      if (!cloudinaryUrl) {
+        console.error("Cloudinary Upload fehlgeschlagen:", JSON.stringify(cloudData));
+        return new Response(
+          JSON.stringify({ status: "failed", error: "Cloudinary Upload fehlgeschlagen" }),
+          { headers: corsHeaders }
+        );
+      }
 
       await supabase
         .from("image_jobs")
         .update({
           nano_url: imageUrl,
-          cloudinary_url: cloudUrl,
+          cloudinary_url: cloudinaryUrl,
           status: "completed",
           completed_at: new Date().toISOString(),
         })
         .eq("id", jobId);
 
       return new Response(
-        JSON.stringify({ status: "completed", imageUrl, cloudinaryUrl: cloudUrl }),
-        { headers: cors }
+        JSON.stringify({ status: "completed", cloudinaryUrl, slot, jobId }),
+        { headers: corsHeaders }
       );
     }
 
-    if (isFailed) {
-      await supabase.from("image_jobs").update({ status: "failed" }).eq("id", jobId);
-      return new Response(
-        JSON.stringify({ status: "failed" }),
-        { headers: cors }
-      );
-    }
-
+    // Noch nicht fertig
     return new Response(
-      JSON.stringify({ status: "generating" }),
-      { headers: cors }
+      JSON.stringify({ status: "generating", taskStatus: status }),
+      { headers: corsHeaders }
     );
-  } catch (err) {
-    console.error("check-image error:", err);
+  } catch (err: any) {
+    console.error("check-image error:", err.message);
     return new Response(
-      JSON.stringify({ error: (err as Error).message }),
-      { status: 500, headers: cors }
+      JSON.stringify({ error: err.message }),
+      { status: 500, headers: corsHeaders }
     );
   }
 });

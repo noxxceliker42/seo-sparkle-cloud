@@ -87,13 +87,33 @@ function DashboardPage() {
     setPages((p) => p.map((x) => (x.id === id ? { ...x, status: newStatus } : x)));
   };
 
-  const exportHtml = (page: SeoPage) => {
-    const blob = new Blob([page.html_output || ""], { type: "text/html" });
+  const exportHtml = async (page: SeoPage) => {
+    // Always fetch fresh from DB to ensure we have html_output
+    const { data: freshPage } = await supabase
+      .from("seo_pages")
+      .select("html_output, keyword")
+      .eq("id", page.id)
+      .single();
+
+    const html = freshPage?.html_output || page.html_output;
+    if (!html) {
+      alert("HTML nicht gefunden in Datenbank");
+      return;
+    }
+
+    const slug = (freshPage?.keyword || page.keyword || "seite")
+      .toLowerCase()
+      .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+      .replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${page.keyword.replace(/\s+/g, "-")}.html`;
+    a.download = `${slug}.html`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 

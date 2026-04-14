@@ -1,8 +1,6 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-
-const QA_KEY = "seo_os_qa_v2";
-const ANALYSIS_KEY = "seo_os_analysis_v2";
+import { storage } from "@/lib/storage";
 
 interface QaContextValue {
   qaState: Record<string, unknown>;
@@ -16,28 +14,19 @@ const QaContext = createContext<QaContextValue>({
   clearQa: () => {},
 });
 
-function readQaStorage(): Record<string, unknown> {
-  try {
-    const s = sessionStorage.getItem(QA_KEY);
-    return s ? JSON.parse(s) : {};
-  } catch {
-    return {};
-  }
-}
-
 export function QaProvider({ children }: { children: ReactNode }) {
-  const [qaState, _setQaState] = useState<Record<string, unknown>>(readQaStorage);
+  const [qaState, _setQaState] = useState<Record<string, unknown>>(() =>
+    storage.get<Record<string, unknown>>("qa", {}),
+  );
 
   const setQaState = useCallback((state: Record<string, unknown>) => {
     _setQaState(state);
-    try {
-      sessionStorage.setItem(QA_KEY, JSON.stringify(state));
-    } catch {}
+    storage.set("qa", state);
 
     // Sync to saved_analyses
     try {
-      const analysisRaw = sessionStorage.getItem(ANALYSIS_KEY);
-      const analysisId = analysisRaw ? JSON.parse(analysisRaw).savedAnalysisId : null;
+      const analysisState = storage.get<{ savedAnalysisId?: string | null }>("analysis", {});
+      const analysisId = analysisState?.savedAnalysisId;
       if (analysisId) {
         void supabase
           .from("saved_analyses")
@@ -48,7 +37,7 @@ export function QaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearQa = useCallback(() => {
-    sessionStorage.removeItem(QA_KEY);
+    storage.remove("qa");
     _setQaState({});
   }, []);
 

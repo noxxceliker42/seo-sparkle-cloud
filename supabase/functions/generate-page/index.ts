@@ -159,11 +159,78 @@ function extractKieContent(data: Record<string, unknown>): string {
     );
   }
 
-  return content
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/```\s*$/i, '')
-    .trim();
+  return content.trim();
+}
+
+function parseKieAiResponse(rawContent: string): {
+  htmlOutput: string;
+  jsonLdOutput: string;
+  metaTitle: string;
+  metaDesc: string;
+  metaKeywords: string;
+} {
+  console.log('=== PARSING START ===');
+  console.log('Raw content length:', rawContent.length);
+  console.log('Raw content preview (first 500):', rawContent.substring(0, 500));
+
+  // META-BLOCK extraction (lines before first ```)
+  const metaMatch = rawContent.match(/^([\s\S]*?)```/);
+  const metaBlock = metaMatch?.[1]?.trim() || '';
+  console.log('META-BLOCK:', metaBlock);
+
+  // Title extraction
+  const titleMatch = metaBlock.match(/(?:SEO-Titel|Title|Titel):\s*(.+)/i);
+  const metaTitle = titleMatch?.[1]?.trim() || '';
+
+  // Description extraction
+  const descMatch = metaBlock.match(/(?:Meta-Desc|Description|Beschreibung):\s*(.+)/i);
+  const metaDesc = descMatch?.[1]?.trim() || '';
+
+  // Keywords extraction
+  const kwMatch = metaBlock.match(/(?:Keywords|Meta-Keywords):\s*(.+)/i);
+  const metaKeywords = kwMatch?.[1]?.trim() || '';
+
+  // HTML blocks extraction (all ```html ... ``` or ``` ... ```)
+  const htmlBlocks = [...rawContent.matchAll(/```(?:html)?\s*\n?([\s\S]*?)```/gi)]
+    .map(m => m[1].trim())
+    .filter(b => b.length > 0);
+
+  console.log('Found HTML blocks:', htmlBlocks.length);
+  htmlBlocks.forEach((b, i) => console.log(`Block ${i} length: ${b.length}, preview: ${b.substring(0, 100)}`));
+
+  let htmlOutput = '';
+  let jsonLdOutput = '';
+
+  if (htmlBlocks.length >= 2) {
+    htmlOutput = htmlBlocks[0];
+    jsonLdOutput = htmlBlocks[1];
+  } else if (htmlBlocks.length === 1) {
+    const block = htmlBlocks[0];
+    // Check if JSON-LD is embedded in the single block
+    const jsonLdMatch = block.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (jsonLdMatch) {
+      // Extract JSON-LD separately
+      jsonLdOutput = jsonLdMatch[0];
+      htmlOutput = block;
+    } else {
+      htmlOutput = block;
+    }
+  } else {
+    // No code blocks found — try to use the entire content as HTML (minus meta block)
+    console.warn('No code blocks found in Kie.AI response');
+    const afterMeta = rawContent.replace(metaBlock, '').trim();
+    if (afterMeta.includes('<')) {
+      htmlOutput = afterMeta;
+    }
+  }
+
+  console.log('Parsed metaTitle:', metaTitle);
+  console.log('Parsed metaDesc length:', metaDesc.length);
+  console.log('Parsed htmlOutput length:', htmlOutput.length);
+  console.log('Parsed jsonLdOutput length:', jsonLdOutput.length);
+  console.log('=== PARSING END ===');
+
+  return { htmlOutput, jsonLdOutput, metaTitle, metaDesc, metaKeywords };
 }
 
 Deno.serve(async (req) => {
@@ -173,6 +240,13 @@ Deno.serve(async (req) => {
 
   try {
     const formData = await req.json();
+    console.log('=== GENERATE-PAGE START ===');
+    console.log('Empfangene Daten:', JSON.stringify({
+      keyword: formData?.keyword,
+      firm: formData?.firmName,
+      hasActiveSections: !!(formData?.activeSections?.length),
+      activeSectionsCount: formData?.activeSections?.length,
+    }));
 
     if (!formData.keyword || typeof formData.keyword !== "string") {
       return new Response(
@@ -191,7 +265,8 @@ Deno.serve(async (req) => {
 
     const masterPrompt = buildMasterPrompt(formData);
 
-    // Call Kie.AI (Anthropic-Format — korrekter Endpoint)
+    // Call Kie.AI (Anthropic-Format)
+    console.log('Calling Kie.AI...');
     const aiResponse = await fetch("https://api.kie.ai/claude/v1/messages", {
       method: "POST",
       headers: {
@@ -206,6 +281,8 @@ Deno.serve(async (req) => {
       }),
     });
 
+    console.log('Kie.AI Response Status:', aiResponse.status);
+
     if (!aiResponse.ok) {
       const errBody = await aiResponse.text();
       console.error("Kie.AI error:", aiResponse.status, errBody);
@@ -218,6 +295,12 @@ Deno.serve(async (req) => {
       if (aiResponse.status === 429) {
         return new Response(
           JSON.stringify({ error: "Kie.AI: Rate Limit erreicht (429) — 30 Sek warten" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (aiResponse.status === 400) {
+        return new Response(
+          JSON.stringify({ error: `Kie.AI: Ungültige Anfrage (400) — ${errBody}` }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -238,41 +321,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Parse output: META-BLOCK, HTML body, JSON-LD
-    const lines = rawContent.split("\n");
-    let metaTitle = "";
-    let metaDesc = "";
-    let metaKeywords = "";
-    let htmlOutput = "";
-    let jsonLd = "";
+    console.log('Kie.AI content length:', rawContent.length);
+    console.log('Kie.AI content preview:', rawContent.substring(0, 300));
 
-    for (const line of lines) {
-      const l = line.trim();
-      if (l.toLowerCase().startsWith("title:")) metaTitle = l.replace(/^title:\s*/i, "").trim();
-      else if (l.toLowerCase().startsWith("description:")) metaDesc = l.replace(/^description:\s*/i, "").trim();
-      else if (l.toLowerCase().startsWith("keywords:")) metaKeywords = l.replace(/^keywords:\s*/i, "").trim();
-    }
-
-    const htmlBlocks: string[] = [];
-    const htmlRegex = /```html\s*\n([\s\S]*?)```/g;
-    let match;
-    while ((match = htmlRegex.exec(rawContent)) !== null) {
-      htmlBlocks.push(match[1].trim());
-    }
-
-    if (htmlBlocks.length >= 2) {
-      htmlOutput = htmlBlocks[0];
-      jsonLd = htmlBlocks.slice(1).join("\n\n");
-    } else if (htmlBlocks.length === 1) {
-      const block = htmlBlocks[0];
-      const jsonLdIdx = block.indexOf('<script type="application/ld+json">');
-      if (jsonLdIdx > -1) {
-        htmlOutput = block.substring(0, jsonLdIdx).trim();
-        jsonLd = block.substring(jsonLdIdx).trim();
-      } else {
-        htmlOutput = block;
-      }
-    }
+    // Parse output using robust parser
+    const { htmlOutput, jsonLdOutput, metaTitle, metaDesc, metaKeywords } = parseKieAiResponse(rawContent);
 
     // Save to Supabase
     const authHeader = req.headers.get("authorization") || "";
@@ -288,7 +341,7 @@ Deno.serve(async (req) => {
 
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { data: insertData } = await supabase.from("seo_pages").insert({
+          const { data: insertData, error: saveError } = await supabase.from("seo_pages").insert({
             user_id: user.id,
             keyword: formData.keyword,
             firm: formData.firmName || null,
@@ -296,7 +349,7 @@ Deno.serve(async (req) => {
             intent: formData.intent || null,
             page_type: formData.pageType || null,
             html_output: htmlOutput,
-            json_ld: jsonLd,
+            json_ld: jsonLdOutput,
             meta_title: metaTitle,
             meta_desc: metaDesc,
             score: 0,
@@ -305,6 +358,9 @@ Deno.serve(async (req) => {
             active_sections: formData.activeSections || [],
           }).select("id").single();
 
+          if (saveError) {
+            console.error("DB save error (non-fatal):", saveError);
+          }
           pageId = insertData?.id || null;
         }
       } catch (dbErr) {
@@ -312,18 +368,22 @@ Deno.serve(async (req) => {
       }
     }
 
+    const responsePayload = {
+      success: true,
+      pageId,
+      metaTitle,
+      metaDesc,
+      metaKeywords,
+      htmlOutput,
+      jsonLd: jsonLdOutput,
+      masterPrompt,
+    };
+
+    console.log('=== GENERATE-PAGE END ===');
+    console.log('Response: success=true, htmlLength=', htmlOutput.length, ', jsonLdLength=', jsonLdOutput.length, ', metaTitle=', metaTitle);
+
     return new Response(
-      JSON.stringify({
-        success: true,
-        pageId,
-        metaTitle,
-        metaDesc,
-        metaKeywords,
-        htmlOutput,
-        jsonLd,
-        masterPrompt,
-        rawContent,
-      }),
+      JSON.stringify(responsePayload),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {

@@ -117,6 +117,11 @@ function Index() {
   const [htmlWarning, setHtmlWarning] = useState("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  // Prompt Review Screen
+  const [showPromptReview, setShowPromptReview] = useState(false);
+  const [reviewPrompt, setReviewPrompt] = useState('');
+  const [isPromptEdited, setIsPromptEdited] = useState(false);
+
   const isLoading = aiState === "loading" || serpState === "loading" || volState === "loading";
   const { setEntries: setLogEntries, setVisible: setShowLog, setTotalSteps, setProcessName, setOnRetry } = useLogContext();
 

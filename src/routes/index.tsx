@@ -147,13 +147,33 @@ function Index() {
     setKeyword(kw);
   }, []);
 
-  // Resume from saved job
+  // Resume from saved job — either completed result or running job that needs polling
   useEffect(() => {
     if (resumedResult && resumedKeyword) {
       applyJobResult(resumedResult as Record<string, unknown>, resumedKeyword);
       clearResumedResult();
     }
   }, [resumedResult, resumedKeyword, clearResumedResult, applyJobResult]);
+
+  // If we have an active running job (e.g. after page reload), restart polling
+  useEffect(() => {
+    if (activeJobId && !isPolling && resumedKeyword) {
+      setAiState("loading");
+      setSerpState("loading");
+      setVolState("loading");
+      setKeyword(resumedKeyword);
+      startPolling(activeJobId, (result) => {
+        applyJobResult(result as Record<string, unknown>, resumedKeyword);
+        const r = result as { analysis?: AnalysisResult; serp?: SerpResult; volume?: VolumeResult; rawJson?: string };
+        saveAnalysis(resumedKeyword, "kieai", r.analysis || null, r.volume || null, r.serp || null, r.rawJson || "");
+      }, (errorMsg) => {
+        setAiError(errorMsg);
+        setAiState("error");
+        setSerpState("idle");
+        setVolState("idle");
+      });
+    }
+  }, [activeJobId, isPolling, resumedKeyword, startPolling, applyJobResult, saveAnalysis]);
 
   const runStandardAnalysis = useCallback((kw: string): AnalysisResult => {
     // Local JS-based quick analysis (no API needed)

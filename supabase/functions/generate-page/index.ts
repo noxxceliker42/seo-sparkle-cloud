@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
           stream: false,
           messages: [{ role: "user", content: prompt }],
         }),
-        signal: AbortSignal.timeout(55000),
+        signal: AbortSignal.timeout(120000),
       });
     } catch (fetchErr: unknown) {
       const err = fetchErr as Error;

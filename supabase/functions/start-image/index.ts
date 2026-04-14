@@ -56,7 +56,11 @@ Deno.serve(async (req) => {
     const {
       promptPositive, promptNegative, width, height,
       aspectRatio, resolution, slotLabel,
-      slot, pageId, firmId, altText, userId, keyword
+      slot, pageId, firmId, altText, userId, keyword,
+      // Image-to-image fields
+      mode,
+      referenceImageUrl,
+      editStrength,
     } = await req.json();
 
     const kieKey = Deno.env.get("KIE_AI_API_KEY");
@@ -68,31 +72,60 @@ Deno.serve(async (req) => {
     );
 
     const prompt = (promptPositive || "").trim().substring(0, 20000);
+    const genMode = mode || "text-to-image";
 
-    // NanoBanana Task starten
-    const nanoRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
+    // Validate image-to-image modes
+    if ((genMode === "image-to-image" || genMode === "image-edit") && !referenceImageUrl) {
+      return new Response(
+        JSON.stringify({ error: "referenceImageUrl fehlt für Image-to-Image" }),
+        { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Build NanoBanana request based on mode
+    let nanoEndpoint: string;
+    let nanoBody: Record<string, unknown>;
+
+    if (genMode === "image-to-image" || genMode === "image-edit") {
+      nanoEndpoint = "https://api.kie.ai/api/v1/images/edits";
+      nanoBody = {
+        prompt,
+        image: referenceImageUrl,
+        model: "nano-banana-2",
+        n: 1,
+        ...(editStrength !== undefined && { strength: editStrength }),
+        ...(aspectRatio && { aspect_ratio: aspectRatio }),
+        ...(resolution && { image_size: resolution }),
+      };
+    } else {
+      nanoEndpoint = "https://api.kie.ai/api/v1/images/generations";
+      nanoBody = {
+        prompt,
+        negative_prompt: promptNegative || "",
+        model: "nano-banana-2",
+        width: width || 1200,
+        height: height || 675,
+        aspect_ratio: aspectRatio || (width === height ? "1:1" : "16:9"),
+        image_size: resolution || "1K",
+        n: 1,
+      };
+    }
+
+    console.log("NanoBanana Mode:", genMode, "Endpoint:", nanoEndpoint);
+
+    const nanoRes = await fetch(nanoEndpoint, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${kieKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "nano-banana-2",
-        input: {
-          prompt,
-          negative_prompt: promptNegative || "",
-          image_input: [],
-          aspect_ratio: aspectRatio || (width === height ? "1:1" : "16:9"),
-          resolution: resolution || "1K",
-          output_format: "jpg",
-        },
-      }),
-      signal: AbortSignal.timeout(12000),
+      body: JSON.stringify(nanoBody),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!nanoRes.ok) {
       const err = await nanoRes.text();
-      throw new Error(`NanoBanana Start ${nanoRes.status}: ${err}`);
+      throw new Error(`NanoBanana ${nanoRes.status}: ${err}`);
     }
 
     const nanoData = await nanoRes.json();
@@ -105,7 +138,6 @@ Deno.serve(async (req) => {
       nanoData?.id ||
       null;
 
-    // Check for direct URL (sync response)
     const directUrl =
       nanoData?.data?.output?.[0] ||
       nanoData?.data?.url ||
@@ -114,7 +146,6 @@ Deno.serve(async (req) => {
       null;
 
     if (directUrl) {
-      // Upload to Cloudinary immediately
       const cloudUrl = await uploadToCloudinary(directUrl, slot || "free", keyword || "", "direct");
 
       const { data: job } = await supabase
@@ -135,6 +166,9 @@ Deno.serve(async (req) => {
           cloudinary_url: cloudUrl,
           status: "completed",
           completed_at: new Date().toISOString(),
+          mode: genMode,
+          reference_image_url: referenceImageUrl || null,
+          edit_strength: editStrength ?? null,
         })
         .select("id")
         .single();
@@ -154,7 +188,6 @@ Deno.serve(async (req) => {
       throw new Error("Keine taskId und keine URL: " + JSON.stringify(nanoData).slice(0, 200));
     }
 
-    // Save job with taskId
     const { data: job } = await supabase
       .from("image_jobs")
       .insert({
@@ -171,6 +204,9 @@ Deno.serve(async (req) => {
         alt_text: altText || "",
         task_id: taskId,
         status: "generating",
+        mode: genMode,
+        reference_image_url: referenceImageUrl || null,
+        edit_strength: editStrength ?? null,
       })
       .select("id")
       .single();

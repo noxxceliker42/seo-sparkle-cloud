@@ -11,8 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import {
   ImageIcon, Download, Loader2, X, Library, Sparkles, Copy, RotateCcw,
+  Upload, Pencil, RefreshCw,
 } from "lucide-react";
 
 export const Route = createFileRoute("/bilder")({
@@ -53,6 +55,14 @@ const SECTION_TYPES = [
 
 const DEFAULT_NEG = "blurry, low quality, distorted, watermark, text overlay, logo, brand name, ugly, deformed";
 
+type UploadMode = "text-to-image" | "image-to-image" | "image-edit";
+
+const MODE_OPTIONS: { id: UploadMode; label: string; icon: React.ReactNode; desc: string }[] = [
+  { id: "text-to-image", label: "Text → Bild", icon: <Sparkles className="h-4 w-4" />, desc: "Aus Prompt generieren" },
+  { id: "image-to-image", label: "Bild → Variante", icon: <RefreshCw className="h-4 w-4" />, desc: "Stil übertragen" },
+  { id: "image-edit", label: "Bild bearbeiten", icon: <Pencil className="h-4 w-4" />, desc: "Prompt-gesteuert" },
+];
+
 interface ActiveJob {
   id: string;
   taskId: string | null;
@@ -73,12 +83,27 @@ interface LibImage {
   created_at: string | null;
 }
 
+interface ReferenceImage {
+  file: File | null;
+  preview: string | null;
+  kieUrl: string | null;
+  isUploading: boolean;
+  error: string | null;
+}
+
+const EMPTY_REF: ReferenceImage = { file: null, preview: null, kieUrl: null, isUploading: false, error: null };
+
 /* ── Component ── */
 
 function ImageStudio() {
   const { user } = useAuth();
   const [firms, setFirms] = useState<{ id: string; name: string }[]>([]);
   const [firmId, setFirmId] = useState("");
+
+  // Mode
+  const [uploadMode, setUploadMode] = useState<UploadMode>("text-to-image");
+  const [referenceImage, setReferenceImage] = useState<ReferenceImage>(EMPTY_REF);
+  const [editStrength, setEditStrength] = useState(0.7);
 
   // Generation state
   const [sectionType, setSectionType] = useState(SECTION_TYPES[0]);
@@ -135,7 +160,53 @@ function ImageStudio() {
     setLibLoading(false);
   };
 
+  /* ── Image Upload ── */
+
+  const handleImageSelect = async (file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      setReferenceImage(prev => ({ ...prev, error: "Datei zu groß — Max 10 MB" }));
+      return;
+    }
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowed.includes(file.type)) {
+      setReferenceImage(prev => ({ ...prev, error: "Nur JPG, PNG, WebP, GIF erlaubt" }));
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    setReferenceImage({ file, preview, kieUrl: null, isUploading: true, error: null });
+
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke("upload-reference-image", {
+        body: { imageBase64: base64, fileName: file.name, mimeType: file.type },
+      });
+
+      if (error || data?.error) {
+        setReferenceImage(prev => ({ ...prev, isUploading: false, error: error?.message || data?.error || "Upload fehlgeschlagen" }));
+        return;
+      }
+
+      setReferenceImage(prev => ({ ...prev, kieUrl: data.fileUrl, isUploading: false, error: null }));
+      toast.success("Referenzbild hochgeladen");
+    } catch (err: any) {
+      setReferenceImage(prev => ({ ...prev, isUploading: false, error: err.message || "Upload fehlgeschlagen" }));
+    }
+  };
+
+  /* ── Generate ── */
+
   const generateImage = async () => {
+    if (uploadMode !== "text-to-image" && !referenceImage.kieUrl) {
+      toast.error("Bitte zuerst ein Referenzbild hochladen");
+      return;
+    }
     if (!prompt.trim() || isGenerating) return;
     setIsGenerating(true);
 
@@ -152,6 +223,9 @@ function ImageStudio() {
         firmId: firmId || null,
         userId: user?.id,
         keyword: "",
+        mode: uploadMode,
+        referenceImageUrl: referenceImage.kieUrl || null,
+        editStrength,
       },
     });
 
@@ -202,6 +276,7 @@ function ImageStudio() {
   };
 
   const wordCount = prompt.split(/\s+/).filter(Boolean).length;
+  const needsRef = uploadMode !== "text-to-image";
 
   return (
     <div className="space-y-6 max-w-[900px]">
@@ -240,6 +315,127 @@ function ImageStudio() {
           <div className="flex flex-col lg:flex-row gap-5 mt-4">
             {/* Left column: Settings */}
             <div className="w-full lg:w-80 space-y-4 shrink-0">
+
+              {/* Mode selector */}
+              <div>
+                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                  Generierungs-Modus
+                </Label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {MODE_OPTIONS.map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => setUploadMode(m.id)}
+                      className={`p-2.5 rounded-md border text-center transition-colors ${
+                        uploadMode === m.id
+                          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                          : "border-border bg-card hover:bg-accent/50"
+                      }`}
+                    >
+                      <div className={`flex justify-center mb-1 ${uploadMode === m.id ? "text-primary" : "text-muted-foreground"}`}>
+                        {m.icon}
+                      </div>
+                      <div className={`text-[11px] font-bold ${uploadMode === m.id ? "text-primary" : "text-foreground"}`}>
+                        {m.label}
+                      </div>
+                      <div className="text-[9px] text-muted-foreground">{m.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Reference image upload */}
+              {needsRef && (
+                <div>
+                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                    Referenzbild hochladen
+                  </Label>
+
+                  {!referenceImage.preview && (
+                    <label
+                      className="block border-2 border-dashed border-primary/30 rounded-lg p-6 text-center cursor-pointer bg-primary/5 hover:bg-primary/10 transition-colors"
+                      onDragOver={e => { e.preventDefault(); }}
+                      onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImageSelect(f); }}
+                    >
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onChange={e => { const f = e.target.files?.[0]; if (f) handleImageSelect(f); }}
+                        className="hidden"
+                      />
+                      <Upload className="h-7 w-7 mx-auto mb-2 text-primary/60" />
+                      <div className="text-xs font-bold text-primary">Bild hierher ziehen oder klicken</div>
+                      <div className="text-[10px] text-muted-foreground mt-1">JPG, PNG, WebP · Max 10 MB</div>
+                    </label>
+                  )}
+
+                  {referenceImage.preview && (
+                    <div className="relative border-2 border-primary/30 rounded-lg overflow-hidden">
+                      <img src={referenceImage.preview} alt="Referenzbild" className="w-full max-h-44 object-cover" />
+
+                      {referenceImage.isUploading && (
+                        <div className="absolute inset-0 bg-primary/80 flex flex-col items-center justify-center gap-2">
+                          <Loader2 className="h-6 w-6 text-primary-foreground animate-spin" />
+                          <span className="text-xs font-bold text-primary-foreground">Wird hochgeladen...</span>
+                        </div>
+                      )}
+
+                      {referenceImage.kieUrl && (
+                        <Badge className="absolute top-2 right-2 bg-green-600 text-white text-[10px]">✓ Bereit</Badge>
+                      )}
+
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="absolute top-2 left-2 h-6 px-2 text-[10px]"
+                        onClick={() => setReferenceImage(EMPTY_REF)}
+                      >
+                        <X className="h-3 w-3 mr-0.5" /> Entfernen
+                      </Button>
+                    </div>
+                  )}
+
+                  {referenceImage.error && (
+                    <div className="mt-1.5 text-[11px] text-destructive bg-destructive/10 rounded-md px-3 py-1.5">
+                      {referenceImage.error}
+                    </div>
+                  )}
+
+                  {/* Edit strength slider */}
+                  {uploadMode === "image-edit" && referenceImage.kieUrl && (
+                    <div className="mt-3">
+                      <div className="flex justify-between text-[10px] font-bold text-muted-foreground mb-1.5">
+                        <span>Veränderungsstärke</span>
+                        <span className="text-primary">{Math.round(editStrength * 100)}%</span>
+                      </div>
+                      <Slider
+                        min={10}
+                        max={100}
+                        step={5}
+                        value={[Math.round(editStrength * 100)]}
+                        onValueChange={([v]) => setEditStrength(v / 100)}
+                      />
+                      <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
+                        <span>Minimal</span>
+                        <span>Maximal</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Info boxes */}
+                  {uploadMode === "image-to-image" && (
+                    <div className="mt-2 text-[10px] text-blue-700 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-300 rounded-md px-3 py-2 leading-relaxed">
+                      <strong>Stil-Transfer:</strong> NanoBanana übernimmt Komposition und Stil des Referenzbildes und kombiniert es mit deinem Prompt.
+                    </div>
+                  )}
+                  {uploadMode === "image-edit" && (
+                    <div className="mt-2 text-[10px] text-blue-700 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-300 rounded-md px-3 py-2 leading-relaxed">
+                      <strong>Bild bearbeiten:</strong> Der Prompt beschreibt was geändert werden soll. Niedriger Wert = nur kleine Änderungen. Hoher Wert = starke Änderungen.
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Step 1: Section */}
               <div>
                 <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5 block">
@@ -338,7 +534,9 @@ function ImageStudio() {
                   value={prompt}
                   onChange={e => setPrompt(e.target.value)}
                   placeholder={
-                    sectionType.id === "hero"
+                    uploadMode === "image-edit"
+                      ? "Describe the changes: make the background darker, add soft bokeh, change lighting to golden hour..."
+                      : sectionType.id === "hero"
                       ? "Professional appliance repair technician in modern Berlin apartment, photorealistic, soft studio lighting..."
                       : sectionType.id === "autor"
                       ? "Professional headshot, neutral background, confident pose, studio lighting..."
@@ -379,7 +577,7 @@ function ImageStudio() {
               {/* Generate button */}
               <Button
                 onClick={generateImage}
-                disabled={!prompt.trim() || isGenerating}
+                disabled={!prompt.trim() || isGenerating || (needsRef && !referenceImage.kieUrl)}
                 className="w-full"
                 size="lg"
               >

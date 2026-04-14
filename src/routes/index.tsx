@@ -804,7 +804,12 @@ function Index() {
             <QaGate
               formData={qaFormData}
               onBack={() => { setShowQaGate(false); setShowForm(true); }}
-              onGenerate={handleGenerate}
+              onGenerate={(data: SeoFormData) => {
+                const prompt = buildMasterPrompt(data);
+                setReviewPrompt(prompt);
+                setIsPromptEdited(false);
+                setShowPromptReview(true);
+              }}
             />
             {generating && (
               <div className="flex items-center gap-3 rounded-md border border-primary/30 bg-primary/5 p-4">

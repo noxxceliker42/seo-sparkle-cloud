@@ -30,10 +30,10 @@ interface ImageJob {
   variantIndex: number;
   slot: string;
   keyword?: string;
-  created_at?: string;
-  page_id?: string;
+  created_at?: string | null;
+  page_id?: string | null;
   html_inserted?: boolean;
-  prompt_positive?: string;
+  prompt_positive?: string | null;
 }
 
 interface GeneratedPrompt {

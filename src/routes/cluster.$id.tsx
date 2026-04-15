@@ -203,8 +203,16 @@ function ClusterDetailPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setGenerating(null); return; }
 
-      const { data, error } = await supabase.functions.invoke("generate-page", {
-        body: {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const session = (await supabase.auth.getSession()).data.session;
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/n8n-proxy`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
           keyword: page.keyword,
           firm: (firmData as { name?: string })?.name || "",
           city: (firmData as { city?: string })?.city || "",
@@ -221,10 +229,20 @@ function ClusterDetailPage() {
           infoGain: "",
           pillarKeyword: cluster?.pillar_keyword || "",
           clusterSiblings: siblings,
-          userId: user.id,
           clusterPageId: page.id,
-        },
+        }),
       });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`n8n-proxy ${res.status}: ${errText}`);
+      }
+
+      const data = await res.json();
+
+      if (!data?.jobId) {
+        throw new Error(data?.error || "n8n hat keine jobId zurückgegeben");
+      }
 
       if (error || !data?.jobId) {
         toast.error(data?.error || error?.message || "Generierung konnte nicht gestartet werden");

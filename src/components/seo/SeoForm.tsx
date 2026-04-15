@@ -384,26 +384,21 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
         <Textarea value={form.uniqueData} onChange={(e) => update("uniqueData", e.target.value)} rows={4} className={!form.uniqueData.trim() ? "border-red-500" : ""} placeholder="z.B. '2.847 Reparaturen in 2025', 'Durchschnittl. Anfahrt 22 Min.'" />
       </FieldWrapper>
 
-      {/* NAP Validation Errors */}
-      {(() => {
-        const napErrors = checkNapValidity(form);
-        if (napErrors.length === 0) return null;
-        return (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 mt-2">
-            <div className="font-bold text-xs text-red-800 mb-2 flex items-center gap-1.5">
-              ⚠ NAP-Validierung fehlgeschlagen
-            </div>
-            {napErrors.map((err, i) => (
-              <div key={i} className="text-[11px] text-red-700 py-0.5 flex items-center gap-1.5">
-                <span>✕</span> {err}
-              </div>
-            ))}
-            <div className="text-[10px] text-muted-foreground mt-2 pt-2 border-t border-red-200">
-              Echte Firmendaten sind Pflicht — ungültige NAP-Daten erzeugen wertlose Schema-Markups und können Google Manual Actions auslösen.
-            </div>
+      {napErrors.length > 0 && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 mt-2">
+          <div className="font-bold text-xs text-red-800 mb-2 flex items-center gap-1.5">
+            ⚠ NAP-Validierung fehlgeschlagen
           </div>
-        );
-      })()}
+          {napErrors.map((err, i) => (
+            <div key={i} className="text-[11px] text-red-700 py-0.5 flex items-center gap-1.5">
+              <span>✕</span> {err}
+            </div>
+          ))}
+          <div className="text-[10px] text-muted-foreground mt-2 pt-2 border-t border-red-200">
+            Echte Firmendaten sind Pflicht — ungültige NAP-Daten erzeugen wertlose Schema-Markups und können Google Manual Actions auslösen.
+          </div>
+        </div>
+      )}
     </div>
   );
 

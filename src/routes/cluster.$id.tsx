@@ -244,12 +244,6 @@ function ClusterDetailPage() {
         throw new Error(data?.error || "n8n hat keine jobId zurückgegeben");
       }
 
-      if (error || !data?.jobId) {
-        toast.error(data?.error || error?.message || "Generierung konnte nicht gestartet werden");
-        await updateStatus(page.id, "approved");
-        setGenerating(null);
-        return;
-      }
 
       toast.info("Generierung gestartet — dauert 2–4 Minuten. Tab-Wechsel ist sicher.");
       startClusterPolling(data.jobId, page.id, page.keyword);

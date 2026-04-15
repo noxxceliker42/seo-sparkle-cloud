@@ -55,6 +55,21 @@ const DESIGN_SYSTEMS: Record<string, any> = {
   },
 };
 
+const TERM_BANK: Record<string, string> = {
+  hausgeraete: `Waschmaschinen: Heizelement, NTC-Sensor, Laugenpumpe, Pressostat, Invertermotor, AquaStop, Motorkohlen, Tacho-Generator, Türverriegelung, Einlaufventil. Kühlschränke: Verdampfer, Abtauheizung, Kompressor, NeoFrost, Kondensator, Thermostat. Geschirrspüler: Umwälzpumpe, Spülarm, EverClean-Filter, Enthärter, Wasserstandssensor. Trockner: Wärmepumpe, Kondensatbehälter, Temperaturbegrenzer, Antriebsriemen.`,
+  kfz: `OBD-Schnittstelle, Fehlerspeicher, CAN-Bus, Lambdasonde, DPF-Regeneration, Kolbenringe, Nockenwelle, Steuerkette, Turbolader, Einspritzventil, Bremsbelag, Bremsscheibe, ABS-Sensor, Stoßdämpfer.`,
+  handwerk: `VDE-Prüfung, FI-Schutzschalter, Potenzialausgleich, DGUV Vorschrift 3, Trinkwasserverordnung, Druckminderer, Brennwertkessel, Hydraulischer Abgleich, Heizlastberechnung, BEG-Förderung.`,
+  immobilien: `Bodenrichtwert, Sachwertverfahren, Ertragswertverfahren, Verkehrswert, Auflassungsvormerkung, Grundbucheintrag, Annuitätendarlehen, KfW-Förderung.`,
+  gesundheit: `Anamnese, Differenzialdiagnose, Laborwerte, Physiotherapie, Ergotherapie, Arthroskopie, Bandscheibenvorfall, Gonarthrose, Rotatorenmanschette.`,
+  gastronomie: `HACCP-Konzept, Critical Control Point, Allergenmanagement, TSE-Pflicht, Hygienepass, Betriebserlaubnis, Zapfanlage.`,
+  "steuer-recht": `AfA, Gewerbesteuer, Vorsteuerabzug, ELSTER, GmbH-Gründung, Handelsregister, Stammkapital, Kündigungsschutzgesetz, Sozialplan.`,
+  "it-tech": `CI/CD-Pipeline, Containerisierung, Microservices, API-REST, Penetrationstest, OWASP Top 10, Zero-Trust, VLAN, VPN-Tunnel.`,
+  "beauty-wellness": `Hautanalyse, Hydratation, Retinol, Hyaluronsäure-Filler, Faszienmassage, Lymphdrainage, Triggerpunkttherapie, Gelnägel.`,
+  bildung: `Scaffolding, Kompetenzorientierung, Systemisches Coaching, Ressourcenorientierung, Blended Learning, SCORM-Standard, LMS.`,
+  ecommerce: `Conversion Rate Optimization, Warenkorbabbruch, A/B-Test, Fulfillment, Retourenquote, ROAS, Customer Lifetime Value.`,
+  "bau-sanierung": `Baugenehmigung, GRZ/GFZ, Statik, Wärmeschutznachweis, Rohbau, Fassadendämmung, KfW-Effizienzhaus, Blower-Door-Test.`,
+};
+
 function truncateList(value: unknown, max: number): string {
   if (!value || typeof value !== "string") return "keine";
   const items = value.split(/[,·|]/).map(s => s.trim()).filter(Boolean);
@@ -66,6 +81,8 @@ export function buildMasterPrompt(data: Record<string, any>): string {
   const ds = DESIGN_SYSTEMS[data.designPreset || "trust"] || DESIGN_SYSTEMS.trust;
   const outputMode = data.outputMode || "standalone";
   const isContao = outputMode === "tinymce";
+  const branche = data.branche || "hausgeraete";
+  const sprache = data.sprache || "de";
   const sections = Array.isArray(data.activeSections)
     ? data.activeSections.join(" · ")
     : "01 Hero · 02 Problem · 04 Symptome · 05 Selbsthilfe · 07 Unique Data · 08 Info Gain · 09 Ablauf · 10 Preise · 14 FAQ · 15 Autor";

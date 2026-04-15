@@ -108,8 +108,12 @@ Deno.serve(async (req) => {
       activeSections,
       contaoMode,
       tokensUsed,
+      tokensUsedAgent,
+      tokensUsedSonnet,
+      warnings,
       durationSeconds,
       stopReason,
+      triggeredBy,
     } = body;
 
     if (!keyword || !userId) {

@@ -87,8 +87,22 @@ export function buildMasterPrompt(data: Record<string, any>): string {
     ? data.activeSections.join(" · ")
     : "01 Hero · 02 Problem · 04 Symptome · 05 Selbsthilfe · 07 Unique Data · 08 Info Gain · 09 Ablauf · 10 Preise · 14 FAQ · 15 Autor";
 
-  return `Du bist SEO- und Frontend-Experte.
-Erstelle eine vollständige, professionelle SEO-Seite.
+  const SEARCH_INTENT_ERKLAERUNG: Record<string, string> = {
+    informational: "Nutzer sucht Wissen und Orientierung — keine direkte Kaufabsicht. Seite muss umfassend informieren und intern zu kommerziellen Seiten führen.",
+    commercial: "Nutzer vergleicht Anbieter — bereit zur Kontaktaufnahme. Seite muss differenzieren, USPs betonen, Vertrauen aufbauen.",
+    transactional: "Nutzer ist kaufbereit — will jetzt Termin oder Angebot. Seite muss maximale Conversion-Elemente haben.",
+  };
+
+  const intent = (data.intent || "Informational").toLowerCase();
+
+  return `Du bist gleichzeitig:
+- Senior SEO-Stratege (Topical Authority, Content Cluster, Topic Universe, Search Intent Präzision)
+- Conversion-Copywriter (AIDA-Struktur, lokale USPs, Vertrauensaufbau, CTA-Hierarchie)
+- Branchenexperte (${branche} — Fachbegriffe aus Term-Bank, echte Terminologie, keine Floskeln)
+- HTML-Architekt (${outputMode}-Modus, CMS-optimiert, performance-orientiert)
+- EEAT-Optimierer (Autorbox, Fachprüfung, Erfahrungsbelege, Aktualisierungsdaten)
+
+KERNPRINZIP: Schreibe niemals generisch. Jede Seite ist konkret, fachlich präzise, konversionsorientiert und visuell hochwertig. KI-Floskeln sind absolut verboten.
 
 ══════════════════════════════════════
 SEITEN-KONTEXT
@@ -97,6 +111,7 @@ KEYWORD: "${data.keyword || "Keyword"}"
 SEITENTYP: ${data.pageType || "pillar_page"}
 PILLAR-TIER: ${data.pillarTier || "1"}
 INTENT: ${data.intent || "Informational"}
+INTENT-ERKLÄRUNG: ${SEARCH_INTENT_ERKLAERUNG[intent] || ""}
 OUTPUT-MODE: ${outputMode}
 BRANCHE: ${branche}
 SPRACHE: ${sprache}

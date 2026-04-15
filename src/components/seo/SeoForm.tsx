@@ -279,10 +279,11 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
 
   const currentStepId = STEPS[step].id;
   const stepRequired = REQUIRED_FIELDS[currentStepId] || [];
+  const napErrors = useMemo(() => currentStepId === "C" ? checkNapValidity(form) : [], [currentStepId, form]);
   const canProceed = stepRequired.every((f) => {
     const v = form[f];
     return typeof v === "string" ? v.trim().length > 0 : Array.isArray(v) ? v.length > 0 : !!v;
-  });
+  }) && napErrors.length === 0;
 
   const toggleSchema = useCallback((schema: string) => {
     setForm((prev) => {

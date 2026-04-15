@@ -18,6 +18,7 @@ export interface SeoFormData {
   pillarTier: string;
   branche: string;
   sprache: string;
+  uspFokus: string;
   secondaryKeywords: string;
   lsiTerms: string;
   negativeKeywords: string;
@@ -35,6 +36,8 @@ export interface SeoFormData {
   city: string;
   phone: string;
   website: string;
+  email: string;
+  oeffnungszeiten: string;
   serviceArea: string;
   uniqueData: string;
   // D — Autor / E-E-A-T
@@ -221,10 +224,10 @@ const REQUIRED_FIELDS: Record<string, (keyof SeoFormData)[]> = {
 };
 
 const DEFAULT_FORM: SeoFormData = {
-  keyword: "", intent: "", pageType: "pillar_page", pillarTier: "1", branche: "hausgeraete", sprache: "de", secondaryKeywords: "", lsiTerms: "",
+  keyword: "", intent: "", pageType: "pillar_page", pillarTier: "1", branche: "hausgeraete", sprache: "de", uspFokus: "", secondaryKeywords: "", lsiTerms: "",
   negativeKeywords: "", pillarUrl: "", pillarTitle: "", siblingPages: "",
   deepPages: "", contentGap: "", paaQuestions: "", firmName: "", street: "",
-  zip: "", city: "", phone: "", website: "", serviceArea: "", uniqueData: "",
+  zip: "", city: "", phone: "", website: "", email: "", oeffnungszeiten: "", serviceArea: "", uniqueData: "",
   authorName: "", authorTitle: "", experienceYears: "", certificates: "",
   reviewer: "", caseStudy: "", kvaPrice: "", priceRange: "", priceCard1: "",
   priceCard2: "", priceCard3: "", repairVsBuy: "", outputMode: "standalone",
@@ -419,6 +422,10 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
       <FieldWrapper label="Pillar-URL">
         <Input value={form.pillarUrl} onChange={(e) => update("pillarUrl", e.target.value)} placeholder="https://example.com/pillar-page" />
       </FieldWrapper>
+      <FieldWrapper label="Wettbewerbs-USP">
+        <Textarea value={form.uspFokus} onChange={(e) => update("uspFokus", e.target.value)} rows={3} placeholder="Was unterscheidet diesen Betrieb von Wettbewerbern für dieses Keyword? z.B. Einziger Betrieb mit 24h-Notdienst, günstigste Anfahrt, 20 Jahre Erfahrung..." />
+        <p className="text-[10px] text-muted-foreground mt-1">Steuert Conversion-Texte und EEAT-Differenzierung der Seite</p>
+      </FieldWrapper>
     </div>
   );
 
@@ -468,6 +475,12 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
       </FieldWrapper>
       <FieldWrapper label="Servicegebiet" autoFilled={isAuto("serviceArea")}>
         <Input value={form.serviceArea} onChange={(e) => update("serviceArea", e.target.value)} className={inputClass("serviceArea")} />
+      </FieldWrapper>
+      <FieldWrapper label="E-Mail">
+        <Input value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="info@firma.de" className={inputClass("email")} />
+      </FieldWrapper>
+      <FieldWrapper label="Öffnungszeiten / Verfügbarkeit">
+        <Input value={form.oeffnungszeiten} onChange={(e) => update("oeffnungszeiten", e.target.value)} placeholder="Mo-Fr 8-18 Uhr, Sa 9-14 Uhr" />
       </FieldWrapper>
       <FieldWrapper label="Unique Data" required>
         <p className="text-xs text-muted-foreground mb-1">Eigene Zahlen, Erfahrungswerte, Statistiken — kein API ersetzt das!</p>

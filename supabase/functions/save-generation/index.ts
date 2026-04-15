@@ -6,20 +6,87 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
 };
 
+const jsonResponse = (body: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
   try {
     const body = await req.json();
+    const action = body.action || "save";
+
+    // Service role client — bypasses RLS
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // ── ACTION: create_job ──────────────────────────────────
+    if (action === "create_job") {
+      const { jobId, userId, keyword, status } = body;
+
+      if (!userId || !keyword) {
+        return jsonResponse({ error: "userId and keyword are required" }, 400);
+      }
+
+      const insertData: Record<string, unknown> = {
+        user_id: userId,
+        keyword,
+        status: status || "running",
+        created_at: new Date().toISOString(),
+      };
+      if (jobId) insertData.id = jobId;
+
+      const { data: job, error } = await supabase
+        .from("generation_jobs")
+        .insert(insertData)
+        .select("id")
+        .single();
+
+      if (error) {
+        console.error("create_job error:", error);
+        return jsonResponse({ error: "Failed to create job", detail: error.message }, 500);
+      }
+
+      return jsonResponse({ success: true, jobId: job.id });
+    }
+
+    // ── ACTION: set_error ───────────────────────────────────
+    if (action === "set_error") {
+      const { jobId, errorMessage } = body;
+
+      if (!jobId) {
+        return jsonResponse({ error: "jobId is required" }, 400);
+      }
+
+      const { error } = await supabase
+        .from("generation_jobs")
+        .update({
+          status: "error",
+          error_message: errorMessage || "Unknown error",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", jobId);
+
+      if (error) {
+        console.error("set_error error:", error);
+        return jsonResponse({ error: "Failed to update job", detail: error.message }, 500);
+      }
+
+      return jsonResponse({ success: true, jobId });
+    }
+
+    // ── ACTION: save (default) ──────────────────────────────
     const {
       jobId,
       keyword,
@@ -44,19 +111,9 @@ Deno.serve(async (req) => {
       stopReason,
     } = body;
 
-    // Validate required fields
     if (!keyword || !userId) {
-      return new Response(
-        JSON.stringify({ error: "keyword and userId are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "keyword and userId are required" }, 400);
     }
-
-    // Service role client — bypasses RLS
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
 
     // 1. Upsert seo_pages
     let finalPageId = pageId || null;
@@ -83,7 +140,6 @@ Deno.serve(async (req) => {
     };
 
     if (finalPageId) {
-      // Update existing page
       const { error: updateErr } = await supabase
         .from("seo_pages")
         .update(pageData)
@@ -91,13 +147,9 @@ Deno.serve(async (req) => {
 
       if (updateErr) {
         console.error("seo_pages update error:", updateErr);
-        return new Response(
-          JSON.stringify({ error: "Failed to update seo_pages", detail: updateErr.message }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ error: "Failed to update seo_pages", detail: updateErr.message }, 500);
       }
     } else {
-      // Insert new page
       const { data: newPage, error: insertErr } = await supabase
         .from("seo_pages")
         .insert(pageData)
@@ -106,10 +158,7 @@ Deno.serve(async (req) => {
 
       if (insertErr) {
         console.error("seo_pages insert error:", insertErr);
-        return new Response(
-          JSON.stringify({ error: "Failed to insert seo_pages", detail: insertErr.message }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ error: "Failed to insert seo_pages", detail: insertErr.message }, 500);
       }
       finalPageId = newPage.id;
     }
@@ -137,19 +186,15 @@ Deno.serve(async (req) => {
 
       if (jobErr) {
         console.error("generation_jobs update error:", jobErr);
-        // Non-fatal — page was already saved
       }
     }
 
-    return new Response(
-      JSON.stringify({ success: true, pageId: finalPageId }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ success: true, pageId: finalPageId });
   } catch (err) {
     console.error("save-generation error:", err);
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    return jsonResponse(
+      { error: err instanceof Error ? err.message : "Unknown error" },
+      500
     );
   }
 });

@@ -131,7 +131,6 @@ function Index() {
   const [isPromptEdited, setIsPromptEdited] = useState(false);
 
   const isLoading = aiState === "loading" || serpState === "loading" || volState === "loading";
-  const { setEntries: setLogEntries, setVisible: setShowLog, setTotalSteps, setProcessName, setOnRetry } = useLogContext();
 
   const {
     isRunning: isAnalysisRunning,

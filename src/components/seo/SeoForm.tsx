@@ -50,6 +50,7 @@ export interface SeoFormData {
   priceCard3: string;
   repairVsBuy: string;
   // F — Design & Bild
+  outputMode: string;
   designPreset: string;
   primaryColor: string;
   toneOfVoice: string;
@@ -205,8 +206,8 @@ const DEFAULT_FORM: SeoFormData = {
   zip: "", city: "", phone: "", website: "", serviceArea: "", uniqueData: "",
   authorName: "", authorTitle: "", experienceYears: "", certificates: "",
   reviewer: "", caseStudy: "", kvaPrice: "", priceRange: "", priceCard1: "",
-  priceCard2: "", priceCard3: "", repairVsBuy: "", designPreset: "trust",
-  primaryColor: "#1d4ed8", toneOfVoice: "Sachlich-kompetent",
+  priceCard2: "", priceCard3: "", repairVsBuy: "", outputMode: "standalone",
+  designPreset: "trust", primaryColor: "#1d4ed8", toneOfVoice: "Sachlich-kompetent",
   imageStrategy: "NanoBanana KI", schemaBlocks: ["FAQPage", "HowTo"],
   breadcrumb: "", rating: "4.9", reviewCount: "", informationGain: "",
   discoverReady: "Ja-Bild vorhanden", comparativeCheck: "Noch ausstehend",
@@ -493,8 +494,33 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
     </div>
   );
 
+  const OUTPUT_MODES = [
+    { value: "standalone", label: "Standalone", desc: "Reines HTML", detail: "Volle Freiheit, alle modernen Features" },
+    { value: "wordpress", label: "WordPress", desc: "Gutenberg / WP", detail: "Style-Block, UTF-8, moderne Tags" },
+    { value: "tinymce", label: "Contao / TinyMCE", desc: "TinyMCE-safe", detail: "Kein Script, Inline-CSS, HTML-Entities" },
+  ];
+
   const renderStepF = () => (
     <div className="space-y-5">
+      <FieldWrapper label="CMS / Output-Mode">
+        <div className="grid grid-cols-3 gap-2">
+          {OUTPUT_MODES.map((mode) => (
+            <div
+              key={mode.value}
+              onClick={() => update("outputMode", mode.value)}
+              className={`cursor-pointer rounded-lg border-2 p-3 text-center transition-colors ${
+                form.outputMode === mode.value
+                  ? "border-[#7c3aed] bg-[#f5f3ff]"
+                  : "border-border bg-background hover:border-[#7c3aed]/40"
+              }`}
+            >
+              <div className={`font-bold text-[13px] ${form.outputMode === mode.value ? "text-[#7c3aed]" : "text-foreground"}`}>{mode.label}</div>
+              <div className={`text-[11px] font-semibold mt-0.5 ${form.outputMode === mode.value ? "text-[#7c3aed]" : "text-muted-foreground"}`}>{mode.desc}</div>
+              <div className="text-[9px] text-muted-foreground mt-1">{mode.detail}</div>
+            </div>
+          ))}
+        </div>
+      </FieldWrapper>
       <FieldWrapper label="Design-Paket">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {DESIGN_PRESETS.map((dp) => (
@@ -522,19 +548,6 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
           ))}
         </div>
       </FieldWrapper>
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
-        <Switch
-          checked={form.designPreset === "contao_inline"}
-          onCheckedChange={(checked) => {
-            if (checked) update("designPreset", form.designPreset);
-          }}
-          id="contao-mode"
-        />
-        <div>
-          <Label htmlFor="contao-mode" className="text-sm font-medium">Contao-Modus (Inline CSS)</Label>
-          <p className="text-[11px] text-muted-foreground">Styles direkt am Element — für Contao 4.x und ältere CMS</p>
-        </div>
-      </div>
       <FieldWrapper label="Tone of Voice">
         <ButtonGroup options={TONE_OPTIONS} value={form.toneOfVoice} onChange={(v) => update("toneOfVoice", v)} />
       </FieldWrapper>

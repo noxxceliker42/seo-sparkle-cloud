@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Search, Image as ImageIcon, Loader2, ArrowRight, BarChart3 } from "lucide-react";
 import { ProcessLogger } from "@/lib/ProcessLogger";
 import { useLogContext } from "@/context/LogContext";
+import { useGenerationJob } from "@/hooks/useGenerationJob";
 import { LsiChips } from "@/components/seo/LsiChips";
 import { SerpPreview } from "@/components/seo/SerpPreview";
 import { PaaList } from "@/components/seo/PaaList";
@@ -113,9 +114,16 @@ function Index() {
   const [qaFormData, setQaFormData] = useState<SeoFormData | null>(null);
   const [generatedPage, setGeneratedPage] = useState<GeneratedPage | null>(null);
 
-  const [generating, setGenerating] = useState(false);
-  const [generateError, setGenerateError] = useState("");
-  const [htmlWarning, setHtmlWarning] = useState("");
+  // Generation via n8n-proxy hook
+  const {
+    generating,
+    error: generateError,
+    htmlWarning,
+    result: generationResult,
+    startGeneration,
+    clearResult: clearGenerationResult,
+    clearError: clearGenerateError,
+  } = useGenerationJob();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Prompt Review Screen

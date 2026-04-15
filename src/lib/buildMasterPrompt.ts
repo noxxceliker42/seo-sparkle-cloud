@@ -134,6 +134,17 @@ RATING: ${data.rating || "4.9"} / 5 (${data.reviewCount || "0"} Bewertungen)
 TONE OF VOICE: ${data.toneOfVoice || "Sachlich-kompetent"}
 
 ══════════════════════════════════════
+BRANCHEN-FACHBEGRIFFE (TERM-BANK)
+══════════════════════════════════════
+${TERM_BANK[branche] || "keine branchenspezifischen Begriffe"}
+${sprache !== "de" ? `
+══════════════════════════════════════
+SPRACHHINWEIS
+══════════════════════════════════════
+WICHTIG: Gesamte Seite auf ${sprache === "en" ? "Englisch" : "Türkisch"} generieren.
+NAP-Daten bleiben auf Deutsch. Schema-Markup in Originalsprache.
+` : ""}
+══════════════════════════════════════
 PREISE
 ══════════════════════════════════════
 KVA-PREIS: ${data.kvaPrice || "k.A."} €

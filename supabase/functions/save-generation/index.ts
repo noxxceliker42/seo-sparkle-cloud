@@ -183,8 +183,12 @@ Deno.serve(async (req) => {
           meta_desc: metaDesc || null,
           meta_keywords: metaKeywords || null,
           tokens_used: tokensUsed || null,
+          tokens_used_agent: tokensUsedAgent || 0,
+          tokens_used_sonnet: tokensUsedSonnet || 0,
+          warnings: warnings || "[]",
           duration_seconds: durationSeconds || null,
           stop_reason: stopReason || null,
+          triggered_by: triggeredBy || "n8n",
           completed_at: new Date().toISOString(),
         })
         .eq("id", jobId);

@@ -227,33 +227,21 @@ export function useGenerationJob() {
         return;
       }
 
-      const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
-      const n8nKey = import.meta.env.VITE_N8N_AUTH_KEY;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const session = (await supabase.auth.getSession()).data.session;
 
-      if (!n8nUrl) {
-        setState((prev) => ({
-          ...prev,
-          generating: false,
-          error: "VITE_N8N_WEBHOOK_URL ist nicht konfiguriert. Bitte in den Projekteinstellungen setzen.",
-        }));
-        return;
-      }
-
-      const res = await fetch(n8nUrl, {
+      const res = await fetch(`${supabaseUrl}/functions/v1/n8n-proxy`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(n8nKey ? { "X-SEO-OS-Key": n8nKey } : {}),
+          "Authorization": `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({
-          ...formData,
-          userId: user.id,
-        }),
+        body: JSON.stringify(formData),
       });
 
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`n8n ${res.status}: ${errText}`);
+        throw new Error(`n8n-proxy ${res.status}: ${errText}`);
       }
 
       const result = await res.json();
@@ -271,7 +259,7 @@ export function useGenerationJob() {
         ...prev,
         generating: false,
         error: msg.includes("Failed to fetch") || msg.includes("NetworkError")
-          ? "n8n nicht erreichbar — Bitte VITE_N8N_WEBHOOK_URL prüfen."
+          ? "n8n nicht erreichbar — Bitte N8N_WEBHOOK_URL in den Cloud-Secrets prüfen."
           : msg,
       }));
     }

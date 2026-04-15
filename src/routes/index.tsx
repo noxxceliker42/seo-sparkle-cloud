@@ -530,265 +530,58 @@ function Index() {
   }, [generating]);
 
   const handleGenerate = useCallback(async (data: SeoFormData, customPrompt?: string) => {
-    setGenerating(true);
-    setGenerateError("");
-    setHtmlWarning("");
-    setShowLog(true);
-    setLogEntries([]);
-    setTotalSteps(7);
-    setProcessName("Neue Seite");
-
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    const logger = new ProcessLogger(
-      "neue_seite",
-      authUser?.id || "",
-      supabase,
-      setLogEntries,
-    );
-
-    setOnRetry(() => () => { handleGenerate(data); });
-
-    // SCHRITT 1: Validierung
-    await logger.log("Formular-Validierung", "running", "Pflichtfelder werden geprüft...");
+    // Validate required fields
     const missing: string[] = [];
     if (!data.keyword?.trim()) missing.push("Keyword");
     if (!data.firmName?.trim()) missing.push("Firma");
     if (!data.city?.trim()) missing.push("Stadt");
     if (!data.informationGain?.trim()) missing.push("Information Gain");
     if (missing.length > 0) {
-      await logger.log("Formular-Validierung", "error", `Fehlende Felder: ${missing.join(", ")}`, {
-        missingFields: missing,
-        hint: "Formular ergänzen und erneut versuchen",
-      });
-      setGenerating(false);
+      toast.error(`Fehlende Felder: ${missing.join(", ")}`);
       return;
     }
-    await logger.log("Formular-Validierung", "success", "Alle Pflichtfelder vorhanden", {
-      keyword: data.keyword, firm: data.firmName,
+
+    // Build basePrompt from master prompt builder
+    const basePrompt = customPrompt || buildMasterPrompt(data);
+
+    // Send all form data + basePrompt to n8n via the hook
+    await startGeneration({
+      ...data,
+      basePrompt,
     });
 
-    // SCHRITT 2: Auth
-    await logger.log("Auth-Prüfung", "running", "Session wird geprüft...");
-    if (!authUser) {
-      await logger.log("Auth-Prüfung", "error", "Keine aktive Session", {
-        hint: "Bitte neu einloggen und erneut versuchen",
-      });
-      setGenerating(false);
-      return;
-    }
-    await logger.log("Auth-Prüfung", "success", `Eingeloggt als ${authUser.email}`);
+    toast.info("Generierung gestartet — dauert 2–4 Minuten. Tab-Wechsel ist sicher.");
+  }, [startGeneration]);
 
-    // SCHRITT 3: Edge Function Ping
-    await logger.log("Edge Function Ping", "running", "Verbindung zu generate-page wird geprüft...");
-    const pingStart = Date.now();
-    try {
-      const { data: pingData, error: pingError } = await supabase.functions.invoke("generate-page", {
-        body: { test: true },
-      });
-      const pingMs = Date.now() - pingStart;
-      if (pingError) {
-        const msg = pingError.message || "";
-        await logger.log("Edge Function Ping", "error", `Nicht erreichbar: ${msg}`, {
-          error: msg,
-          hint: msg.includes("Failed to send")
-            ? "Edge Function nicht deployed — Status prüfen"
-            : msg.includes("404")
-            ? "Function nicht gefunden — Name prüfen"
-            : "Netzwerkfehler — VPN oder Firewall?",
-          duration: pingMs + "ms",
-        });
-        setGenerating(false);
-        return;
-      }
-      await logger.log("Edge Function Ping", "success", `Erreichbar (${pingMs}ms) · Key: ${pingData?.keyPresent ? "vorhanden" : "FEHLT!"}`, {
-        pingData, duration: pingMs + "ms",
-      });
-      if (!pingData?.keyPresent) {
-        await logger.log("API Key Check", "error", "API Key fehlt in Secrets", {
-          hint: "Backend Secrets prüfen und API Key eintragen",
-        });
-        setGenerating(false);
-        return;
-      }
-    } catch (err: any) {
-      await logger.log("Edge Function Ping", "error", `Netzwerkfehler: ${err.message}`, {
-        hint: "Internetverbindung prüfen",
-      });
-      setGenerating(false);
-      return;
-    }
+  // Map generation hook result → UI state
+  useEffect(() => {
+    if (!generationResult) return;
 
-    // SCHRITT 4: Prompt aufbauen
-    await logger.log("Prompt aufbauen", "running", "Master-Prompt wird zusammengestellt...");
-    const promptSize = JSON.stringify(data).length;
-    await logger.log("Prompt aufbauen", "success", `Prompt bereit · ${promptSize} Zeichen Input`, {
-      designPreset: data.designPreset, activeSections: data.activeSections?.length || 0, contaoMode: (data as any).contaoMode || false,
+    setGeneratedPage({
+      metaTitle: generationResult.metaTitle || "",
+      metaDesc: generationResult.metaDesc || "",
+      metaKeywords: generationResult.metaKeywords || "",
+      htmlOutput: generationResult.htmlOutput,
+      bodyContent: generationResult.bodyContent || "",
+      cssBlock: generationResult.cssBlock || "",
+      jsonLd: generationResult.jsonLd || "",
+      masterPrompt: generationResult.promptUsed || "",
+      activeSections: qaFormData?.activeSections || [],
+      firmName: qaFormData?.firmName || "",
+      street: qaFormData?.street || "",
+      city: qaFormData?.city || "",
+      phone: qaFormData?.phone || "",
+      pageId: generationResult.pageId || undefined,
+      keyword: qaFormData?.keyword || keyword,
+      tokensUsed: generationResult.tokensUsed || 0,
+      duration: generationResult.durationSeconds || 0,
+      stopReason: generationResult.stopReason || "",
     });
-
-    // SCHRITT 5: Anthropic Call (direkter fetch für Streaming/chunked Response)
-    await logger.log("Anthropic Generierung", "running", "Claude generiert HTML... (30-90 Sek)");
-    const genStart = Date.now();
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-      const httpResponse = await fetch(
-        `${supabaseUrl}/functions/v1/generate-page`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session?.access_token}`,
-            "apikey": supabaseKey,
-          },
-          body: JSON.stringify({ ...data, userId: authUser.id, ...(customPrompt ? { customPrompt } : {}) }),
-        }
-      );
-
-      const genMs = Date.now() - genStart;
-
-      if (!httpResponse.ok) {
-        const errText = await httpResponse.text();
-        let msg = `HTTP ${httpResponse.status}`;
-        try {
-          const errJson = JSON.parse(errText);
-          msg = errJson.error || msg;
-        } catch {}
-        let hint = "";
-        if (msg.includes("timeout") || genMs > 140000) hint = "Timeout — Weniger Sektionen aktivieren.";
-        else if (msg.includes("401")) hint = "API Key ungültig — Key erneuern";
-        else if (msg.includes("429")) hint = "Rate Limit — 30 Sek warten";
-        else if (msg.includes("500")) hint = "Interner Fehler — Logs prüfen";
-        await logger.log("Anthropic Generierung", "error", `Fehler nach ${Math.round(genMs / 1000)}s: ${msg}`, {
-          error: msg, hint, duration: genMs + "ms",
-        });
-        setGenerateError(msg);
-        setGenerating(false);
-        return;
-      }
-
-      // Chunked Response lesen und parsen
-      const text = await httpResponse.text();
-      console.log('Raw response length:', text.length);
-      console.log('Raw response preview:', text.slice(0, 200));
-      let result: any;
-      try {
-        result = JSON.parse(text);
-      } catch {
-        // JSON unvollständig — letztes } suchen:
-        const lastBrace = text.lastIndexOf('}');
-        if (lastBrace > 0) {
-          try {
-            result = JSON.parse(text.slice(0, lastBrace + 1));
-          } catch {
-            // Fallback: html direkt aus Text extrahieren
-            const htmlMatch = text.match(/"html"\s*:\s*"([\s\S]*?)(?:","|\}$)/);
-            if (htmlMatch) {
-              result = { html: htmlMatch[1], success: true };
-            } else {
-              throw new Error(
-                'Response nicht parsbar. Länge: ' + text.length + ' Zeichen. Preview: ' + text.slice(0, 100)
-              );
-            }
-          }
-        } else {
-          throw new Error(
-            'Leere Response von Edge Function. Länge: ' + text.length
-          );
-        }
-      }
-
-      if (result.error) {
-        await logger.log("Anthropic Generierung", "error", result.error, {
-          hint: "Edge Function Logs prüfen",
-        });
-        setGenerateError(result.error);
-        setGenerating(false);
-        return;
-      }
-
-      if (!result.html || result.html.trim() === "") {
-        await logger.log("Anthropic Generierung", "error", "HTML leer — stop_reason: " + (result.stopReason || "unbekannt"));
-        setGenerateError("HTML leer — stop_reason: " + (result.stopReason || "unbekannt"));
-        setGenerating(false);
-        return;
-      }
-
-      // Warnings prüfen
-      const warnings: string[] = [];
-      if (!result.html.trim().endsWith("</html>")) warnings.push("HTML nicht vollständig");
-      if (!result.jsonLd || result.jsonLd.trim() === "") warnings.push("JSON-LD fehlt");
-      if (!result.metaTitle) warnings.push("Meta-Title fehlt");
-      if (result.tokensUsed >= 63500) warnings.push("Token-Limit fast erreicht — Sektionen möglicherweise gekürzt");
-
-      if (warnings.length > 0) {
-        await logger.log("Anthropic Generierung", "warning", `HTML generiert mit Hinweisen nach ${Math.round(genMs / 1000)}s · ${result.tokensUsed || "?"} Tokens`, {
-          htmlLength: result.html?.length, warnings, duration: genMs + "ms", tokensUsed: result.tokensUsed,
-        });
-      } else {
-        await logger.log("Anthropic Generierung", "success", `${result.html?.length || 0} Zeichen HTML · ${result.tokensUsed || "?"} Tokens · ${Math.round(genMs / 1000)}s`, {
-          htmlLength: result.html?.length, duration: genMs + "ms", tokensUsed: result.tokensUsed, isComplete: result.isComplete,
-        });
-      }
-
-      // HTML completeness check for warning banner
-      const html = result.html;
-      const isComplete = html.trim().endsWith("</html>");
-      const hasFaq = html.includes('id="faq"');
-      const hasSchema = html.includes("application/ld+json");
-      const hasAutor = html.includes('id="autor"');
-      if (!(isComplete && hasFaq && hasSchema && hasAutor)) {
-        const missingParts = [
-          !isComplete && "HTML-Ende fehlt",
-          !hasFaq && "FAQ-Sektion fehlt",
-          !hasSchema && "JSON-LD fehlt",
-          !hasAutor && "Autor-Sektion fehlt",
-        ].filter(Boolean).join(", ");
-        setHtmlWarning(`HTML unvollständig — Token-Limit erreicht. Fehlend: ${missingParts}`);
-      }
-
-      // SCHRITT 6: Speichern
-      await logger.log("Seite speichern", "running", "Wird gespeichert...");
-      if (result.pageId) {
-        await logger.log("Seite speichern", "success", `Gespeichert · ID: ${result.pageId}`);
-      } else {
-        await logger.log("Seite speichern", "warning", "Keine pageId erhalten — möglicherweise nicht gespeichert");
-      }
-
-      // SCHRITT 7: Output laden
-      await logger.log("Output laden", "running", "Ergebnisse werden in UI geladen...");
-      setGeneratedPage({
-        metaTitle: result.metaTitle || "",
-        metaDesc: result.metaDesc || "",
-        metaKeywords: result.metaKeywords || "",
-        htmlOutput: result.html,
-        bodyContent: result.bodyContent || "",
-        cssBlock: result.cssBlock || "",
-        jsonLd: result.jsonLd || "",
-        masterPrompt: result.prompt || "",
-        activeSections: data.activeSections || [],
-        firmName: data.firmName,
-        street: data.street,
-        city: data.city,
-        phone: data.phone,
-        pageId: result.pageId || undefined,
-        keyword: data.keyword || keyword,
-        tokensUsed: result.tokensUsed || 0,
-        duration: result.duration || 0,
-        stopReason: result.stopReason || "",
-      });
-      await logger.log("Output laden", "success", "Fertig — Output-Panel wird geöffnet");
-      setShowQaGate(false);
-      setShowOutput(true);
-      toast.success(`Seite generiert: ${result.tokensUsed} Tokens, ${result.duration}s`);
-    } catch (err: any) {
-      await logger.log("Anthropic Generierung", "error", `Unerwarteter Fehler: ${err.message}`);
-      setGenerateError(err.message || "Unbekannter Fehler");
-    } finally {
-      setGenerating(false);
-    }
-  }, [keyword, setLogEntries, setShowLog, setTotalSteps, setProcessName, setOnRetry]);
+    setShowQaGate(false);
+    setShowOutput(true);
+    toast.success(`Seite generiert: ${generationResult.tokensUsed || "?"} Tokens, ${generationResult.durationSeconds || "?"}s`);
+    clearGenerationResult();
+  }, [generationResult, qaFormData, keyword, clearGenerationResult]);
 
   const handleNewPage = useCallback(() => {
     setShowOutput(false);

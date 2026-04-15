@@ -6,7 +6,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Search, Image as ImageIcon, Loader2, ArrowRight, BarChart3 } from "lucide-react";
-import { ProcessLogger } from "@/lib/ProcessLogger";
 import { useLogContext } from "@/context/LogContext";
 import { useGenerationJob } from "@/hooks/useGenerationJob";
 import { LsiChips } from "@/components/seo/LsiChips";

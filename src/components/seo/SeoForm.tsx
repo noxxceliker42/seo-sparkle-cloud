@@ -170,9 +170,12 @@ function validatePhone(phone: string): string | null {
 
 function validateWebsite(url: string): string | null {
   if (!url || url.trim().length < 4) return null; // website is optional
-  if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('www.')) {
-    return 'Website muss mit http://, https:// oder www. beginnen';
-  }
+  const trimmed = url.trim().toLowerCase();
+  // Accept URLs with protocol, www prefix, or plain domain names (e.g. "example.de")
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('www.')) return null;
+  // Accept if it looks like a domain (contains a dot with TLD)
+  if (/^[a-z0-9äöüß][a-z0-9äöüß\-]*\.[a-z]{2,}/.test(trimmed)) return null;
+  // Accept plain brand/company names without dots (not a URL, but not an error)
   return null;
 }
 

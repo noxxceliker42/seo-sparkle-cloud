@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
 
     // ── ACTION: create_job ──────────────────────────────────
     if (action === "create_job") {
-      const { jobId, userId, keyword, status } = body;
+      const { jobId, userId, keyword, status, triggeredBy } = body;
 
       if (!userId || !keyword) {
         return jsonResponse({ error: "userId and keyword are required" }, 400);
@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
         user_id: userId,
         keyword,
         status: status || "running",
+        triggered_by: triggeredBy || "n8n",
         created_at: new Date().toISOString(),
       };
       if (jobId) insertData.id = jobId;

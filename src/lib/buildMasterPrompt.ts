@@ -115,6 +115,7 @@ INTENT-ERKLÄRUNG: ${SEARCH_INTENT_ERKLAERUNG[intent] || ""}
 OUTPUT-MODE: ${outputMode}
 BRANCHE: ${branche}
 SPRACHE: ${sprache}
+USP-FOKUS: ${data.uspFokus || ""}
 SEKUNDÄR-KEYWORDS: ${truncateList(data.secondaryKeywords, 5)}
 LSI-BEGRIFFE: ${truncateList(data.lsiTerms || data.lsi, 8)}
 GESCHWISTER-SEITEN: ${truncateList(data.siblingPages, 3)}
@@ -129,7 +130,9 @@ FIRMA: ${data.firmName || data.firm || ""}
 STRASSE: ${data.street || ""}
 PLZ + STADT: ${data.zip || ""} ${data.city || "Berlin"}
 TELEFON: ${data.phone || ""}
+E-MAIL: ${data.email || "nicht angegeben"}
 WEBSITE: ${data.website || ""}
+ÖFFNUNGSZEITEN: ${data.oeffnungszeiten || "nicht angegeben"}
 SERVICEGEBIET: ${data.serviceArea || "Berlin und Umland"}
 
 ══════════════════════════════════════

@@ -98,6 +98,8 @@ SEITENTYP: ${data.pageType || "pillar_page"}
 PILLAR-TIER: ${data.pillarTier || "1"}
 INTENT: ${data.intent || "Informational"}
 OUTPUT-MODE: ${outputMode}
+BRANCHE: ${branche}
+SPRACHE: ${sprache}
 SEKUNDÄR-KEYWORDS: ${truncateList(data.secondaryKeywords, 5)}
 LSI-BEGRIFFE: ${truncateList(data.lsiTerms || data.lsi, 8)}
 GESCHWISTER-SEITEN: ${truncateList(data.siblingPages, 3)}

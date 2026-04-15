@@ -199,7 +199,7 @@ const REQUIRED_FIELDS: Record<string, (keyof SeoFormData)[]> = {
 };
 
 const DEFAULT_FORM: SeoFormData = {
-  keyword: "", intent: "", pageType: "", secondaryKeywords: "", lsiTerms: "",
+  keyword: "", intent: "", pageType: "pillar_page", pillarTier: "1", secondaryKeywords: "", lsiTerms: "",
   negativeKeywords: "", pillarUrl: "", pillarTitle: "", siblingPages: "",
   deepPages: "", contentGap: "", paaQuestions: "", firmName: "", street: "",
   zip: "", city: "", phone: "", website: "", serviceArea: "", uniqueData: "",

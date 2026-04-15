@@ -15,6 +15,7 @@ export interface SeoFormData {
   keyword: string;
   intent: string;
   pageType: string;
+  pillarTier: string;
   secondaryKeywords: string;
   lsiTerms: string;
   negativeKeywords: string;
@@ -92,7 +93,21 @@ const STEPS = [
 ];
 
 const INTENTS = ["Informational", "Commercial", "Transactional", "Local"];
-const PAGE_TYPES = ["Pillar Page", "Supporting Info", "Supporting Commercial", "Transactional/Local", "Deep Page"];
+const PAGE_TYPE_OPTIONS = [
+  { value: "pillar_page", label: "Pillar Page — Hauptthema des Clusters" },
+  { value: "service", label: "Service-Seite — Dienstleistungsangebot" },
+  { value: "fehlercode", label: "Fehlercode-Seite — Fehlercode + Lösung" },
+  { value: "supporting_info", label: "Supporting Informational — Ratgeber/Info" },
+  { value: "supporting_commercial", label: "Supporting Commercial — Vergleich/Entscheidung" },
+  { value: "transactional", label: "Transactional — Ortsteil/lokale Landingpage" },
+  { value: "deep_page", label: "Deep Page — Spezifisches Thema/Modell" },
+  { value: "blog", label: "Blog / Ratgeber-Artikel" },
+];
+const PILLAR_TIERS = [
+  { value: "1", label: "Tier 1", desc: "Haupt-Pillar", sub: "Brand oder Generic Hauptseite" },
+  { value: "2", label: "Tier 2", desc: "Device-Pillar", sub: "Gerätetyp oder Unterkategorie" },
+  { value: "3", label: "Tier 3", desc: "Cluster-Seite", sub: "Deep Page oder Ortsteil" },
+];
 const DESIGN_PRESETS = [
   { id: "trust", label: "Trust & Service", color: "#1d4ed8", desc: "Professionell & vertrauenswürdig", gradient: "linear-gradient(135deg, #1d4ed8, #3b82f6)" },
   { id: "glassmorphism", label: "Midnight Executive", color: "#3b82f6", desc: "Premium & dunkel", gradient: "linear-gradient(135deg, #0f172a, #1e3a8a)" },
@@ -184,7 +199,7 @@ const REQUIRED_FIELDS: Record<string, (keyof SeoFormData)[]> = {
 };
 
 const DEFAULT_FORM: SeoFormData = {
-  keyword: "", intent: "", pageType: "", secondaryKeywords: "", lsiTerms: "",
+  keyword: "", intent: "", pageType: "pillar_page", pillarTier: "1", secondaryKeywords: "", lsiTerms: "",
   negativeKeywords: "", pillarUrl: "", pillarTitle: "", siblingPages: "",
   deepPages: "", contentGap: "", paaQuestions: "", firmName: "", street: "",
   zip: "", city: "", phone: "", website: "", serviceArea: "", uniqueData: "",
@@ -315,7 +330,35 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
         <ButtonGroup options={INTENTS} value={form.intent} onChange={(v) => update("intent", v)} />
       </FieldWrapper>
       <FieldWrapper label="Seitentyp" autoFilled={isAuto("pageType")}>
-        <ButtonGroup options={PAGE_TYPES} value={form.pageType} onChange={(v) => update("pageType", v)} />
+        <select
+          value={form.pageType || "pillar_page"}
+          onChange={(e) => update("pageType", e.target.value)}
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        >
+          {PAGE_TYPE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+        <p className="text-[10px] text-muted-foreground mt-1">Bestimmt aktive Sektionen und Schema-Auswahl</p>
+      </FieldWrapper>
+      <FieldWrapper label="Pillar-Tier">
+        <div className="grid grid-cols-3 gap-2">
+          {PILLAR_TIERS.map((tier) => (
+            <div
+              key={tier.value}
+              onClick={() => update("pillarTier", tier.value)}
+              className={`cursor-pointer rounded-lg border-2 p-2.5 text-center transition-colors ${
+                form.pillarTier === tier.value
+                  ? "border-primary bg-primary/5"
+                  : "border-border bg-background hover:border-primary/40"
+              }`}
+            >
+              <div className={`font-bold text-[13px] ${form.pillarTier === tier.value ? "text-primary" : "text-foreground"}`}>{tier.label}</div>
+              <div className={`text-[11px] font-semibold mt-0.5 ${form.pillarTier === tier.value ? "text-primary" : "text-muted-foreground"}`}>{tier.desc}</div>
+              <div className="text-[9px] text-muted-foreground mt-0.5">{tier.sub}</div>
+            </div>
+          ))}
+        </div>
       </FieldWrapper>
       <FieldWrapper label="Sekundär-Keywords" autoFilled={isAuto("secondaryKeywords")}>
         <Textarea value={form.secondaryKeywords} onChange={(e) => update("secondaryKeywords", e.target.value)} className={inputClass("secondaryKeywords")} rows={3} />

@@ -191,6 +191,13 @@ SEO-REGELN (alle einhalten)
 11. Voice Search: H2 als Fragesatz formuliert
 12. NAP überall identisch
 13. page-uid Kommentar im HTML gegen Duplikate
+${outputMode === "tinymce" ? `
+TINYMCE-SAFE PFLICHTREGELN:
+- Kein @media erlaubt
+- UTF-8 direkt (keine Entities nötig)
+- Emojis als Design-Elemente erlaubt (sparsam)
+- Inline <script> am Ende erlaubt
+` : ""}
 
 ══════════════════════════════════════
 SCHEMA-BLÖCKE (alle generieren)

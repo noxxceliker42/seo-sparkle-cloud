@@ -304,7 +304,11 @@ export type Database = {
           status: string
           stop_reason: string | null
           tokens_used: number | null
+          tokens_used_agent: number | null
+          tokens_used_sonnet: number | null
+          triggered_by: string | null
           user_id: string
+          warnings: string | null
         }
         Insert: {
           body_content?: string | null
@@ -325,7 +329,11 @@ export type Database = {
           status?: string
           stop_reason?: string | null
           tokens_used?: number | null
+          tokens_used_agent?: number | null
+          tokens_used_sonnet?: number | null
+          triggered_by?: string | null
           user_id: string
+          warnings?: string | null
         }
         Update: {
           body_content?: string | null
@@ -346,7 +354,11 @@ export type Database = {
           status?: string
           stop_reason?: string | null
           tokens_used?: number | null
+          tokens_used_agent?: number | null
+          tokens_used_sonnet?: number | null
+          triggered_by?: string | null
           user_id?: string
+          warnings?: string | null
         }
         Relationships: []
       }

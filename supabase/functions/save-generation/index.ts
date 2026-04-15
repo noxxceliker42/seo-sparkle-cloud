@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
 
     // ── ACTION: create_job ──────────────────────────────────
     if (action === "create_job") {
-      const { jobId, userId, keyword, status } = body;
+      const { jobId, userId, keyword, status, triggeredBy } = body;
 
       if (!userId || !keyword) {
         return jsonResponse({ error: "userId and keyword are required" }, 400);
@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
         user_id: userId,
         keyword,
         status: status || "running",
+        triggered_by: triggeredBy || "n8n",
         created_at: new Date().toISOString(),
       };
       if (jobId) insertData.id = jobId;
@@ -107,8 +108,12 @@ Deno.serve(async (req) => {
       activeSections,
       contaoMode,
       tokensUsed,
+      tokensUsedAgent,
+      tokensUsedSonnet,
+      warnings,
       durationSeconds,
       stopReason,
+      triggeredBy,
     } = body;
 
     if (!keyword || !userId) {
@@ -178,8 +183,12 @@ Deno.serve(async (req) => {
           meta_desc: metaDesc || null,
           meta_keywords: metaKeywords || null,
           tokens_used: tokensUsed || null,
+          tokens_used_agent: tokensUsedAgent || 0,
+          tokens_used_sonnet: tokensUsedSonnet || 0,
+          warnings: warnings || "[]",
           duration_seconds: durationSeconds || null,
           stop_reason: stopReason || null,
+          triggered_by: triggeredBy || "n8n",
           completed_at: new Date().toISOString(),
         })
         .eq("id", jobId);

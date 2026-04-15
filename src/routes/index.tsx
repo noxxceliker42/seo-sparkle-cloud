@@ -489,6 +489,26 @@ function Index() {
   }, [analysis, selectedFirm]);
 
   const handleFormSubmit = useCallback((data: SeoFormData) => {
+    // NAP pre-check before QA gate
+    const napErrors: string[] = [];
+    const INVALID_PATTERNS = ['k.a.', 'tbd', 'n/a', 'na', 'none', 'test', 'xxx', 'platzhalter', 'placeholder', '000', 'beispiel', 'mustermann', 'muster'];
+    const checkField = (val: string, name: string, min: number) => {
+      if (!val || val.trim().length < min) { napErrors.push(`${name} ist zu kurz oder leer`); return; }
+      if (INVALID_PATTERNS.some(p => val.trim().toLowerCase().includes(p))) napErrors.push(`${name} enthält ungültigen Wert`);
+    };
+    checkField(data.firmName, 'Firmenname', 3);
+    checkField(data.street, 'Straße', 5);
+    checkField(data.city, 'Stadt', 4);
+    const cleanedPhone = (data.phone || '').replace(/[\s\-\(\)]/g, '');
+    if (cleanedPhone.length < 6) napErrors.push('Telefon zu kurz');
+    else if (!/\d{4,}/.test(cleanedPhone)) napErrors.push('Telefon ungültig');
+    if (data.website && data.website.trim().length >= 4 && !data.website.startsWith('http') && !data.website.startsWith('www.')) {
+      napErrors.push('Website muss mit http://, https:// oder www. beginnen');
+    }
+    if (napErrors.length > 0) {
+      toast.error('NAP ungültig: ' + napErrors.join(', ') + ' — Bitte Schritt C korrigieren.');
+      return;
+    }
     setQaFormData(data);
     setShowForm(false);
     setShowQaGate(true);

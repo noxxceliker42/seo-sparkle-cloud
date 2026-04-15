@@ -105,6 +105,52 @@ const TONE_OPTIONS = ["Sachlich-kompetent", "Freundlich-nahbar", "Direkt-verkauf
 const IMAGE_STRATEGIES = ["NanoBanana KI", "Upload + Alt-Text", "Platzhalter"];
 const SCHEMA_OPTIONS = ["FAQPage", "HowTo", "LocalBusiness", "BreadcrumbList", "Service", "AggregateRating", "SpeakableSpec", "ImageObject"];
 
+// ─── NAP Validation ───────────────────────────────────────────────────────
+
+const INVALID_PATTERNS = [
+  'k.a.', 'k.A.', 'tbd', 'n/a', 'na', 'none',
+  'unerreichbar', 'unbekannt', 'asd', 'test', 'xxx',
+  'platzhalter', 'placeholder', '123', '000',
+  'beispiel', 'mustermann', 'muster',
+];
+
+function validateNapField(value: string, fieldName: string, minLength = 3): string | null {
+  if (!value || value.trim().length < minLength) return `${fieldName} ist zu kurz oder leer`;
+  const lower = value.trim().toLowerCase();
+  if (INVALID_PATTERNS.some((p) => p.length > 0 && lower.includes(p))) return `${fieldName} enthält ungültigen Wert`;
+  return null;
+}
+
+function validatePhone(phone: string): string | null {
+  const cleaned = phone.replace(/[\s\-\(\)]/g, '');
+  if (cleaned.length < 6) return 'Telefon zu kurz';
+  if (!/\d{4,}/.test(cleaned)) return 'Telefon ungültig — keine Ziffern erkannt';
+  return null;
+}
+
+function validateWebsite(url: string): string | null {
+  if (!url || url.trim().length < 4) return null; // website is optional
+  if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('www.')) {
+    return 'Website muss mit http://, https:// oder www. beginnen';
+  }
+  return null;
+}
+
+function checkNapValidity(form: SeoFormData): string[] {
+  const errors: string[] = [];
+  const e1 = validateNapField(form.firmName, 'Firmenname', 3);
+  if (e1) errors.push(e1);
+  const e2 = validateNapField(form.street, 'Straße', 5);
+  if (e2) errors.push(e2);
+  const e3 = validateNapField(form.city, 'Stadt', 4);
+  if (e3) errors.push(e3);
+  const e4 = validatePhone(form.phone);
+  if (e4) errors.push(e4);
+  const e5 = validateWebsite(form.website);
+  if (e5) errors.push(e5);
+  return errors;
+}
+
 const CORE_SECTIONS = [
   { id: "01", label: "Hero-Sektion" },
   { id: "02", label: "Problem-Spiegelung" },
@@ -233,10 +279,11 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
 
   const currentStepId = STEPS[step].id;
   const stepRequired = REQUIRED_FIELDS[currentStepId] || [];
+  const napErrors = useMemo(() => currentStepId === "C" ? checkNapValidity(form) : [], [currentStepId, form]);
   const canProceed = stepRequired.every((f) => {
     const v = form[f];
     return typeof v === "string" ? v.trim().length > 0 : Array.isArray(v) ? v.length > 0 : !!v;
-  });
+  }) && napErrors.length === 0;
 
   const toggleSchema = useCallback((schema: string) => {
     setForm((prev) => {
@@ -336,6 +383,22 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
         <p className="text-xs text-muted-foreground mb-1">Eigene Zahlen, Erfahrungswerte, Statistiken — kein API ersetzt das!</p>
         <Textarea value={form.uniqueData} onChange={(e) => update("uniqueData", e.target.value)} rows={4} className={!form.uniqueData.trim() ? "border-red-500" : ""} placeholder="z.B. '2.847 Reparaturen in 2025', 'Durchschnittl. Anfahrt 22 Min.'" />
       </FieldWrapper>
+
+      {napErrors.length > 0 && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 mt-2">
+          <div className="font-bold text-xs text-red-800 mb-2 flex items-center gap-1.5">
+            ⚠ NAP-Validierung fehlgeschlagen
+          </div>
+          {napErrors.map((err, i) => (
+            <div key={i} className="text-[11px] text-red-700 py-0.5 flex items-center gap-1.5">
+              <span>✕</span> {err}
+            </div>
+          ))}
+          <div className="text-[10px] text-muted-foreground mt-2 pt-2 border-t border-red-200">
+            Echte Firmendaten sind Pflicht — ungültige NAP-Daten erzeugen wertlose Schema-Markups und können Google Manual Actions auslösen.
+          </div>
+        </div>
+      )}
     </div>
   );
 

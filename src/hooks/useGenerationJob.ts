@@ -259,7 +259,7 @@ export function useGenerationJob() {
         ...prev,
         generating: false,
         error: msg.includes("Failed to fetch") || msg.includes("NetworkError")
-          ? "n8n nicht erreichbar — Bitte VITE_N8N_WEBHOOK_URL prüfen."
+          ? "n8n nicht erreichbar — Bitte N8N_WEBHOOK_URL in den Cloud-Secrets prüfen."
           : msg,
       }));
     }

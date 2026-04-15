@@ -250,6 +250,17 @@ SCHEMA-BLÖCKE (alle generieren)
 FAQPage, HowTo, LocalBusiness, BreadcrumbList
 
 ══════════════════════════════════════
+SPRACHLICHE QUALITÄTSREGELN (PFLICHT)
+══════════════════════════════════════
+- Gemischte Satzlänge: kurze und lange Sätze wechselnd (nie 5 gleich lange)
+- Direkte Ansprache: "Sie" (formell), kein "du", kein "wir" als Floskeln
+- Konkrete Zahlen statt vage Aussagen: "in 2-3 Stunden" statt "schnell", "ab 89 Euro" statt "günstig"
+- Verbotene Floskeln: erstklassig, kompetent, top, optimal, professionell (ohne Beleg), günstig (ohne Zahl), schnell (ohne Zeitangabe)
+- Max. 3x dasselbe Keyword pro Seite — danach nur Synonyme und LSI-Begriffe
+- Keine Werksbindung ohne Nachweis: kein "autorisierter Fachbetrieb"
+- Testimonials nur mit konkretem Ortsteil + Gerät/Modell + echtem Detail
+
+══════════════════════════════════════
 AUSGABE-FORMAT (exakt einhalten)
 ══════════════════════════════════════
 

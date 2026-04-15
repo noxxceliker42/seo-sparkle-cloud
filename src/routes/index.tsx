@@ -710,7 +710,7 @@ function Index() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { setGenerateError(""); if (qaFormData) handleGenerate(qaFormData); }}
+                  onClick={() => { clearGenerateError(); if (qaFormData) handleGenerate(qaFormData); }}
                   className="text-xs border-destructive/30"
                 >
                   Erneut versuchen

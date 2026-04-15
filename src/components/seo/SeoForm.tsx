@@ -16,6 +16,8 @@ export interface SeoFormData {
   intent: string;
   pageType: string;
   pillarTier: string;
+  branche: string;
+  sprache: string;
   secondaryKeywords: string;
   lsiTerms: string;
   negativeKeywords: string;
@@ -108,6 +110,25 @@ const PILLAR_TIERS = [
   { value: "1", label: "Tier 1", desc: "Haupt-Pillar", sub: "Brand oder Generic Hauptseite" },
   { value: "2", label: "Tier 2", desc: "Device-Pillar", sub: "Gerätetyp oder Unterkategorie" },
   { value: "3", label: "Tier 3", desc: "Cluster-Seite", sub: "Deep Page oder Ortsteil" },
+];
+const BRANCHEN = [
+  { value: "hausgeraete", label: "Hausgeräte" },
+  { value: "kfz", label: "KFZ / Automobile" },
+  { value: "immobilien", label: "Immobilien" },
+  { value: "gesundheit", label: "Gesundheit / Medizin" },
+  { value: "handwerk", label: "Handwerk / Bau" },
+  { value: "gastronomie", label: "Gastronomie" },
+  { value: "steuer-recht", label: "Steuer / Recht" },
+  { value: "it-tech", label: "IT / Technologie" },
+  { value: "beauty-wellness", label: "Beauty / Wellness" },
+  { value: "bildung", label: "Bildung / Coaching" },
+  { value: "ecommerce", label: "E-Commerce" },
+  { value: "bau-sanierung", label: "Bau / Sanierung" },
+];
+const SPRACHEN = [
+  { value: "de", label: "DE", name: "Deutsch" },
+  { value: "en", label: "EN", name: "Englisch" },
+  { value: "tr", label: "TR", name: "Türkçe" },
 ];
 const DESIGN_PRESETS = [
   { id: "trust", label: "Trust & Service", color: "#1d4ed8", desc: "Professionell & vertrauenswürdig", gradient: "linear-gradient(135deg, #1d4ed8, #3b82f6)" },
@@ -357,6 +378,31 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
               <div className={`font-bold text-[13px] ${form.pillarTier === tier.value ? "text-primary" : "text-foreground"}`}>{tier.label}</div>
               <div className={`text-[11px] font-semibold mt-0.5 ${form.pillarTier === tier.value ? "text-primary" : "text-muted-foreground"}`}>{tier.desc}</div>
               <div className="text-[9px] text-muted-foreground mt-0.5">{tier.sub}</div>
+            </div>
+          ))}
+        </div>
+      </FieldWrapper>
+      <FieldWrapper label="Branche">
+        <select value={form.branche} onChange={(e) => update("branche", e.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-[13px] text-foreground">
+          {BRANCHEN.map((b) => (
+            <option key={b.value} value={b.value}>{b.label}</option>
+          ))}
+        </select>
+      </FieldWrapper>
+      <FieldWrapper label="Seitensprache">
+        <div className="grid grid-cols-3 gap-2">
+          {SPRACHEN.map((lang) => (
+            <div
+              key={lang.value}
+              onClick={() => update("sprache", lang.value)}
+              className={`cursor-pointer rounded-lg border-2 p-2.5 text-center transition-colors ${
+                form.sprache === lang.value
+                  ? "border-cyan-600 bg-cyan-50"
+                  : "border-border bg-background hover:border-cyan-400"
+              }`}
+            >
+              <div className={`font-bold text-sm ${form.sprache === lang.value ? "text-cyan-700" : "text-foreground"}`}>{lang.label}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">{lang.name}</div>
             </div>
           ))}
         </div>

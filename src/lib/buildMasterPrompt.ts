@@ -64,7 +64,8 @@ function truncateList(value: unknown, max: number): string {
 
 export function buildMasterPrompt(data: Record<string, any>): string {
   const ds = DESIGN_SYSTEMS[data.designPreset || "trust"] || DESIGN_SYSTEMS.trust;
-  const isContao = data.contaoMode === true;
+  const outputMode = data.outputMode || "standalone";
+  const isContao = outputMode === "tinymce";
   const sections = Array.isArray(data.activeSections)
     ? data.activeSections.join(" · ")
     : "01 Hero · 02 Problem · 04 Symptome · 05 Selbsthilfe · 07 Unique Data · 08 Info Gain · 09 Ablauf · 10 Preise · 14 FAQ · 15 Autor";
@@ -79,6 +80,7 @@ KEYWORD: "${data.keyword || "Keyword"}"
 SEITENTYP: ${data.pageType || "pillar_page"}
 PILLAR-TIER: ${data.pillarTier || "1"}
 INTENT: ${data.intent || "Informational"}
+OUTPUT-MODE: ${outputMode}
 SEKUNDÄR-KEYWORDS: ${truncateList(data.secondaryKeywords, 5)}
 LSI-BEGRIFFE: ${truncateList(data.lsiTerms || data.lsi, 8)}
 GESCHWISTER-SEITEN: ${truncateList(data.siblingPages, 3)}
@@ -189,6 +191,13 @@ SEO-REGELN (alle einhalten)
 11. Voice Search: H2 als Fragesatz formuliert
 12. NAP überall identisch
 13. page-uid Kommentar im HTML gegen Duplikate
+${outputMode === "tinymce" ? `
+TINYMCE-SAFE PFLICHTREGELN:
+- Kein @media erlaubt
+- UTF-8 direkt (keine Entities nötig)
+- Emojis als Design-Elemente erlaubt (sparsam)
+- Inline <script> am Ende erlaubt
+` : ""}
 
 ══════════════════════════════════════
 SCHEMA-BLÖCKE (alle generieren)

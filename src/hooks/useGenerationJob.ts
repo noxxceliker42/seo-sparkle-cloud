@@ -227,30 +227,52 @@ export function useGenerationJob() {
         return;
       }
 
-      const { data: result, error } = await supabase.functions.invoke("generate-page", {
-        body: { ...formData, userId: user.id },
-      });
+      const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
+      const n8nKey = import.meta.env.VITE_N8N_AUTH_KEY;
 
-      if (error || !result?.jobId) {
-        const msg = error?.message || result?.error || "Job konnte nicht gestartet werden";
+      if (!n8nUrl) {
         setState((prev) => ({
           ...prev,
           generating: false,
-          error: msg.includes("Failed to send")
-            ? "Edge Function nicht erreichbar. Bitte Seite neu laden und erneut versuchen."
-            : msg,
+          error: "VITE_N8N_WEBHOOK_URL ist nicht konfiguriert. Bitte in den Projekteinstellungen setzen.",
         }));
         return;
+      }
+
+      const res = await fetch(n8nUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(n8nKey ? { "X-SEO-OS-Key": n8nKey } : {}),
+        },
+        body: JSON.stringify({
+          ...formData,
+          userId: user.id,
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`n8n ${res.status}: ${errText}`);
+      }
+
+      const result = await res.json();
+
+      if (!result?.jobId) {
+        throw new Error(result?.error || "n8n hat keine jobId zurückgegeben");
       }
 
       writeStorage(result.jobId, (formData.keyword as string) || "");
       setState((prev) => ({ ...prev, jobId: result.jobId }));
       startPolling(result.jobId);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "Fehler";
       setState((prev) => ({
         ...prev,
         generating: false,
-        error: err instanceof Error ? err.message : "Fehler",
+        error: msg.includes("Failed to fetch") || msg.includes("NetworkError")
+          ? "n8n nicht erreichbar — Bitte VITE_N8N_WEBHOOK_URL prüfen."
+          : msg,
       }));
     }
   }, [stopPolling, startPolling]);

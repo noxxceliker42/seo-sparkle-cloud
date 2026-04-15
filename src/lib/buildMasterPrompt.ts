@@ -76,7 +76,8 @@ Erstelle eine vollständige, professionelle SEO-Seite.
 SEITEN-KONTEXT
 ══════════════════════════════════════
 KEYWORD: "${data.keyword || "Keyword"}"
-SEITENTYP: ${data.pageType || "Pillar Page"}
+SEITENTYP: ${data.pageType || "pillar_page"}
+PILLAR-TIER: ${data.pillarTier || "1"}
 INTENT: ${data.intent || "Informational"}
 SEKUNDÄR-KEYWORDS: ${truncateList(data.secondaryKeywords, 5)}
 LSI-BEGRIFFE: ${truncateList(data.lsiTerms || data.lsi, 8)}

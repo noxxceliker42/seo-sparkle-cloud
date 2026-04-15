@@ -199,9 +199,7 @@ function ClusterDetailPage() {
         .filter((p) => p.id !== page.id && p.status === "generated" && p.seo_page_id)
         .map((p) => ({ keyword: p.keyword, anchor: p.internal_link_anchor }));
 
-      // Get user for userId
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setGenerating(null); return; }
+      // Session for auth header (userId is resolved server-side by n8n-proxy)
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const session = (await supabase.auth.getSession()).data.session;

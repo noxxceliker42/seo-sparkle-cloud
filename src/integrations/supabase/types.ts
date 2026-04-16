@@ -182,45 +182,69 @@ export type Database = {
       }
       clusters: {
         Row: {
+          accent_color: string | null
           branche: string | null
           cluster_type: string | null
           created_at: string | null
+          design_philosophy: string | null
+          design_philosophy_custom: string | null
+          differentiation: string | null
           firm_id: string | null
           id: string
           main_keyword: string
           name: string
           pillar_page_id: string | null
           plan_generated: boolean | null
+          primary_color: string | null
+          secondary_color: string | null
           sprache: string | null
           status: string | null
+          target_audience: string | null
+          theme_context: string | null
           user_id: string | null
         }
         Insert: {
+          accent_color?: string | null
           branche?: string | null
           cluster_type?: string | null
           created_at?: string | null
+          design_philosophy?: string | null
+          design_philosophy_custom?: string | null
+          differentiation?: string | null
           firm_id?: string | null
           id?: string
           main_keyword: string
           name: string
           pillar_page_id?: string | null
           plan_generated?: boolean | null
+          primary_color?: string | null
+          secondary_color?: string | null
           sprache?: string | null
           status?: string | null
+          target_audience?: string | null
+          theme_context?: string | null
           user_id?: string | null
         }
         Update: {
+          accent_color?: string | null
           branche?: string | null
           cluster_type?: string | null
           created_at?: string | null
+          design_philosophy?: string | null
+          design_philosophy_custom?: string | null
+          differentiation?: string | null
           firm_id?: string | null
           id?: string
           main_keyword?: string
           name?: string
           pillar_page_id?: string | null
           plan_generated?: boolean | null
+          primary_color?: string | null
+          secondary_color?: string | null
           sprache?: string | null
           status?: string | null
+          target_audience?: string | null
+          theme_context?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -295,6 +319,7 @@ export type Database = {
       }
       firms: {
         Row: {
+          accent_color: string | null
           author: string | null
           author_certs: string | null
           author_experience: number | null
@@ -302,21 +327,29 @@ export type Database = {
           branche: string | null
           city: string | null
           created_at: string | null
+          design_philosophy: string | null
+          design_philosophy_custom: string | null
+          differentiation: string | null
           email: string | null
           id: string
           name: string
           oeffnungszeiten: string | null
           phone: string | null
+          primary_color: string | null
           rating: number | null
           review_count: number | null
+          secondary_color: string | null
           service_area: string | null
           sprache: string | null
           street: string | null
+          target_audience: string | null
+          theme_context: string | null
           user_id: string
           website: string | null
           zip: string | null
         }
         Insert: {
+          accent_color?: string | null
           author?: string | null
           author_certs?: string | null
           author_experience?: number | null
@@ -324,21 +357,29 @@ export type Database = {
           branche?: string | null
           city?: string | null
           created_at?: string | null
+          design_philosophy?: string | null
+          design_philosophy_custom?: string | null
+          differentiation?: string | null
           email?: string | null
           id?: string
           name: string
           oeffnungszeiten?: string | null
           phone?: string | null
+          primary_color?: string | null
           rating?: number | null
           review_count?: number | null
+          secondary_color?: string | null
           service_area?: string | null
           sprache?: string | null
           street?: string | null
+          target_audience?: string | null
+          theme_context?: string | null
           user_id: string
           website?: string | null
           zip?: string | null
         }
         Update: {
+          accent_color?: string | null
           author?: string | null
           author_certs?: string | null
           author_experience?: number | null
@@ -346,16 +387,23 @@ export type Database = {
           branche?: string | null
           city?: string | null
           created_at?: string | null
+          design_philosophy?: string | null
+          design_philosophy_custom?: string | null
+          differentiation?: string | null
           email?: string | null
           id?: string
           name?: string
           oeffnungszeiten?: string | null
           phone?: string | null
+          primary_color?: string | null
           rating?: number | null
           review_count?: number | null
+          secondary_color?: string | null
           service_area?: string | null
           sprache?: string | null
           street?: string | null
+          target_audience?: string | null
+          theme_context?: string | null
           user_id?: string
           website?: string | null
           zip?: string | null
@@ -907,7 +955,10 @@ export type Database = {
           contao_mode: boolean | null
           created_at: string | null
           css_block: string | null
+          design_philosophy: string | null
+          design_philosophy_custom: string | null
           design_preset: string | null
+          differentiation: string | null
           firm: string | null
           firm_id: string | null
           html_output: string | null
@@ -926,6 +977,8 @@ export type Database = {
           sitemap_added: boolean | null
           status: string | null
           status_changed_at: string | null
+          target_audience: string | null
+          theme_context: string | null
           updated_at: string | null
           user_id: string
         }
@@ -936,7 +989,10 @@ export type Database = {
           contao_mode?: boolean | null
           created_at?: string | null
           css_block?: string | null
+          design_philosophy?: string | null
+          design_philosophy_custom?: string | null
           design_preset?: string | null
+          differentiation?: string | null
           firm?: string | null
           firm_id?: string | null
           html_output?: string | null
@@ -955,6 +1011,8 @@ export type Database = {
           sitemap_added?: boolean | null
           status?: string | null
           status_changed_at?: string | null
+          target_audience?: string | null
+          theme_context?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -965,7 +1023,10 @@ export type Database = {
           contao_mode?: boolean | null
           created_at?: string | null
           css_block?: string | null
+          design_philosophy?: string | null
+          design_philosophy_custom?: string | null
           design_preset?: string | null
+          differentiation?: string | null
           firm?: string | null
           firm_id?: string | null
           html_output?: string | null
@@ -984,6 +1045,8 @@ export type Database = {
           sitemap_added?: boolean | null
           status?: string | null
           status_changed_at?: string | null
+          target_audience?: string | null
+          theme_context?: string | null
           updated_at?: string | null
           user_id?: string
         }

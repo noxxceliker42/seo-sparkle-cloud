@@ -862,6 +862,42 @@ export function GeneratePageModal({
                   Diese Seiten werden als interne Links in den Prompt eingebaut.
                 </p>
               </div>
+
+              {/* ── Kontext-Felder ── */}
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Kontext-Felder</p>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Zielgruppe</Label>
+                  <Select value={targetAudience} onValueChange={setTargetAudience} disabled={generating}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ZIELGRUPPEN.map((z) => (
+                        <SelectItem key={z.value} value={z.value}>{z.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Themen-Kontext</Label>
+                  <Textarea
+                    value={themeContext}
+                    onChange={(e) => setThemeContext(e.target.value)}
+                    placeholder="Spezifische Details für diese Seite..."
+                    rows={3}
+                    disabled={generating}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Differenzierung (Wettbewerbsvorteile)</Label>
+                  <Textarea
+                    value={differentiation}
+                    onChange={(e) => setDifferentiation(e.target.value)}
+                    placeholder={"Was bietet ihr konkret was Wettbewerber nicht bieten?\nz.B.: Einziger Miele-Spezialist in Pankow, Originalteile auf Lager"}
+                    rows={2}
+                    disabled={generating}
+                  />
+                </div>
+              </div>
             </CollapsibleContent>
           </Collapsible>
 

@@ -103,14 +103,14 @@ Deno.serve(async (req) => {
     if (action === "create_cluster") {
       const { userId, firmId, mainKeyword, clusterType, branche } = body;
 
-      if (!userId || !mainKeyword) {
+      if (!resolvedUserId || !mainKeyword) {
         return jsonResponse({ error: "userId and mainKeyword are required" }, 400);
       }
 
       const { data: cluster, error } = await supabase
         .from("clusters")
         .insert({
-          user_id: userId,
+          user_id: resolvedUserId,
           firm_id: firmId || null,
           name: mainKeyword,
           main_keyword: mainKeyword,

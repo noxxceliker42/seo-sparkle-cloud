@@ -239,7 +239,7 @@ Deno.serve(async (req) => {
       triggeredBy,
     } = body;
 
-    if (!keyword || !userId) {
+    if (!keyword || !resolvedUserId) {
       return jsonResponse({ error: "keyword and userId are required" }, 400);
     }
 
@@ -248,7 +248,7 @@ Deno.serve(async (req) => {
 
     const pageData: Record<string, unknown> = {
       keyword,
-      user_id: userId,
+      user_id: resolvedUserId,
       html_output: html || null,
       body_content: bodyContent || null,
       css_block: cssBlock || null,

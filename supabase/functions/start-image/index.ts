@@ -26,11 +26,16 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    const body = await req.json();
     const {
-      promptPositive, promptNegative, width, height,
+      prompt, promptPositive, promptNegative, width, height,
       aspectRatio, resolution, slot, slotLabel,
-      firmId, userId, keyword,
-    } = await req.json();
+      firmId, userId, keyword, pageId, mode,
+      referenceImageUrl, editStrength,
+    } = body;
+
+    // Accept either "prompt" or "promptPositive"
+    const effectivePrompt = promptPositive || prompt || "";
 
     // Job in DB anlegen
     const { data: job, error: insertErr } = await supabase
@@ -38,14 +43,18 @@ Deno.serve(async (req) => {
       .insert({
         user_id: userId,
         firm_id: firmId || null,
+        page_id: pageId || null,
         slot: slot || "free",
         slot_label: slotLabel || slot || null,
-        prompt: promptPositive || "",
-        prompt_positive: promptPositive || "",
+        prompt: effectivePrompt,
+        prompt_positive: effectivePrompt,
         prompt_negative: promptNegative || "",
         width: width || 1200,
         height: height || 675,
         status: "generating",
+        mode: mode || "text-to-image",
+        reference_image_url: referenceImageUrl || null,
+        edit_strength: editStrength || null,
       })
       .select("id")
       .single();
@@ -68,7 +77,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: "nano-banana-2",
           input: {
-            prompt: promptPositive,
+            prompt: effectivePrompt,
             negative_prompt: promptNegative || undefined,
             aspect_ratio: aspectRatio || "16:9",
             image_size: resolution || "1K",

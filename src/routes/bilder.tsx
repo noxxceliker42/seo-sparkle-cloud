@@ -81,6 +81,8 @@ interface LibImage {
   width: number | null;
   height: number | null;
   created_at: string | null;
+  page_id: string | null;
+  nano_url: string | null;
 }
 
 interface ReferenceImage {
@@ -151,7 +153,7 @@ function ImageStudio() {
     setLibLoading(true);
     const { data } = await supabase
       .from("image_jobs")
-      .select("id, cloudinary_url, alt_text, slot, slot_label, width, height, created_at")
+      .select("id, cloudinary_url, alt_text, slot, slot_label, width, height, created_at, page_id, nano_url")
       .eq("user_id", user.id)
       .eq("status", "completed")
       .order("created_at", { ascending: false })
@@ -675,6 +677,9 @@ function ImageStudio() {
                     <div className="text-[9px] text-muted-foreground">
                       {img.width && img.height ? `${img.width}×${img.height}px` : ""}
                       {img.created_at && ` · ${new Date(img.created_at).toLocaleDateString("de-DE")}`}
+                    </div>
+                    <div className="text-[9px] text-muted-foreground truncate">
+                      Quelle: {img.page_id ? "Seite" : "Bild-Studio"}
                     </div>
                     <div className="flex gap-1">
                       <Button

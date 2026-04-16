@@ -35,6 +35,8 @@ interface OutputPanelProps {
   onNewPage: () => void;
 }
 
+type SlotStatus = "pending" | "generating" | "completed" | "uploaded" | "failed" | "approved";
+
 interface ImageSlot {
   id: string;
   slot: string;
@@ -43,9 +45,48 @@ interface ImageSlot {
   altText: string;
   width: number;
   height: number;
-  status: string;
+  status: SlotStatus;
   cloudinaryUrl?: string;
   nanoUrl?: string;
+  isNbSlot?: boolean;
+}
+
+function toSlotStatus(s: string): SlotStatus {
+  const valid: SlotStatus[] = ["pending", "generating", "completed", "uploaded", "failed", "approved"];
+  return valid.includes(s as SlotStatus) ? (s as SlotStatus) : "pending";
+}
+
+/** Parse nb-image-slot elements from HTML */
+function parseNbSlots(html: string): ImageSlot[] {
+  const slots: ImageSlot[] = [];
+  const regex = /<img[^>]*class="[^"]*nb-image-slot[^"]*"[^>]*>/gi;
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    const tag = match[0];
+    const getAttr = (name: string) => {
+      const m = tag.match(new RegExp(`${name}="([^"]*)"`));
+      return m ? m[1] : "";
+    };
+    const slot = getAttr("data-nb-slot") || `slot-${slots.length}`;
+    const prompt = getAttr("data-nb-prompt");
+    const width = parseInt(getAttr("data-nb-width")) || 800;
+    const height = parseInt(getAttr("data-nb-height")) || 450;
+    const alt = getAttr("alt");
+    const label = slot.replace(/^section-/, "").replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+    slots.push({
+      id: `nb-${slot}`,
+      slot,
+      slotLabel: label,
+      prompt,
+      altText: alt,
+      width,
+      height,
+      status: "pending",
+      isNbSlot: true,
+    });
+  }
+  return slots;
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -115,30 +156,54 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
 
   const htmlComplete = page.htmlOutput.trim().endsWith("</html>");
 
-  // --- Image slot logic (kept from original) ---
+  // Track current HTML for "Freigeben + einbauen"
+  const [liveHtml, setLiveHtml] = useState(page.htmlOutput);
+  useEffect(() => setLiveHtml(page.htmlOutput), [page.htmlOutput]);
+
+  // --- Image slot logic ---
   useEffect(() => {
-    if (tab !== "images" || slotsAnalyzed || !page.pageId || !page.htmlOutput) return;
+    if (tab !== "images" || slotsAnalyzed || !page.htmlOutput) return;
     async function analyzeSlots() {
       setSlotsLoading(true);
       try {
-        const { data: existing } = await supabase
-          .from("page_images")
-          .select("id, slot, slot_label, nano_prompt, alt_text, width, height, nano_status, cloudinary_url, nano_url")
-          .eq("page_id", page.pageId!);
-        if (existing && existing.length > 0) {
-          setImageSlots(existing.map((r: any) => ({
-            id: r.id, slot: r.slot, slotLabel: r.slot_label || r.slot,
-            prompt: r.nano_prompt || "", altText: r.alt_text || "",
-            width: r.width || 800, height: r.height || 450,
-            status: r.nano_status || "pending",
-            cloudinaryUrl: r.cloudinary_url, nanoUrl: r.nano_url,
-          })));
+        // 1) Check for nb-image-slot elements in HTML
+        const nbSlots = parseNbSlots(page.htmlOutput);
+
+        // 2) Check existing page_images in DB
+        if (page.pageId) {
+          const { data: existing } = await supabase
+            .from("page_images")
+            .select("id, slot, slot_label, nano_prompt, alt_text, width, height, nano_status, cloudinary_url, nano_url")
+            .eq("page_id", page.pageId);
+          if (existing && existing.length > 0) {
+            const dbSlots: ImageSlot[] = existing.map((r: any) => ({
+              id: r.id, slot: r.slot, slotLabel: r.slot_label || r.slot,
+              prompt: r.nano_prompt || "", altText: r.alt_text || "",
+              width: r.width || 800, height: r.height || 450,
+              status: toSlotStatus(r.nano_status || "pending"),
+              cloudinaryUrl: r.cloudinary_url, nanoUrl: r.nano_url,
+            }));
+            // Merge: DB slots take priority, add nb-slots not yet in DB
+            const dbSlotNames = new Set(dbSlots.map((s) => s.slot));
+            const merged = [...dbSlots, ...nbSlots.filter((nb) => !dbSlotNames.has(nb.slot))];
+            setImageSlots(merged);
+            setSlotsAnalyzed(true); setSlotsLoading(false); return;
+          }
+        }
+
+        // 3) If nb-slots found in HTML, use those
+        if (nbSlots.length > 0) {
+          setImageSlots(nbSlots);
           setSlotsAnalyzed(true); setSlotsLoading(false); return;
         }
-        const { data, error } = await supabase.functions.invoke("analyze-image-slots", {
-          body: { pageId: page.pageId, html: page.htmlOutput, keyword: page.keyword || "", firm: page.firmName || "", city: page.city || "" },
-        });
-        if (!error && data?.slots) setImageSlots(data.slots);
+
+        // 4) Fallback: analyze-image-slots edge function
+        if (page.pageId) {
+          const { data, error } = await supabase.functions.invoke("analyze-image-slots", {
+            body: { pageId: page.pageId, html: page.htmlOutput, keyword: page.keyword || "", firm: page.firmName || "", city: page.city || "" },
+          });
+          if (!error && data?.slots) setImageSlots(data.slots);
+        }
         setSlotsAnalyzed(true);
       } catch (err) { console.error("Slot analysis error:", err); }
       setSlotsLoading(false);
@@ -159,7 +224,7 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
         if (!data) continue;
         if (["uploaded", "completed", "failed"].includes(data.nano_status!)) {
           setImageSlots((prev) => prev.map((s) => s.id === slot.id ? {
-            ...s, status: data.nano_status!, cloudinaryUrl: data.cloudinary_url || undefined,
+            ...s, status: toSlotStatus(data.nano_status!), cloudinaryUrl: data.cloudinary_url || undefined,
             nanoUrl: data.nano_url || undefined, altText: data.alt_text || s.altText,
           } : s));
         }
@@ -173,56 +238,95 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
   const generateImage = useCallback(async (slotId: string) => {
     const slot = imageSlots.find((s) => s.id === slotId);
     if (!slot) return;
-    setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "generating" } : s)));
+    setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "generating" as SlotStatus } : s)));
     try {
       const user = (await supabase.auth.getUser()).data.user;
       const { data, error } = await supabase.functions.invoke("start-image", {
-        body: { prompt: slot.prompt, pageId: page.pageId || null, slot: slot.slot, userId: user?.id },
+        body: {
+          prompt: slot.prompt,
+          pageId: page.pageId || null,
+          slot: slot.slot,
+          slotLabel: slot.slotLabel,
+          width: slot.width,
+          height: slot.height,
+          userId: user?.id,
+        },
       });
       if (error || data?.error) {
-        setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s)));
+        setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" as SlotStatus } : s)));
         return;
       }
       if (data.status === "completed" && data.imageUrl) {
-        setImageSlots((prev) => prev.map((s) => s.id === slotId ? { ...s, status: "completed", nanoUrl: data.imageUrl } : s));
-        await supabase.from("page_images").update({ nano_url: data.imageUrl, nano_status: "completed" }).eq("id", slotId);
+        setImageSlots((prev) => prev.map((s) => s.id === slotId ? { ...s, status: "completed" as SlotStatus, nanoUrl: data.imageUrl } : s));
+        if (!slotId.startsWith("nb-")) {
+          await supabase.from("page_images").update({ nano_url: data.imageUrl, nano_status: "completed" }).eq("id", slotId);
+        }
         return;
       }
       const jobId = data.jobId; const taskId = data.taskId; let attempts = 0;
       if (slotPollRefs.current[slotId]) clearInterval(slotPollRefs.current[slotId]);
       slotPollRefs.current[slotId] = setInterval(async () => {
         attempts++;
-        if (attempts > 20) {
+        if (attempts > 60) {
           clearInterval(slotPollRefs.current[slotId]); delete slotPollRefs.current[slotId];
-          setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s)));
+          setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" as SlotStatus } : s)));
           return;
         }
         try {
           const { data: checkData } = await supabase.functions.invoke("check-image", { body: { jobId, taskId } });
           if (checkData?.status === "completed" && checkData?.imageUrl) {
             clearInterval(slotPollRefs.current[slotId]); delete slotPollRefs.current[slotId];
-            setImageSlots((prev) => prev.map((s) => s.id === slotId ? { ...s, status: "completed", nanoUrl: checkData.imageUrl } : s));
-            await supabase.from("page_images").update({ nano_url: checkData.imageUrl, nano_status: "completed" }).eq("id", slotId);
+            setImageSlots((prev) => prev.map((s) => s.id === slotId ? { ...s, status: "completed" as SlotStatus, nanoUrl: checkData.imageUrl } : s));
+            if (!slotId.startsWith("nb-")) {
+              await supabase.from("page_images").update({ nano_url: checkData.imageUrl, nano_status: "completed" }).eq("id", slotId);
+            }
           }
           if (checkData?.status === "failed") {
             clearInterval(slotPollRefs.current[slotId]); delete slotPollRefs.current[slotId];
-            setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s)));
+            setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" as SlotStatus } : s)));
           }
         } catch {}
       }, 3000);
     } catch {
-      setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s)));
+      setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" as SlotStatus } : s)));
     }
   }, [imageSlots, page.pageId]);
 
+  /** Approve image and insert into HTML (replace NANOBANANA_PLACEHOLDER for this slot) */
+  const approveImage = useCallback(async (slotId: string) => {
+    const slot = imageSlots.find((s) => s.id === slotId);
+    if (!slot || !slot.nanoUrl) return;
+
+    // Replace the placeholder img for this slot in the HTML
+    const slotRegex = new RegExp(
+      `<img[^>]*data-nb-slot="${slot.slot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>`,
+      "gi"
+    );
+    const replacement = `<img src="${slot.nanoUrl}" data-nb-slot="${slot.slot}" alt="${slot.altText || slot.slotLabel}" width="${slot.width}" height="${slot.height}" class="nb-image-slot" loading="${slot.slot === 'hero' ? 'eager' : 'lazy'}">`;
+
+    const updatedHtml = liveHtml.replace(slotRegex, replacement);
+    setLiveHtml(updatedHtml);
+
+    // Update in DB
+    if (page.pageId) {
+      await supabase.from("seo_pages").update({ html_output: updatedHtml }).eq("id", page.pageId);
+    }
+
+    setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "approved" as SlotStatus } : s)));
+  }, [imageSlots, liveHtml, page.pageId]);
+
   const updateSlotPrompt = useCallback(async (slotId: string, prompt: string) => {
     setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, prompt } : s)));
-    await supabase.from("page_images").update({ nano_prompt: prompt }).eq("id", slotId);
+    if (!slotId.startsWith("nb-")) {
+      await supabase.from("page_images").update({ nano_prompt: prompt }).eq("id", slotId);
+    }
   }, []);
 
   const updateSlotAlt = useCallback(async (slotId: string, altText: string) => {
     setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, altText } : s)));
-    await supabase.from("page_images").update({ alt_text: altText }).eq("id", slotId);
+    if (!slotId.startsWith("nb-")) {
+      await supabase.from("page_images").update({ alt_text: altText }).eq("id", slotId);
+    }
   }, []);
 
   // --- QA checks ---
@@ -465,9 +569,9 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
             </div>
             <InfoBox>Externe Bilder/Fonts nicht geladen in Vorschau.</InfoBox>
             <div className="rounded-lg border border-border overflow-hidden h-[600px] bg-muted/30">
-              {page.htmlOutput ? (
+              {liveHtml ? (
                 <iframe
-                  srcDoc={page.htmlOutput.replace(/^```html\s*/i, "").replace(/```\s*$/i, "").trim()}
+                  srcDoc={liveHtml.replace(/^```html\s*/i, "").replace(/```\s*$/i, "").trim()}
                   className={`h-full border-none ${previewMode === "mobile" ? "w-[375px] mx-auto block" : "w-full"}`}
                   title="SEO-Seite Live-Vorschau"
                   sandbox="allow-same-origin allow-scripts"
@@ -495,56 +599,101 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
                 <ImageIcon className="h-10 w-10 mx-auto mb-3 opacity-40" />
                 <p className="text-sm font-medium">Keine Bild-Platzhalter im HTML gefunden</p>
                 <p className="text-xs mt-1">
-                  Das HTML enthält keine <code className="bg-muted px-1 rounded">data-img-slot</code> Attribute.
+                  Das HTML enthält keine <code className="bg-muted px-1 rounded">nb-image-slot</code> oder <code className="bg-muted px-1 rounded">data-img-slot</code> Elemente.
                 </p>
               </div>
             )}
             {generatingCount > 0 && (
-              <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium">
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300">
                 <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
                 {generatingCount} {generatingCount === 1 ? "Bild wird" : "Bilder werden"} generiert...
               </div>
             )}
-            {imageSlots.map((slot) => (
-              <div key={slot.id} className={`rounded-xl border p-4 space-y-3 ${
-                ["uploaded", "completed"].includes(slot.status) ? "border-green-200 bg-green-50/50"
-                : slot.status === "failed" ? "border-red-200 bg-red-50/50" : "border-border bg-card"
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-foreground">{slot.slotLabel}</span>
-                    <Badge variant={["uploaded","completed"].includes(slot.status) ? "default" : slot.status === "generating" ? "secondary" : slot.status === "failed" ? "destructive" : "outline"} className="text-[10px]">
-                      {["uploaded","completed"].includes(slot.status) ? "✓ Fertig" : slot.status === "generating" ? "⏳ Generiert..." : slot.status === "failed" ? "✗ Fehler" : "● Bereit"}
-                    </Badge>
+            {imageSlots.map((slot) => {
+              const isReady = ["uploaded", "completed"].includes(slot.status);
+              const isApproved = slot.status === "approved";
+              return (
+                <div key={slot.id} className={`rounded-xl border p-4 space-y-3 ${
+                  isApproved ? "border-green-300 bg-green-50/70 dark:border-green-800 dark:bg-green-950/30"
+                  : isReady ? "border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20"
+                  : slot.status === "failed" ? "border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20"
+                  : "border-border bg-card"
+                }`}>
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-foreground">{slot.slotLabel}</span>
+                      <Badge
+                        variant={isApproved ? "default" : isReady ? "secondary" : slot.status === "generating" ? "secondary" : slot.status === "failed" ? "destructive" : "outline"}
+                        className={`text-[10px] ${isApproved ? "bg-green-600 text-white" : ""}`}
+                      >
+                        {isApproved ? "✓ Freigegeben" : isReady ? "● Vorschau" : slot.status === "generating" ? "⏳ Generiert..." : slot.status === "failed" ? "✗ Fehler" : "○ Wartend"}
+                      </Badge>
+                      {slot.isNbSlot && (
+                        <Badge variant="outline" className="text-[9px] px-1 py-0">NB-Slot</Badge>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">{slot.width} × {slot.height}</span>
                   </div>
-                  {slot.status !== "generating" && (
-                    <Button size="sm" variant={["uploaded","completed"].includes(slot.status) ? "outline" : "default"} onClick={() => generateImage(slot.id)} className="gap-1.5 text-xs">
-                      {["uploaded","completed"].includes(slot.status) ? <RotateCcw className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
-                      {["uploaded","completed"].includes(slot.status) ? "Neu" : "Generieren"}
-                    </Button>
+
+                  {/* Image preview */}
+                  {(slot.cloudinaryUrl || slot.nanoUrl) && (
+                    <img src={slot.cloudinaryUrl || slot.nanoUrl} alt={slot.altText} className="w-full max-h-[200px] object-cover rounded-lg border border-border" />
                   )}
-                </div>
-                {(slot.cloudinaryUrl || slot.nanoUrl) && (
-                  <img src={slot.cloudinaryUrl || slot.nanoUrl} alt={slot.altText} className="w-full max-h-[200px] object-cover rounded-lg border border-border" />
-                )}
-                {slot.status === "generating" && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
-                    <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" /> NanoBanana generiert Bild...
+
+                  {/* Loading state */}
+                  {slot.status === "generating" && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300">
+                      <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" /> NanoBanana generiert Bild...
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="flex gap-2 flex-wrap">
+                    {slot.status === "pending" && (
+                      <Button size="sm" onClick={() => generateImage(slot.id)} className="gap-1.5 text-xs">
+                        <Sparkles className="h-3.5 w-3.5" /> Bild generieren
+                      </Button>
+                    )}
+                    {isReady && !isApproved && (
+                      <>
+                        <Button size="sm" onClick={() => approveImage(slot.id)} className="gap-1.5 text-xs bg-green-600 hover:bg-green-700 text-white">
+                          <Check className="h-3.5 w-3.5" /> Freigeben + einbauen
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => generateImage(slot.id)} className="gap-1.5 text-xs">
+                          <RotateCcw className="h-3.5 w-3.5" /> Erneut generieren
+                        </Button>
+                      </>
+                    )}
+                    {isApproved && (
+                      <Button size="sm" variant="outline" onClick={() => generateImage(slot.id)} className="gap-1.5 text-xs">
+                        <RotateCcw className="h-3.5 w-3.5" /> Erneut generieren
+                      </Button>
+                    )}
+                    {slot.status === "failed" && (
+                      <Button size="sm" variant="outline" onClick={() => generateImage(slot.id)} className="gap-1.5 text-xs">
+                        <RotateCcw className="h-3.5 w-3.5" /> Erneut versuchen
+                      </Button>
+                    )}
                   </div>
-                )}
-                <div>
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1 block">Bildprompt (bearbeitbar)</label>
-                  <Textarea value={slot.prompt} onChange={(e) => updateSlotPrompt(slot.id, e.target.value)} className="min-h-[60px] font-mono text-xs bg-muted/30" />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Alt-Text</label>
-                    <span className={`text-[10px] font-bold ${(slot.altText?.length || 0) > 125 ? "text-red-600" : "text-green-600"}`}>{slot.altText?.length || 0}/125</span>
+
+                  {/* Prompt editor */}
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1 block">Bildprompt (bearbeitbar)</label>
+                    <Textarea value={slot.prompt} onChange={(e) => updateSlotPrompt(slot.id, e.target.value)} className="min-h-[60px] font-mono text-xs bg-muted/30" />
                   </div>
-                  <input type="text" value={slot.altText} onChange={(e) => updateSlotAlt(slot.id, e.target.value)} className="w-full px-3 py-2 rounded-md border border-input bg-background text-xs" />
+
+                  {/* Alt text */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Alt-Text</label>
+                      <span className={`text-[10px] font-bold ${(slot.altText?.length || 0) > 125 ? "text-destructive" : "text-green-600"}`}>{slot.altText?.length || 0}/125</span>
+                    </div>
+                    <input type="text" value={slot.altText} onChange={(e) => updateSlotAlt(slot.id, e.target.value)} className="w-full px-3 py-2 rounded-md border border-input bg-background text-xs" />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {imageSlots.length > 0 && imageSlots.some((s) => s.status === "pending") && (
               <Button onClick={() => imageSlots.filter((s) => s.status === "pending").forEach((s) => generateImage(s.id))} className="w-full min-h-[44px] gap-2">
                 <Sparkles className="h-4 w-4" /> Alle Bilder generieren ({imageSlots.filter((s) => s.status === "pending").length})

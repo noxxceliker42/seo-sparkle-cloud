@@ -31,16 +31,28 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Resolve userId from JWT if available, fallback to body.userId
+    let resolvedUserId: string | null = body.userId || null;
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser(
+          authHeader.replace("Bearer ", "")
+        );
+        if (user?.id) resolvedUserId = user.id;
+      } catch (_) { /* keep body fallback */ }
+    }
+
     // ── ACTION: create_job ──────────────────────────────────
     if (action === "create_job") {
       const { jobId, userId, keyword, status, triggeredBy } = body;
 
-      if (!userId || !keyword) {
+      if (!resolvedUserId || !keyword) {
         return jsonResponse({ error: "userId and keyword are required" }, 400);
       }
 
       const insertData: Record<string, unknown> = {
-        user_id: userId,
+        user_id: resolvedUserId,
         keyword,
         status: status || "running",
         triggered_by: triggeredBy || "n8n",
@@ -91,14 +103,14 @@ Deno.serve(async (req) => {
     if (action === "create_cluster") {
       const { userId, firmId, mainKeyword, clusterType, branche } = body;
 
-      if (!userId || !mainKeyword) {
+      if (!resolvedUserId || !mainKeyword) {
         return jsonResponse({ error: "userId and mainKeyword are required" }, 400);
       }
 
       const { data: cluster, error } = await supabase
         .from("clusters")
         .insert({
-          user_id: userId,
+          user_id: resolvedUserId,
           firm_id: firmId || null,
           name: mainKeyword,
           main_keyword: mainKeyword,
@@ -227,7 +239,7 @@ Deno.serve(async (req) => {
       triggeredBy,
     } = body;
 
-    if (!keyword || !userId) {
+    if (!keyword || !resolvedUserId) {
       return jsonResponse({ error: "keyword and userId are required" }, 400);
     }
 
@@ -236,7 +248,7 @@ Deno.serve(async (req) => {
 
     const pageData: Record<string, unknown> = {
       keyword,
-      user_id: userId,
+      user_id: resolvedUserId,
       html_output: html || null,
       body_content: bodyContent || null,
       css_block: cssBlock || null,

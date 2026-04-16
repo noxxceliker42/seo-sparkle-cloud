@@ -1,7 +1,8 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import type { Tables } from "@/integrations/supabase/types";
 import { buildMasterPrompt } from "@/lib/buildMasterPrompt";
 import { useGenerationJob } from "@/hooks/useGenerationJob";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +28,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Loader2, ChevronRight, Info } from "lucide-react";
+import { Loader2, ChevronRight, Info, Search } from "lucide-react";
 
 type ClusterPageRow = Tables<"cluster_pages">;
 type ClusterRow = Tables<"clusters">;
@@ -101,6 +102,15 @@ function getDefaultSections(pageType: string): SectionKey[] {
   return DEFAULTS_BY_TYPE[pageType] || FALLBACK_SECTIONS;
 }
 
+// ── Internal link item type ───────────────────────────────────
+interface InternalLinkItem {
+  keyword: string;
+  slug: string;
+  source: "cluster" | "search";
+  checked: boolean;
+  disabled: boolean;
+}
+
 export function GeneratePageModal({
   open,
   clusterPage,
@@ -140,15 +150,93 @@ export function GeneratePageModal({
     getDefaultSections(clusterPage.page_type)
   );
 
-  // Internal links textarea
-  const siblingLinksDefault = useMemo(() => {
-    return siblingPages
-      .filter((p) => p.id !== clusterPage.id && p.status === "generated")
-      .slice(0, 10)
-      .map((p) => `${p.keyword} → /${p.url_slug}`)
-      .join("\n");
-  }, [siblingPages, clusterPage.id]);
-  const [internalLinks, setInternalLinks] = useState(siblingLinksDefault);
+  // Internal links — checkbox-based
+  const [linkItems, setLinkItems] = useState<InternalLinkItem[]>(() => {
+    const siblings = siblingPages
+      .filter((p) => p.id !== clusterPage.id)
+      .slice(0, 30)
+      .map((p) => ({
+        keyword: p.keyword,
+        slug: p.url_slug,
+        source: "cluster" as const,
+        checked: p.status === "generated" || p.status === "published" || p.status === "live",
+        disabled: p.status === "planned" || p.status === "suggested",
+      }));
+    return siblings;
+  });
+
+  // Search for additional seo_pages
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{ keyword: string; url_slug: string; firm: string | null }[]>([]);
+  const [searching, setSearching] = useState(false);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const doSearch = useCallback(async (q: string) => {
+    if (q.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    const { data } = await supabase
+      .from("seo_pages")
+      .select("keyword, intent, firm, meta_title, id")
+      .ilike("keyword", `%${q}%`)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (data) {
+      // Filter out already-added items
+      const existingSlugs = new Set(linkItems.map((l) => l.slug));
+      // seo_pages don't have url_slug, derive from keyword
+      setSearchResults(
+        data
+          .filter((d) => !existingSlugs.has(d.keyword.toLowerCase().replace(/\s+/g, "-")))
+          .map((d) => ({
+            keyword: d.keyword,
+            url_slug: d.keyword.toLowerCase().replace(/\s+/g, "-"),
+            firm: d.firm,
+          }))
+      );
+    }
+    setSearching(false);
+  }, [linkItems]);
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    searchTimeoutRef.current = setTimeout(() => doSearch(searchQuery), 300);
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [searchQuery, doSearch]);
+
+  const addSearchResult = (r: { keyword: string; url_slug: string }) => {
+    setLinkItems((prev) => [
+      ...prev,
+      { keyword: r.keyword, slug: r.url_slug, source: "search", checked: true, disabled: false },
+    ]);
+    setSearchResults((prev) => prev.filter((x) => x.keyword !== r.keyword));
+    setSearchQuery("");
+  };
+
+  const toggleLink = (idx: number) => {
+    setLinkItems((prev) =>
+      prev.map((item, i) =>
+        i === idx && !item.disabled ? { ...item, checked: !item.checked } : item
+      )
+    );
+  };
+
+  // Compute combined output
+  const siblingPagesString = useMemo(() => {
+    return linkItems
+      .filter((l) => l.checked)
+      .map((l) => `${l.keyword} → /${l.slug}`)
+      .join(", ");
+  }, [linkItems]);
 
   // Accordion state
   const [firmOpen, setFirmOpen] = useState(false);
@@ -214,7 +302,7 @@ export function GeneratePageModal({
         const sec = ALL_SECTIONS.find((s) => s.key === k);
         return sec ? sec.label : k;
       }),
-      siblingPages: internalLinks,
+      siblingPages: siblingPagesString,
       clusterPageId: clusterPage.id,
       clusterId: cluster.id,
       webhookPath: "seo-generate",
@@ -441,16 +529,100 @@ export function GeneratePageModal({
                 </div>
               </div>
 
-              {/* Interne Verlinkung */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Interne Verlinkung (Geschwister-Seiten)</Label>
-                <Textarea
-                  value={internalLinks}
-                  onChange={(e) => setInternalLinks(e.target.value)}
-                  disabled={generating}
-                  rows={4}
-                  className="font-mono text-xs"
-                />
+              {/* ── Interne Verlinkung (Checkbox-based) ── */}
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Seiten intern verlinken</p>
+
+                {/* QUELLE A: Cluster siblings */}
+                {linkItems.filter((l) => l.source === "cluster").length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-medium text-muted-foreground">Aus diesem Cluster</p>
+                    <div className="max-h-40 overflow-y-auto space-y-1 border rounded-md p-2 bg-muted/30">
+                      {linkItems.map((item, idx) => {
+                        if (item.source !== "cluster") return null;
+                        return (
+                          <label
+                            key={`cluster-${idx}`}
+                            className={`flex items-center gap-2 text-xs py-0.5 ${item.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                          >
+                            <Checkbox
+                              checked={item.checked}
+                              onCheckedChange={() => toggleLink(idx)}
+                              disabled={item.disabled || generating}
+                            />
+                            <span className="truncate flex-1">
+                              {item.keyword}
+                              <span className="text-muted-foreground font-mono ml-1">→ /{item.slug}</span>
+                            </span>
+                            {item.disabled && (
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0">geplant</Badge>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* QUELLE B: Search other pages */}
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-medium text-muted-foreground">Weitere Seiten verlinken</p>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Keyword suchen..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      disabled={generating}
+                      className="pl-8 h-8 text-xs"
+                    />
+                  </div>
+                  {(searchResults.length > 0 || searching) && (
+                    <div className="border rounded-md bg-popover shadow-md max-h-36 overflow-y-auto">
+                      {searching && (
+                        <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Suche…
+                        </div>
+                      )}
+                      {searchResults.map((r) => (
+                        <button
+                          key={r.keyword}
+                          type="button"
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors flex items-center gap-2"
+                          onClick={() => addSearchResult(r)}
+                        >
+                          <span className="truncate flex-1">{r.keyword}</span>
+                          {r.firm && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">{r.firm}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Show search-added items */}
+                  {linkItems.filter((l) => l.source === "search").length > 0 && (
+                    <div className="space-y-1 border rounded-md p-2 bg-muted/30">
+                      {linkItems.map((item, idx) => {
+                        if (item.source !== "search") return null;
+                        return (
+                          <label key={`search-${idx}`} className="flex items-center gap-2 text-xs cursor-pointer py-0.5">
+                            <Checkbox
+                              checked={item.checked}
+                              onCheckedChange={() => toggleLink(idx)}
+                              disabled={generating}
+                            />
+                            <span className="truncate flex-1">
+                              {item.keyword}
+                              <span className="text-muted-foreground font-mono ml-1">→ /{item.slug}</span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 <p className="text-[11px] text-muted-foreground">
                   Diese Seiten werden als interne Links in den Prompt eingebaut.
                 </p>

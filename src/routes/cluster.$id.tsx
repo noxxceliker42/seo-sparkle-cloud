@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,24 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Loader2, Zap, Network, Eye, Rocket } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Loader2, Zap, Network, Eye, Rocket, AlertCircle, RotateCcw } from "lucide-react";
 import { calculateScore, scoreColor, scoreTextColor } from "@/lib/clusterScore";
 import { GeneratePageModal, type FirmData } from "@/components/seo/GeneratePageModal";
 import type { Tables } from "@/integrations/supabase/types";
@@ -309,10 +326,21 @@ function ClusterDetailPage() {
                     <ClusterPageCard
                       key={page.id}
                       page={page}
+                      cluster={cluster!}
+                      firm={firm}
                       isGenerating={generatingIds.has(page.id)}
                       isFetchingScores={fetchingScores}
                       onGenerate={() => handleGenerateClick(page)}
                       onSetLive={() => handleSetLive(page)}
+                      onSubClusterCreated={(subClusterId) => {
+                        setPages((prev) =>
+                          prev.map((p) =>
+                            p.id === page.id
+                              ? { ...p, sub_cluster_id: subClusterId, is_sub_cluster_suggested: true }
+                              : p
+                          )
+                        );
+                      }}
                     />
                   ))}
                 </div>
@@ -345,108 +373,359 @@ function ClusterDetailPage() {
   );
 }
 
+// ── Sub-Cluster Modal ─────────────────────────────────────────
+const SUB_CLUSTER_TYPES = [
+  { value: "brand_pillar", label: "Marke + Service" },
+  { value: "generic_local", label: "Gerät/Service lokal" },
+  { value: "device_cluster", label: "Gerätetyp-fokussiert" },
+  { value: "local_cluster", label: "Ortsteil-fokussiert" },
+];
+
+const SUB_CLUSTER_DEPTHS = [
+  { value: "kompakt", label: "Kompakt (15–20 Seiten)" },
+  { value: "standard", label: "Standard (25–35 Seiten)" },
+  { value: "vollstaendig", label: "Vollständig (40–50 Seiten)" },
+];
+
+const SUB_LOADING_MSGS = [
+  { after: 0, text: "Claude analysiert Keywords…" },
+  { after: 10000, text: "Sub-Cluster wird aufgebaut…" },
+  { after: 20000, text: "Keywords werden zugewiesen…" },
+  { after: 30000, text: "Fast fertig…" },
+];
+
+interface SubClusterModalProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  page: ClusterPageRow;
+  cluster: ClusterRow;
+  firm: FirmData | null;
+  onCreated: (subClusterId: string) => void;
+}
+
+function SubClusterModal({ open, onOpenChange, page, cluster, firm, onCreated }: SubClusterModalProps) {
+  const navigate = useNavigate();
+  const [keyword, setKeyword] = useState(page.keyword);
+  const [clusterType, setClusterType] = useState(cluster.cluster_type || "brand_pillar");
+  const [clusterDepth, setClusterDepth] = useState("kompakt");
+  const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const msgTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const cleanup = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = null;
+    msgTimers.current.forEach(clearTimeout);
+    msgTimers.current = [];
+  }, []);
+
+  useEffect(() => () => cleanup(), [cleanup]);
+
+  const handleSubmit = async () => {
+    if (!keyword.trim()) return;
+    setLoading(true);
+    setError(null);
+
+    setLoadingMsg(SUB_LOADING_MSGS[0].text);
+    SUB_LOADING_MSGS.slice(1).forEach((m) => {
+      const t = setTimeout(() => setLoadingMsg(m.text), m.after);
+      msgTimers.current.push(t);
+    });
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        setError("Nicht eingeloggt");
+        setLoading(false);
+        cleanup();
+        return;
+      }
+
+      const { error: fnError } = await supabase.functions.invoke("n8n-proxy", {
+        body: {
+          webhookType: "cluster-plan",
+          payload: {
+            mainKeyword: keyword.trim(),
+            firm: firm?.name || "",
+            city: firm?.city || "",
+            branche: cluster.branche || firm?.branche || "",
+            clusterType,
+            clusterDepth,
+            userId: session.user.id,
+            firmId: firm?.id || null,
+            parentClusterId: cluster.id,
+          },
+        },
+      });
+
+      if (fnError) {
+        setError(fnError.message || "Fehler beim Starten");
+        setLoading(false);
+        cleanup();
+        return;
+      }
+
+      const userId = session.user.id;
+      pollRef.current = setInterval(async () => {
+        const { data: clusters } = await supabase
+          .from("clusters")
+          .select("id, status, plan_generated")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (!clusters || clusters.length === 0) return;
+        const latest = clusters[0];
+
+        if (latest.plan_generated === true && latest.status === "active") {
+          cleanup();
+          setLoading(false);
+
+          // Update the source cluster_page
+          await supabase
+            .from("cluster_pages")
+            .update({
+              sub_cluster_id: latest.id,
+              is_sub_cluster_suggested: true,
+            })
+            .eq("id", page.id);
+
+          onCreated(latest.id);
+          onOpenChange(false);
+          navigate({ to: "/cluster/$id", params: { id: latest.id } });
+        } else if (latest.status === "error") {
+          cleanup();
+          setLoading(false);
+          setError("Sub-Cluster-Generierung fehlgeschlagen. Bitte erneut versuchen.");
+        }
+      }, 3000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+      setLoading(false);
+      cleanup();
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!loading) onOpenChange(v); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Sub-Cluster starten</DialogTitle>
+          <DialogDescription>
+            Erstelle einen Sub-Cluster basierend auf diesem Thema.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Diese Seite hat Potenzial für einen eigenen Cluster. Starte einen Sub-Cluster mit diesem
+            Thema als Haupt-Keyword und erhalte automatisch einen vollständigen Seitenplan.
+          </p>
+
+          <div className="space-y-2">
+            <Label htmlFor="sub-keyword">Haupt-Keyword *</Label>
+            <Input
+              id="sub-keyword"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Cluster-Typ</Label>
+            <Select value={clusterType} onValueChange={setClusterType} disabled={loading}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {SUB_CLUSTER_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Cluster-Tiefe</Label>
+            <RadioGroup value={clusterDepth} onValueChange={setClusterDepth} disabled={loading}>
+              {SUB_CLUSTER_DEPTHS.map((d) => (
+                <div key={d.value} className="flex items-center gap-2">
+                  <RadioGroupItem value={d.value} id={`sub-depth-${d.value}`} />
+                  <Label htmlFor={`sub-depth-${d.value}`} className="font-normal cursor-pointer">
+                    {d.label}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p>{error}</p>
+                <Button variant="ghost" size="sm" className="mt-1 h-7 gap-1 px-2" onClick={handleSubmit}>
+                  <RotateCcw className="h-3 w-3" /> Erneut versuchen
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              {loadingMsg}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading} className="flex-1">
+              Abbrechen
+            </Button>
+            <Button onClick={handleSubmit} disabled={!keyword.trim() || loading} className="flex-1">
+              {loading ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Generiere…</>
+              ) : (
+                "Sub-Cluster generieren"
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Card Component ────────────────────────────────────────────
 interface ClusterPageCardProps {
   page: ClusterPageRow;
+  cluster: ClusterRow;
+  firm: FirmData | null;
   isGenerating: boolean;
   isFetchingScores: boolean;
   onGenerate: () => void;
   onSetLive: () => void;
+  onSubClusterCreated: (subClusterId: string) => void;
 }
 
-function ClusterPageCard({ page, isGenerating, isFetchingScores, onGenerate, onSetLive }: ClusterPageCardProps) {
+function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, onGenerate, onSetLive, onSubClusterCreated }: ClusterPageCardProps) {
+  const [subModalOpen, setSubModalOpen] = useState(false);
   const score = calculateScore(page);
   const status = page.status || "planned";
   const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.planned;
   const isGenerated = status === "generated" || status === "published" || status === "live";
   const canGenerate = !isGenerated && status !== "generating" && !isGenerating;
   const showSkeleton = isFetchingScores && !page.score_volume;
+  const hasSubCluster = !!page.sub_cluster_id;
 
   return (
-    <Card className="shadow-sm">
-      <CardContent className="p-3 space-y-2">
-        <p className="font-semibold text-sm text-foreground leading-tight truncate">{page.keyword}</p>
-        <p className="text-[10px] text-muted-foreground font-mono truncate">/{page.url_slug}</p>
+    <>
+      <Card className="shadow-sm">
+        <CardContent className="p-3 space-y-2">
+          <p className="font-semibold text-sm text-foreground leading-tight truncate">{page.keyword}</p>
+          <p className="text-[10px] text-muted-foreground font-mono truncate">/{page.url_slug}</p>
 
-        {/* Score bar — skeleton while fetching */}
-        {showSkeleton ? (
-          <div className="space-y-1.5">
-            <Skeleton className="h-1.5 w-full rounded-full" />
-            <div className="flex gap-1">
-              <Skeleton className="h-4 w-14 rounded" />
-              <Skeleton className="h-4 w-12 rounded" />
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${scoreColor(score)}`}
-                  style={{ width: `${Math.min(score, 100)}%` }}
-                />
+          {/* Score bar — skeleton while fetching */}
+          {showSkeleton ? (
+            <div className="space-y-1.5">
+              <Skeleton className="h-1.5 w-full rounded-full" />
+              <div className="flex gap-1">
+                <Skeleton className="h-4 w-14 rounded" />
+                <Skeleton className="h-4 w-12 rounded" />
               </div>
-              <span className={`text-xs font-bold ${scoreTextColor(score)}`}>
-                {score}/100
-              </span>
             </div>
-
-            <div className="flex gap-1 flex-wrap">
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                Vol: {page.search_volume != null ? page.search_volume.toLocaleString() : "—"}
-              </Badge>
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                KD: {page.keyword_difficulty != null ? page.keyword_difficulty : "—"}
-              </Badge>
-            </div>
-          </>
-        )}
-
-        {/* Status */}
-        <div className="flex gap-1 flex-wrap">
-          <Badge className={`text-[10px] px-1.5 py-0 ${statusCfg.color}`}>
-            {isGenerating ? "Generiert…" : statusCfg.label}
-          </Badge>
-          {page.has_sub_cluster_potential && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/50 text-primary">
-              <Network className="h-2.5 w-2.5 mr-0.5" /> Sub-Cluster
-            </Badge>
-          )}
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex gap-1 pt-1">
-          {canGenerate && (
-            <Button size="sm" className="flex-1 text-[11px] h-7 gap-1" onClick={onGenerate}>
-              <Zap className="h-3 w-3" /> Generieren
-            </Button>
-          )}
-          {isGenerating && (
-            <Button size="sm" className="flex-1 text-[11px] h-7 gap-1" disabled>
-              <Loader2 className="h-3 w-3 animate-spin" /> Generiere…
-            </Button>
-          )}
-          {isGenerated && page.seo_page_id && (
+          ) : (
             <>
-              <Button size="sm" variant="outline" className="flex-1 text-[11px] h-7 gap-1" asChild>
-                <Link to="/" search={{ previewPageId: page.seo_page_id }}>
-                  <Eye className="h-3 w-3" /> Vorschau
-                </Link>
-              </Button>
-              {status !== "live" && (
-                <Button size="sm" variant="default" className="text-[11px] h-7 gap-1" onClick={onSetLive}>
-                  <Rocket className="h-3 w-3" /> Live
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${scoreColor(score)}`}
+                    style={{ width: `${Math.min(score, 100)}%` }}
+                  />
+                </div>
+                <span className={`text-xs font-bold ${scoreTextColor(score)}`}>
+                  {score}/100
+                </span>
+              </div>
+
+              <div className="flex gap-1 flex-wrap">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                  Vol: {page.search_volume != null ? page.search_volume.toLocaleString() : "—"}
+                </Badge>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                  KD: {page.keyword_difficulty != null ? page.keyword_difficulty : "—"}
+                </Badge>
+              </div>
             </>
           )}
-          {page.has_sub_cluster_potential && !isGenerating && (
-            <Button size="sm" variant="outline" className="text-[11px] h-7" disabled>
-              Sub-Cluster
-            </Button>
+
+          {/* Sub-Cluster Badge */}
+          {page.has_sub_cluster_potential && (
+            hasSubCluster ? (
+              <Link to="/cluster/$id" params={{ id: page.sub_cluster_id! }}>
+                <Badge className="text-[10px] px-1.5 py-0 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 cursor-pointer hover:bg-green-200 dark:hover:bg-green-800 transition-colors">
+                  <Network className="h-2.5 w-2.5 mr-0.5" /> Sub-Cluster aktiv
+                </Badge>
+              </Link>
+            ) : (
+              <Badge
+                className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 cursor-pointer hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors"
+                onClick={() => setSubModalOpen(true)}
+              >
+                <Network className="h-2.5 w-2.5 mr-0.5" /> Sub-Cluster möglich
+              </Badge>
+            )
           )}
-        </div>
-      </CardContent>
-    </Card>
+
+          {/* Status */}
+          <div className="flex gap-1 flex-wrap">
+            <Badge className={`text-[10px] px-1.5 py-0 ${statusCfg.color}`}>
+              {isGenerating ? "Generiert…" : statusCfg.label}
+            </Badge>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-1 pt-1">
+            {canGenerate && (
+              <Button size="sm" className="flex-1 text-[11px] h-7 gap-1" onClick={onGenerate}>
+                <Zap className="h-3 w-3" /> Generieren
+              </Button>
+            )}
+            {isGenerating && (
+              <Button size="sm" className="flex-1 text-[11px] h-7 gap-1" disabled>
+                <Loader2 className="h-3 w-3 animate-spin" /> Generiere…
+              </Button>
+            )}
+            {isGenerated && page.seo_page_id && (
+              <>
+                <Button size="sm" variant="outline" className="flex-1 text-[11px] h-7 gap-1" asChild>
+                  <Link to="/" search={{ previewPageId: page.seo_page_id }}>
+                    <Eye className="h-3 w-3" /> Vorschau
+                  </Link>
+                </Button>
+                {status !== "live" && (
+                  <Button size="sm" variant="default" className="text-[11px] h-7 gap-1" onClick={onSetLive}>
+                    <Rocket className="h-3 w-3" /> Live
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sub-Cluster Modal */}
+      {subModalOpen && (
+        <SubClusterModal
+          open={subModalOpen}
+          onOpenChange={setSubModalOpen}
+          page={page}
+          cluster={cluster}
+          firm={firm}
+          onCreated={onSubClusterCreated}
+        />
+      )}
+    </>
   );
 }

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Building2, Loader2, Info } from "lucide-react";
+import { DesignTab } from "./DesignTab";
 import { toast } from "sonner";
 
 interface Firm {
@@ -36,6 +37,8 @@ const emptyForm = {
   oeffnungszeiten: "", branche: "hausgeraete", sprache: "de",
   author: "", author_title: "", author_experience: "", author_certs: "",
   rating: "", review_count: "",
+  target_audience: "privatkunden", design_philosophy: "trust_classic", design_philosophy_custom: "",
+  primary_color: "#1d4ed8", secondary_color: "#ffffff", accent_color: "#dc2626",
 };
 
 const BRANCHEN = [
@@ -118,6 +121,12 @@ export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps
         author_certs: form.author_certs || null,
         rating: form.rating ? parseFloat(form.rating) : null,
         review_count: form.review_count ? parseInt(form.review_count) : null,
+        target_audience: form.target_audience || "privatkunden",
+        design_philosophy: form.design_philosophy || "trust_classic",
+        design_philosophy_custom: form.design_philosophy_custom || null,
+        primary_color: form.primary_color || "#1d4ed8",
+        secondary_color: form.secondary_color || "#ffffff",
+        accent_color: form.accent_color || "#dc2626",
       }).select().single();
 
       if (error) { setApiError(error.message); setSaving(false); return; }
@@ -183,10 +192,11 @@ export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps
           )}
 
           <Tabs defaultValue="stammdaten" className="mt-2">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="stammdaten">Stammdaten</TabsTrigger>
               <TabsTrigger value="betrieb">Betrieb</TabsTrigger>
               <TabsTrigger value="eeat">E-E-A-T</TabsTrigger>
+              <TabsTrigger value="design">Design</TabsTrigger>
             </TabsList>
 
             <TabsContent value="stammdaten" className="space-y-3 mt-3">
@@ -288,6 +298,10 @@ export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps
                   Diese Daten werden für E-E-A-T Signale in den generierten Seiten verwendet.
                 </p>
               </div>
+            </TabsContent>
+
+            <TabsContent value="design" className="mt-3">
+              <DesignTab form={form} setField={setField} />
             </TabsContent>
           </Tabs>
 

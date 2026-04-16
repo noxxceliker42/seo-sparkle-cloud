@@ -53,6 +53,14 @@ export interface FirmData {
   author_certs?: string | null;
   rating?: number | null;
   review_count?: number | null;
+  design_philosophy?: string | null;
+  design_philosophy_custom?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  accent_color?: string | null;
+  target_audience?: string | null;
+  differentiation?: string | null;
+  theme_context?: string | null;
 }
 
 interface GeneratePageModalProps {

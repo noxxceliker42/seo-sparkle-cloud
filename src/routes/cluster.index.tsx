@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { PlusCircle, Network, Loader2 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { ClusterStartModal } from "@/components/seo/ClusterStartModal";
 
 export const Route = createFileRoute("/cluster/")({
   component: ClusterListPage,
@@ -57,9 +58,29 @@ interface ClusterWithPages extends ClusterRow {
 function ClusterListPage() {
   const [clusters, setClusters] = useState<ClusterWithPages[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [activeFirm, setActiveFirm] = useState<{ id: string; name: string; city?: string | null; service_area?: string | null } | null>(null);
 
   useEffect(() => {
     async function load() {
+      // Load active firm from profile
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("firm_id")
+          .eq("id", session.user.id)
+          .single();
+        if (profile?.firm_id) {
+          const { data: firm } = await supabase
+            .from("firms")
+            .select("id, name, city, service_area")
+            .eq("id", profile.firm_id)
+            .single();
+          if (firm) setActiveFirm(firm);
+        }
+      }
+
       const { data: clusterData } = await supabase
         .from("clusters")
         .select("*")
@@ -108,10 +129,8 @@ function ClusterListPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Meine Cluster</h1>
-        <Button asChild className="gap-2">
-          <Link to="/cluster/neu">
-            <PlusCircle className="h-4 w-4" /> Neuen Cluster starten
-          </Link>
+        <Button onClick={() => setModalOpen(true)} className="gap-2">
+          <PlusCircle className="h-4 w-4" /> Neuen Cluster starten
         </Button>
       </div>
 
@@ -123,10 +142,8 @@ function ClusterListPage() {
             <p className="text-muted-foreground text-center max-w-md">
               Ein Cluster gruppiert eine Pillar-Seite mit allen zugehörigen Unterseiten zu einem Themengebiet.
             </p>
-            <Button asChild className="gap-2">
-              <Link to="/cluster/neu">
-                <PlusCircle className="h-4 w-4" /> Ersten Cluster anlegen
-              </Link>
+            <Button onClick={() => setModalOpen(true)} className="gap-2">
+              <PlusCircle className="h-4 w-4" /> Ersten Cluster anlegen
             </Button>
           </CardContent>
         </Card>
@@ -137,6 +154,12 @@ function ClusterListPage() {
           ))}
         </div>
       )}
+
+      <ClusterStartModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        activeFirm={activeFirm}
+      />
     </div>
   );
 }

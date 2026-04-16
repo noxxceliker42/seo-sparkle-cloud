@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 import { buildMasterPrompt } from "@/lib/buildMasterPrompt";
-import { useGenerationJob } from "@/hooks/useGenerationJob";
+import { useGenerationJob, clearStuckJob } from "@/hooks/useGenerationJob";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -310,6 +310,11 @@ export function GeneratePageModal({
   const [targetAudience, setTargetAudience] = useState("");
   const [themeContext, setThemeContext] = useState("");
   const [differentiation, setDifferentiation] = useState("");
+
+  // Clear stuck generation jobs on open
+  useEffect(() => {
+    if (open) clearStuckJob();
+  }, [open]);
 
   // Init context from cluster/firm on open
   useEffect(() => {

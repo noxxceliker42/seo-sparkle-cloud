@@ -24,7 +24,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Loader2, Zap, Network, Eye, Rocket, AlertCircle, RotateCcw } from "lucide-react";
+import { ArrowLeft, Loader2, Zap, Network, Eye, Rocket, AlertCircle, RotateCcw, LinkIcon, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { calculateScore, scoreColor, scoreTextColor } from "@/lib/clusterScore";
 import { GeneratePageModal, type FirmData } from "@/components/seo/GeneratePageModal";
 import type { Tables } from "@/integrations/supabase/types";

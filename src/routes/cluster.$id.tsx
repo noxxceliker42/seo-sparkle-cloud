@@ -326,10 +326,21 @@ function ClusterDetailPage() {
                     <ClusterPageCard
                       key={page.id}
                       page={page}
+                      cluster={cluster!}
+                      firm={firm}
                       isGenerating={generatingIds.has(page.id)}
                       isFetchingScores={fetchingScores}
                       onGenerate={() => handleGenerateClick(page)}
                       onSetLive={() => handleSetLive(page)}
+                      onSubClusterCreated={(subClusterId) => {
+                        setPages((prev) =>
+                          prev.map((p) =>
+                            p.id === page.id
+                              ? { ...p, sub_cluster_id: subClusterId, is_sub_cluster_suggested: true }
+                              : p
+                          )
+                        );
+                      }}
                     />
                   ))}
                 </div>

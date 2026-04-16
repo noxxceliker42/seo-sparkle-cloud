@@ -314,8 +314,8 @@ export function GeneratePageModal({
   useEffect(() => {
     if (open) {
       setTargetAudience(cluster.target_audience || selectedFirmObj?.target_audience || "privatkunden");
-      setThemeContext(cluster.theme_context || selectedFirmObj?.theme_context || "");
-      setDifferentiation(cluster.differentiation || selectedFirmObj?.differentiation || "");
+      setThemeContext(String(cluster.theme_context || selectedFirmObj?.theme_context || ""));
+      setDifferentiation(String(cluster.differentiation || selectedFirmObj?.differentiation || ""));
       setDesignOverride(null);
       setDesignCustomOverride("");
     }

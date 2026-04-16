@@ -222,6 +222,7 @@ Deno.serve(async (req) => {
       metaDesc,
       metaKeywords,
       pageId,
+      firmId,
       userId,
       firm,
       city,
@@ -249,6 +250,7 @@ Deno.serve(async (req) => {
     const pageData: Record<string, unknown> = {
       keyword,
       user_id: resolvedUserId,
+      firm_id: firmId || null,
       html_output: html || null,
       body_content: bodyContent || null,
       css_block: cssBlock || null,

@@ -25,28 +25,49 @@ export const Route = createFileRoute("/cluster/$id")({
 interface Cluster {
   id: string;
   name: string;
-  pillar_keyword: string;
+  main_keyword: string;
   firm_id: string | null;
-  status: string;
+  status: string | null;
+  cluster_type: string | null;
+  branche: string | null;
+  sprache: string | null;
+  pillar_page_id: string | null;
+  plan_generated: boolean | null;
+  user_id: string | null;
+  created_at: string | null;
 }
 
 interface ClusterPage {
   id: string;
-  cluster_id: string;
+  cluster_id: string | null;
   keyword: string;
+  url_slug: string;
   page_type: string;
-  intent: string | null;
-  priority: string;
-  reason: string | null;
-  content_angle: string | null;
-  differentiator: string | null;
-  internal_link_anchor: string | null;
-  estimated_volume: number | null;
-  estimated_difficulty: number | null;
-  firm_id: string | null;
+  ai_description: string | null;
+  search_volume: number | null;
+  keyword_difficulty: number | null;
+  cpc: number | null;
+  priority: number | null;
+  pillar_tier: number | null;
+  score_volume: number | null;
+  score_difficulty: number | null;
+  score_trend: number | null;
+  score_gap: number | null;
+  score_conversion: number | null;
+  score_pillar_support: number | null;
+  score_total: number | null;
+  trend_direction: string | null;
   seo_page_id: string | null;
-  status: string;
-  sort_order: number;
+  generation_jobs_id: string | null;
+  status: string | null;
+  user_id: string | null;
+  generated_at: string | null;
+  created_at: string | null;
+  has_sub_cluster_potential: boolean | null;
+  is_sub_cluster_suggested: boolean | null;
+  sub_cluster_id: string | null;
+  internal_links_set: boolean | null;
+  sitemap_added: boolean | null;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -189,15 +210,19 @@ function ClusterDetailPage() {
     try {
       // Get firm data
       let firmData: Record<string, unknown> = {};
-      if (page.firm_id) {
-        const { data } = await supabase.from("firms").select("*").eq("id", page.firm_id).single();
-        if (data) firmData = data;
+      const clusterId = page.cluster_id;
+      if (clusterId) {
+        const { data: clusterData } = await supabase.from("clusters").select("firm_id").eq("id", clusterId).single();
+        if (clusterData?.firm_id) {
+          const { data } = await supabase.from("firms").select("*").eq("id", clusterData.firm_id).single();
+          if (data) firmData = data;
+        }
       }
 
       // Get sibling pages for internal linking
       const siblings = clusterPages
         .filter((p) => p.id !== page.id && p.status === "generated" && p.seo_page_id)
-        .map((p) => ({ keyword: p.keyword, anchor: p.internal_link_anchor }));
+        .map((p) => ({ keyword: p.keyword, slug: p.url_slug }));
 
       // Session for auth header (userId is resolved server-side by n8n-proxy)
 
@@ -225,7 +250,7 @@ function ClusterDetailPage() {
           primaryColor: "#1d4ed8",
           uniqueData: "",
           infoGain: "",
-          pillarKeyword: cluster?.pillar_keyword || "",
+          pillarKeyword: cluster?.main_keyword || "",
           clusterSiblings: siblings,
           clusterPageId: page.id,
         }),
@@ -286,7 +311,7 @@ function ClusterDetailPage() {
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-foreground">{cluster.name}</h1>
-          <p className="text-sm text-muted-foreground">Pillar: {cluster.pillar_keyword}</p>
+          <p className="text-sm text-muted-foreground">Pillar: {cluster.main_keyword}</p>
         </div>
         <div className="text-right">
           <p className="text-sm font-medium">{stats.done} / {stats.total} Seiten generiert</p>
@@ -302,11 +327,11 @@ function ClusterDetailPage() {
               {/* Pillar center */}
               <circle cx={400} cy={250} r={24} fill="#fca5a5" stroke="#ef4444" strokeWidth={3} />
               <text x={400} y={254} textAnchor="middle" className="fill-foreground text-[9px] font-semibold">
-                {cluster.pillar_keyword.length > 16 ? cluster.pillar_keyword.slice(0, 14) + "…" : cluster.pillar_keyword}
+                {cluster.main_keyword.length > 16 ? cluster.main_keyword.slice(0, 14) + "…" : cluster.main_keyword}
               </text>
               {/* Connections + Nodes */}
               {nodes.map((node) => {
-                const nc = NODE_COLORS[node.status] || NODE_COLORS.suggested;
+                const nc = NODE_COLORS[node.status || "suggested"] || NODE_COLORS.suggested;
                 return (
                   <g key={node.id}>
                     <line x1={400} y1={250} x2={node.x} y2={node.y} stroke="currentColor" strokeOpacity={0.12} strokeWidth={1.5} />
@@ -320,7 +345,7 @@ function ClusterDetailPage() {
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="font-medium">{node.keyword}</p>
-                        <p className="text-xs">{STATUS_CONFIG[node.status]?.label}</p>
+                        <p className="text-xs">{STATUS_CONFIG[node.status || "suggested"]?.label}</p>
                       </TooltipContent>
                     </Tooltip>
                     <text x={node.x} y={node.y + 26} textAnchor="middle" className="fill-foreground text-[8px]">
@@ -353,12 +378,12 @@ function ClusterDetailPage() {
               <TableRow key={page.id} className={page.status === "rejected" ? "opacity-40 line-through" : ""}>
                 <TableCell className="font-medium">{page.keyword}</TableCell>
                 <TableCell><Badge variant="outline">{TYPE_LABELS[page.page_type] || page.page_type}</Badge></TableCell>
-                <TableCell><Badge variant="outline">{page.priority.replace("_", " ")}</Badge></TableCell>
-                <TableCell className="text-sm">{(page.estimated_volume || 0).toLocaleString()}</TableCell>
-                <TableCell className="text-sm">{page.estimated_difficulty || 0}</TableCell>
+                <TableCell><Badge variant="outline">{page.priority ?? 99}</Badge></TableCell>
+                <TableCell className="text-sm">{(page.search_volume || 0).toLocaleString()}</TableCell>
+                <TableCell className="text-sm">{page.keyword_difficulty || 0}</TableCell>
                 <TableCell>
-                  <Badge className={STATUS_CONFIG[page.status]?.color || ""}>
-                    {STATUS_CONFIG[page.status]?.label || page.status}
+                  <Badge className={STATUS_CONFIG[page.status || "suggested"]?.color || ""}>
+                    {STATUS_CONFIG[page.status || "suggested"]?.label || page.status}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
@@ -411,36 +436,17 @@ function ClusterDetailPage() {
               </SheetHeader>
               <div className="space-y-4 mt-4">
                 <div className="flex gap-2 flex-wrap">
-                  <Badge variant="outline">{previewPage.intent || "–"}</Badge>
                   <Badge variant="outline">{TYPE_LABELS[previewPage.page_type] || previewPage.page_type}</Badge>
-                  <Badge variant="outline">{previewPage.priority.replace("_", " ")}</Badge>
+                  <Badge variant="outline">Priorität: {previewPage.priority ?? 99}</Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-muted-foreground">Suchvolumen:</span> {(previewPage.estimated_volume || 0).toLocaleString()}</div>
-                  <div><span className="text-muted-foreground">KD:</span> {previewPage.estimated_difficulty || 0}</div>
+                  <div><span className="text-muted-foreground">Suchvolumen:</span> {(previewPage.search_volume || 0).toLocaleString()}</div>
+                  <div><span className="text-muted-foreground">KD:</span> {previewPage.keyword_difficulty || 0}</div>
                 </div>
-                {previewPage.reason && (
+                {previewPage.ai_description && (
                   <div>
-                    <p className="text-xs text-muted-foreground uppercase mb-1">Warum wichtig</p>
-                    <p className="text-sm">{previewPage.reason}</p>
-                  </div>
-                )}
-                {previewPage.content_angle && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase mb-1">Content Angle</p>
-                    <p className="text-sm">{previewPage.content_angle}</p>
-                  </div>
-                )}
-                {previewPage.differentiator && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase mb-1">Differentiator</p>
-                    <p className="text-sm">{previewPage.differentiator}</p>
-                  </div>
-                )}
-                {previewPage.internal_link_anchor && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase mb-1">Interner Link Anchor</p>
-                    <p className="text-sm font-mono">{previewPage.internal_link_anchor}</p>
+                    <p className="text-xs text-muted-foreground uppercase mb-1">Beschreibung</p>
+                    <p className="text-sm">{previewPage.ai_description}</p>
                   </div>
                 )}
 

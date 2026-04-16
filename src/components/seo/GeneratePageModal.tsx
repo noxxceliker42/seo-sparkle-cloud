@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 import { buildMasterPrompt } from "@/lib/buildMasterPrompt";
 import { useGenerationJob } from "@/hooks/useGenerationJob";
@@ -316,8 +317,8 @@ export function GeneratePageModal({
       setTargetAudience(cluster.target_audience || selectedFirmObj?.target_audience || "privatkunden");
       setThemeContext(String(cluster.theme_context || selectedFirmObj?.theme_context || ""));
       setDifferentiation(String(cluster.differentiation || selectedFirmObj?.differentiation || ""));
-      setDesignOverride(null);
-      setDesignCustomOverride("");
+      setDesignOverride(selectedFirmObj?.design_philosophy || null);
+      setDesignCustomOverride(String(selectedFirmObj?.design_philosophy_custom || ""));
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -949,6 +950,9 @@ export function GeneratePageModal({
           <PickerDialogHeader>
             <PickerDialogTitle>Design-Philosophie wählen</PickerDialogTitle>
           </PickerDialogHeader>
+          {designCustomOverride.length >= 10 && (
+            <p className="text-[10px] text-muted-foreground mt-1">Optional — eigene Beschreibung aktiv</p>
+          )}
           <div className="grid grid-cols-3 gap-2 mt-2">
             {PALETTES.map((p) => (
               <button
@@ -956,7 +960,6 @@ export function GeneratePageModal({
                 type="button"
                 onClick={() => {
                   setDesignOverride(p.id);
-                  setPickerOpen(false);
                 }}
                 className={cn(
                   "rounded-lg border p-2 text-left transition-all hover:shadow-md cursor-pointer",
@@ -983,6 +986,28 @@ export function GeneratePageModal({
               rows={2}
             />
           </div>
+          {!designOverride && designCustomOverride.length < 10 && (
+            <p className="text-[10px] text-destructive mt-1">Bitte Preset wählen oder eigene Beschreibung eingeben</p>
+          )}
+          <Button
+            className="w-full mt-3"
+            disabled={!designOverride && designCustomOverride.length < 10}
+            onClick={async () => {
+              if (selectedFirmObj?.id) {
+                await supabase
+                  .from("firms")
+                  .update({
+                    design_philosophy: designOverride || selectedFirmObj.design_philosophy,
+                    design_philosophy_custom: designCustomOverride || null,
+                  })
+                  .eq("id", selectedFirmObj.id);
+                toast.success("Design gespeichert ✓");
+              }
+              setPickerOpen(false);
+            }}
+          >
+            Design übernehmen →
+          </Button>
         </PickerDialogContent>
       </PickerDialog>
     </>

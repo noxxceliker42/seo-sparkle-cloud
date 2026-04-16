@@ -425,8 +425,18 @@ function ClusterDetailPage() {
                 </div>
 
                 <div className="p-2 border-t border-border">
-                  <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground" disabled>
-                    Mehr vorschlagen
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs text-muted-foreground"
+                    disabled={expandingCols.has(col.key)}
+                    onClick={() => handleExpandColumn(col.key)}
+                  >
+                    {expandingCols.has(col.key) ? (
+                      <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Wird geladen…</>
+                    ) : (
+                      "Mehr vorschlagen"
+                    )}
                   </Button>
                 </div>
               </div>

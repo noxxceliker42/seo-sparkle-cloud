@@ -28,7 +28,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Loader2, ChevronRight, Info, Search } from "lucide-react";
+import { Loader2, ChevronRight, Info, Search, RefreshCw } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type ClusterPageRow = Tables<"cluster_pages">;
 type ClusterRow = Tables<"clusters">;
@@ -171,6 +172,47 @@ export function GeneratePageModal({
   const [uniqueData, setUniqueData] = useState("");
   const [informationGain, setInformationGain] = useState("");
   const [uspFokus, setUspFokus] = useState("");
+
+  // AI suggestions
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiLoaded, setAiLoaded] = useState(false);
+  const aiCalledRef = useRef(false);
+
+  const fetchAiSuggestions = useCallback(async () => {
+    setAiLoading(true);
+    try {
+      const selectedFirm = allFirms.find((f) => f.id === selectedFirmId);
+      const { data, error: fnError } = await supabase.functions.invoke(
+        "generate-field-suggestions",
+        {
+          body: {
+            keyword: clusterPage.keyword,
+            pageType: clusterPage.page_type,
+            firm: selectedFirm?.name || firm?.name || "",
+            branche: selectedFirm?.branche || cluster.branche || "hausgeraete",
+          },
+        }
+      );
+      if (!fnError && data) {
+        if (data.uniqueData) setUniqueData(data.uniqueData);
+        if (data.informationGain) setInformationGain(data.informationGain);
+        if (data.uspFokus) setUspFokus(data.uspFokus);
+      }
+    } catch (err) {
+      console.error("AI suggestions error:", err);
+    } finally {
+      setAiLoading(false);
+      setAiLoaded(true);
+    }
+  }, [clusterPage.keyword, clusterPage.page_type, allFirms, selectedFirmId, firm, cluster.branche]);
+
+  // Auto-fetch on open (once)
+  useEffect(() => {
+    if (open && !aiCalledRef.current) {
+      aiCalledRef.current = true;
+      void fetchAiSuggestions();
+    }
+  }, [open, fetchAiSuggestions]);
 
   // Firm fields (editable overrides)
   const [firmName, setFirmName] = useState("");

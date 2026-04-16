@@ -1,16 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { toast } from "sonner";
-import { ArrowLeft, Check, X, Zap, Eye, RefreshCw, Loader2, ChevronRight } from "lucide-react";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ArrowLeft, Loader2, Zap, Network } from "lucide-react";
+import { calculateScore, scoreColor, scoreTextColor } from "@/lib/clusterScore";
+import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/cluster/$id")({
   component: ClusterDetailPage,
@@ -22,475 +20,227 @@ export const Route = createFileRoute("/cluster/$id")({
   }),
 });
 
-interface Cluster {
-  id: string;
-  name: string;
-  main_keyword: string;
-  firm_id: string | null;
-  status: string | null;
-  cluster_type: string | null;
-  branche: string | null;
-  sprache: string | null;
-  pillar_page_id: string | null;
-  plan_generated: boolean | null;
-  user_id: string | null;
-  created_at: string | null;
-}
+type ClusterRow = Tables<"clusters">;
+type ClusterPageRow = Tables<"cluster_pages">;
 
-interface ClusterPage {
-  id: string;
-  cluster_id: string | null;
-  keyword: string;
-  url_slug: string;
-  page_type: string;
-  ai_description: string | null;
-  search_volume: number | null;
-  keyword_difficulty: number | null;
-  cpc: number | null;
-  priority: number | null;
-  pillar_tier: number | null;
-  score_volume: number | null;
-  score_difficulty: number | null;
-  score_trend: number | null;
-  score_gap: number | null;
-  score_conversion: number | null;
-  score_pillar_support: number | null;
-  score_total: number | null;
-  trend_direction: string | null;
-  seo_page_id: string | null;
-  generation_jobs_id: string | null;
-  status: string | null;
-  user_id: string | null;
-  generated_at: string | null;
-  created_at: string | null;
-  has_sub_cluster_potential: boolean | null;
-  is_sub_cluster_suggested: boolean | null;
-  sub_cluster_id: string | null;
-  internal_links_set: boolean | null;
-  sitemap_added: boolean | null;
+const KANBAN_COLUMNS = [
+  { key: "pillar_page", label: "Pillar Page" },
+  { key: "service", label: "Service" },
+  { key: "fehlercode", label: "Fehlercode" },
+  { key: "supporting_info", label: "Supporting Info" },
+  { key: "supporting_commercial", label: "Supporting Commercial" },
+  { key: "transactional", label: "Transaktional" },
+  { key: "deep_page", label: "Deep Page" },
+  { key: "blog", label: "Blog" },
+] as const;
+
+// Map DB page_type values to kanban column keys
+function toColumnKey(pageType: string): string {
+  if (pageType === "pillar") return "pillar_page";
+  if (pageType === "transactional_local") return "transactional";
+  return pageType;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  planned: { label: "Geplant", color: "bg-muted text-muted-foreground" },
   suggested: { label: "Vorgeschlagen", color: "bg-muted text-muted-foreground" },
   approved: { label: "Bereit", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
-  rejected: { label: "Abgelehnt", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
-  generating: { label: "Generiert...", color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 animate-pulse" },
-  generated: { label: "Fertig", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
+  generating: { label: "Generiert…", color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 animate-pulse" },
+  generated: { label: "Generiert", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
   published: { label: "Veröffentlicht", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" },
-};
-
-const NODE_COLORS: Record<string, { stroke: string; fill: string }> = {
-  suggested: { stroke: "#9ca3af", fill: "#e5e7eb" },
-  approved: { stroke: "#3b82f6", fill: "#93c5fd" },
-  rejected: { stroke: "#ef4444", fill: "#fca5a5" },
-  generating: { stroke: "#f59e0b", fill: "#fcd34d" },
-  generated: { stroke: "#22c55e", fill: "#86efac" },
-  published: { stroke: "#8b5cf6", fill: "#c4b5fd" },
-};
-
-const TYPE_LABELS: Record<string, string> = {
-  supporting_info: "Info",
-  supporting_commercial: "Commercial",
-  transactional_local: "Local",
-  deep_page: "Deep",
-  pillar: "Pillar",
+  live: { label: "Live", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
+  rejected: { label: "Abgelehnt", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
 };
 
 function ClusterDetailPage() {
   const { id } = Route.useParams();
-  const [cluster, setCluster] = useState<Cluster | null>(null);
-  const [clusterPages, setClusterPages] = useState<ClusterPage[]>([]);
+  const [cluster, setCluster] = useState<ClusterRow | null>(null);
+  const [pages, setPages] = useState<ClusterPageRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [previewPage, setPreviewPage] = useState<ClusterPage | null>(null);
-  const [generateConfirm, setGenerateConfirm] = useState<ClusterPage | null>(null);
-  const [generating, setGenerating] = useState<string | null>(null);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const generatingRef = useRef<{ jobId: string; pageId: string } | null>(null);
 
-  const CLUSTER_GEN_KEY = "seo_os_cluster_gen";
-
-  const stopClusterPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
+  useEffect(() => {
+    async function load() {
+      const [clusterRes, pagesRes] = await Promise.all([
+        supabase.from("clusters").select("*").eq("id", id).single(),
+        supabase.from("cluster_pages").select("*").eq("cluster_id", id).order("priority"),
+      ]);
+      if (clusterRes.data) setCluster(clusterRes.data);
+      setPages(pagesRes.data || []);
+      setLoading(false);
     }
-  }, []);
-
-  const loadData = useCallback(async () => {
-    const [clusterRes, pagesRes] = await Promise.all([
-      supabase.from("clusters").select("*").eq("id", id).single(),
-      supabase.from("cluster_pages").select("*").eq("cluster_id", id).order("sort_order"),
-    ]);
-    if (clusterRes.data) setCluster(clusterRes.data as Cluster);
-    setClusterPages((pagesRes.data as ClusterPage[]) || []);
-    setLoading(false);
+    load();
   }, [id]);
 
-  useEffect(() => { loadData(); }, [loadData]);
-
-  const updateStatus = async (pageId: string, status: string) => {
-    await supabase.from("cluster_pages").update({ status }).eq("id", pageId);
-    setClusterPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, status } : p)));
-    if (previewPage?.id === pageId) setPreviewPage((prev) => prev ? { ...prev, status } : null);
-  };
-
-  const startClusterPolling = useCallback((jobId: string, pageId: string, pageKeyword: string) => {
-    if (pollingRef.current) return;
-    generatingRef.current = { jobId, pageId };
-    try { sessionStorage.setItem(CLUSTER_GEN_KEY, JSON.stringify({ jobId, pageId })); } catch {}
-
-    pollingRef.current = setInterval(async () => {
-      try {
-        const { data: job } = await supabase
-          .from("generation_jobs")
-          .select("status, page_id, error_message")
-          .eq("id", jobId)
-          .single();
-
-        if (!job) return;
-
-        if (job.status === "completed") {
-          stopClusterPolling();
-          try { sessionStorage.removeItem(CLUSTER_GEN_KEY); } catch {}
-          generatingRef.current = null;
-          if (job.page_id) {
-            setClusterPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, status: "generated", seo_page_id: job.page_id } : p)));
-          }
-          toast.success(`Seite "${pageKeyword}" wurde generiert`);
-          setGenerating(null);
-        }
-
-        if (job.status === "error") {
-          stopClusterPolling();
-          try { sessionStorage.removeItem(CLUSTER_GEN_KEY); } catch {}
-          generatingRef.current = null;
-          toast.error(job.error_message || "Generierung fehlgeschlagen");
-          await updateStatus(pageId, "approved");
-          setGenerating(null);
-        }
-      } catch (pollErr) {
-        console.error("Poll error:", pollErr);
+  // Group pages by kanban column
+  const columns = useMemo(() => {
+    const map = new Map<string, ClusterPageRow[]>();
+    KANBAN_COLUMNS.forEach((col) => map.set(col.key, []));
+    pages.forEach((p) => {
+      const key = toColumnKey(p.page_type);
+      const arr = map.get(key);
+      if (arr) {
+        arr.push(p);
+      } else {
+        // Unknown type → first column that exists, or skip
+        const fallback = map.get("deep_page");
+        if (fallback) fallback.push(p);
       }
-    }, 5000);
-  }, [stopClusterPolling, updateStatus]);
-
-  // Restore generation state on mount
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(CLUSTER_GEN_KEY);
-      if (!raw) return;
-      const { jobId, pageId } = JSON.parse(raw);
-      if (!jobId || !pageId) return;
-      setGenerating(pageId);
-      const page = clusterPages.find((p) => p.id === pageId);
-      startClusterPolling(jobId, pageId, page?.keyword || "");
-    } catch {}
-    return () => stopClusterPolling();
-  }, [clusterPages.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Resume polling on tab visibility change
-  useEffect(() => {
-    const handler = () => {
-      if (document.visibilityState !== "visible") return;
-      const cur = generatingRef.current;
-      if (cur && !pollingRef.current) {
-        const page = clusterPages.find((p) => p.id === cur.pageId);
-        startClusterPolling(cur.jobId, cur.pageId, page?.keyword || "");
-      }
-    };
-    document.addEventListener("visibilitychange", handler);
-    return () => document.removeEventListener("visibilitychange", handler);
-  }, [startClusterPolling, clusterPages]);
-
-  const handleGenerate = async (page: ClusterPage) => {
-    setGenerateConfirm(null);
-    setGenerating(page.id);
-    await updateStatus(page.id, "generating");
-
-    try {
-      // Get firm data
-      let firmData: Record<string, unknown> = {};
-      const clusterId = page.cluster_id;
-      if (clusterId) {
-        const { data: clusterData } = await supabase.from("clusters").select("firm_id").eq("id", clusterId).single();
-        if (clusterData?.firm_id) {
-          const { data } = await supabase.from("firms").select("*").eq("id", clusterData.firm_id).single();
-          if (data) firmData = data;
-        }
-      }
-
-      // Get sibling pages for internal linking
-      const siblings = clusterPages
-        .filter((p) => p.id !== page.id && p.status === "generated" && p.seo_page_id)
-        .map((p) => ({ keyword: p.keyword, slug: p.url_slug }));
-
-      // Session for auth header (userId is resolved server-side by n8n-proxy)
-
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const session = (await supabase.auth.getSession()).data.session;
-
-      const res = await fetch(`${supabaseUrl}/functions/v1/n8n-proxy`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({
-          keyword: page.keyword,
-          firm: (firmData as { name?: string })?.name || "",
-          city: (firmData as { city?: string })?.city || "",
-          phone: (firmData as { phone?: string })?.phone || "",
-          email: (firmData as { email?: string })?.email || "",
-          website: (firmData as { website?: string })?.website || "",
-          street: (firmData as { street?: string })?.street || "",
-          zip: (firmData as { zip?: string })?.zip || "",
-          serviceArea: (firmData as { service_area?: string })?.service_area || "",
-          activeSections: ["01", "02", "03", "04", "05", "09", "10", "13", "14", "15"],
-          designPreset: "trust",
-          primaryColor: "#1d4ed8",
-          uniqueData: "",
-          infoGain: "",
-          pillarKeyword: cluster?.main_keyword || "",
-          clusterSiblings: siblings,
-          clusterPageId: page.id,
-        }),
-      });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`n8n-proxy ${res.status}: ${errText}`);
-      }
-
-      const data = await res.json();
-
-      if (!data?.jobId) {
-        throw new Error(data?.error || "n8n hat keine jobId zurückgegeben");
-      }
-
-
-      toast.info("Generierung gestartet — dauert 2–4 Minuten. Tab-Wechsel ist sicher.");
-      startClusterPolling(data.jobId, page.id, page.keyword);
-    } catch (err) {
-      console.error(err);
-      toast.error("Generierung fehlgeschlagen");
-      await updateStatus(page.id, "approved");
-      setGenerating(null);
-    }
-  };
-
-  const stats = useMemo(() => {
-    const total = clusterPages.filter((p) => p.status !== "rejected").length;
-    const done = clusterPages.filter((p) => p.status === "generated" || p.status === "published").length;
-    return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
-  }, [clusterPages]);
-
-  // SVG cluster map
-  const nodes = useMemo(() => {
-    const cx = 400, cy = 250;
-    const active = clusterPages.filter((p) => p.status !== "rejected");
-    return active.map((p, i) => {
-      const angle = (2 * Math.PI * i) / Math.max(active.length, 1);
-      const radius = 140;
-      return {
-        ...p,
-        x: cx + Math.cos(angle) * radius,
-        y: cy + Math.sin(angle) * radius,
-      };
     });
-  }, [clusterPages]);
+    return map;
+  }, [pages]);
 
-  if (loading) return <div className="text-center py-12 text-muted-foreground">Lade Cluster…</div>;
-  if (!cluster) return <div className="text-center py-12"><p>Cluster nicht gefunden.</p><Button asChild><Link to="/cluster">Zurück</Link></Button></div>;
+  // Stats
+  const stats = useMemo(() => {
+    const total = pages.filter((p) => p.status !== "rejected").length;
+    const done = pages.filter((p) => p.status === "generated" || p.status === "published" || p.status === "live").length;
+    return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
+  }, [pages]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 gap-2 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" /> Lade Cluster…
+      </div>
+    );
+  }
+
+  if (!cluster) {
+    return (
+      <div className="text-center py-12 space-y-4">
+        <p className="text-muted-foreground">Cluster nicht gefunden.</p>
+        <Button asChild>
+          <Link to="/cluster">Zurück</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
-          <Link to="/cluster"><ArrowLeft className="h-4 w-4" /></Link>
+          <Link to="/cluster">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
         </Button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-foreground">{cluster.name}</h1>
-          <p className="text-sm text-muted-foreground">Pillar: {cluster.main_keyword}</p>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold text-foreground truncate">{cluster.name}</h1>
+          <p className="text-sm text-muted-foreground truncate">Haupt-Keyword: {cluster.main_keyword}</p>
         </div>
-        <div className="text-right">
-          <p className="text-sm font-medium">{stats.done} / {stats.total} Seiten generiert</p>
+        <div className="text-right shrink-0">
+          <p className="text-sm font-medium">
+            {stats.done} / {stats.total} Seiten generiert
+          </p>
           <Progress value={stats.pct} className="h-2 w-32 mt-1" />
         </div>
       </div>
 
-      {/* SVG Cluster Map */}
-      <TooltipProvider>
-        <Card>
-          <CardContent className="pt-4">
-            <svg viewBox="0 0 800 500" className="w-full h-[300px]">
-              {/* Pillar center */}
-              <circle cx={400} cy={250} r={24} fill="#fca5a5" stroke="#ef4444" strokeWidth={3} />
-              <text x={400} y={254} textAnchor="middle" className="fill-foreground text-[9px] font-semibold">
-                {cluster.main_keyword.length > 16 ? cluster.main_keyword.slice(0, 14) + "…" : cluster.main_keyword}
-              </text>
-              {/* Connections + Nodes */}
-              {nodes.map((node) => {
-                const nc = NODE_COLORS[node.status || "suggested"] || NODE_COLORS.suggested;
-                return (
-                  <g key={node.id}>
-                    <line x1={400} y1={250} x2={node.x} y2={node.y} stroke="currentColor" strokeOpacity={0.12} strokeWidth={1.5} />
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <circle
-                          cx={node.x} cy={node.y} r={16}
-                          fill={nc.fill} stroke={nc.stroke} strokeWidth={2}
-                          className="cursor-pointer" onClick={() => setPreviewPage(node)}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="font-medium">{node.keyword}</p>
-                        <p className="text-xs">{STATUS_CONFIG[node.status || "suggested"]?.label}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    <text x={node.x} y={node.y + 26} textAnchor="middle" className="fill-foreground text-[8px]">
-                      {node.keyword.length > 14 ? node.keyword.slice(0, 12) + "…" : node.keyword}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-          </CardContent>
-        </Card>
-      </TooltipProvider>
-
-      {/* Page table */}
-      <div className="rounded-lg border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Keyword</TableHead>
-              <TableHead>Typ</TableHead>
-              <TableHead>Priorität</TableHead>
-              <TableHead>Vol.</TableHead>
-              <TableHead>KD</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Aktionen</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {clusterPages.map((page) => (
-              <TableRow key={page.id} className={page.status === "rejected" ? "opacity-40 line-through" : ""}>
-                <TableCell className="font-medium">{page.keyword}</TableCell>
-                <TableCell><Badge variant="outline">{TYPE_LABELS[page.page_type] || page.page_type}</Badge></TableCell>
-                <TableCell><Badge variant="outline">{page.priority ?? 99}</Badge></TableCell>
-                <TableCell className="text-sm">{(page.search_volume || 0).toLocaleString()}</TableCell>
-                <TableCell className="text-sm">{page.keyword_difficulty || 0}</TableCell>
-                <TableCell>
-                  <Badge className={STATUS_CONFIG[page.status || "suggested"]?.color || ""}>
-                    {STATUS_CONFIG[page.status || "suggested"]?.label || page.status}
+      {/* Kanban Board */}
+      <ScrollArea className="w-full">
+        <div className="flex gap-3 pb-4 min-w-max">
+          {KANBAN_COLUMNS.map((col) => {
+            const colPages = columns.get(col.key) || [];
+            return (
+              <div
+                key={col.key}
+                className="w-[260px] shrink-0 rounded-lg border border-border bg-muted/30"
+              >
+                {/* Column header */}
+                <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-foreground">{col.label}</h3>
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                    {colPages.length}
                   </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex gap-1 justify-end">
-                    {page.status === "suggested" && (
-                      <>
-                        <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={() => setPreviewPage(page)}>
-                          <Eye className="h-3 w-3" /> Prüfen
-                        </Button>
-                        <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => updateStatus(page.id, "rejected")}>
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </>
-                    )}
-                    {page.status === "approved" && (
-                      <>
-                        <Button
-                          size="sm" className="gap-1 text-xs"
-                          disabled={generating === page.id}
-                          onClick={() => setGenerateConfirm(page)}
-                        >
-                          {generating === page.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
-                          Generieren
-                        </Button>
-                        <Button size="sm" variant="ghost" className="text-xs" onClick={() => updateStatus(page.id, "suggested")}>
-                          <RefreshCw className="h-3 w-3" />
-                        </Button>
-                      </>
-                    )}
-                    {page.status === "generated" && (
-                      <Button size="sm" variant="outline" className="text-xs" onClick={() => updateStatus(page.id, "published")}>
-                        <Check className="h-3 w-3 mr-1" /> Veröffentlichen
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Preview Sheet */}
-      <Sheet open={!!previewPage} onOpenChange={(open) => !open && setPreviewPage(null)}>
-        <SheetContent className="w-[400px] sm:w-[500px] overflow-y-auto">
-          {previewPage && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{previewPage.keyword}</SheetTitle>
-              </SheetHeader>
-              <div className="space-y-4 mt-4">
-                <div className="flex gap-2 flex-wrap">
-                  <Badge variant="outline">{TYPE_LABELS[previewPage.page_type] || previewPage.page_type}</Badge>
-                  <Badge variant="outline">Priorität: {previewPage.priority ?? 99}</Badge>
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-muted-foreground">Suchvolumen:</span> {(previewPage.search_volume || 0).toLocaleString()}</div>
-                  <div><span className="text-muted-foreground">KD:</span> {previewPage.keyword_difficulty || 0}</div>
-                </div>
-                {previewPage.ai_description && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase mb-1">Beschreibung</p>
-                    <p className="text-sm">{previewPage.ai_description}</p>
-                  </div>
-                )}
 
-                <div className="flex gap-2 pt-4 border-t border-border">
-                  {previewPage.status === "suggested" && (
-                    <>
-                      <Button className="flex-1 gap-1" onClick={() => { updateStatus(previewPage.id, "approved"); toast.success(`"${previewPage.keyword}" freigegeben`); }}>
-                        <Check className="h-4 w-4" /> Freigeben
-                      </Button>
-                      <Button variant="destructive" className="gap-1" onClick={() => { updateStatus(previewPage.id, "rejected"); setPreviewPage(null); }}>
-                        <X className="h-4 w-4" /> Ablehnen
-                      </Button>
-                    </>
+                {/* Cards */}
+                <div className="p-2 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto">
+                  {colPages.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-6">Keine Seiten</p>
                   )}
-                  {previewPage.status === "approved" && (
-                    <Button className="flex-1 gap-1" onClick={() => { setPreviewPage(null); setGenerateConfirm(previewPage); }}>
-                      <Zap className="h-4 w-4" /> Jetzt generieren
-                    </Button>
-                  )}
+                  {colPages.map((page) => (
+                    <ClusterPageCard key={page.id} page={page} />
+                  ))}
+                </div>
+
+                {/* More button */}
+                <div className="p-2 border-t border-border">
+                  <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground" disabled>
+                    Mehr vorschlagen
+                  </Button>
                 </div>
               </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      {/* Generate Confirmation Dialog */}
-      <Dialog open={!!generateConfirm} onOpenChange={(open) => !open && setGenerateConfirm(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Seite generieren?</DialogTitle>
-          </DialogHeader>
-          {generateConfirm && (
-            <p className="text-sm text-muted-foreground">
-              Seite "<span className="font-medium text-foreground">{generateConfirm.keyword}</span>" generieren?
-              Dies nutzt 1 Kie.AI-Generierung.
-            </p>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setGenerateConfirm(null)}>Abbrechen</Button>
-            <Button onClick={() => generateConfirm && handleGenerate(generateConfirm)}>Generieren</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            );
+          })}
+        </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
     </div>
+  );
+}
+
+function ClusterPageCard({ page }: { page: ClusterPageRow }) {
+  const score = calculateScore(page);
+  const status = page.status || "planned";
+  const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.planned;
+
+  return (
+    <Card className="shadow-sm">
+      <CardContent className="p-3 space-y-2">
+        {/* Keyword */}
+        <p className="font-semibold text-sm text-foreground leading-tight truncate">{page.keyword}</p>
+
+        {/* URL slug */}
+        <p className="text-[10px] text-muted-foreground font-mono truncate">/{page.url_slug}</p>
+
+        {/* Score bar */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+            <div
+              className={`h-full rounded-full ${scoreColor(score)}`}
+              style={{ width: `${Math.min(score, 100)}%` }}
+            />
+          </div>
+          <span className={`text-xs font-bold ${scoreTextColor(score)}`}>
+            {score}/100
+          </span>
+        </div>
+
+        {/* Metrics badges */}
+        <div className="flex gap-1 flex-wrap">
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+            Vol: {page.search_volume != null ? page.search_volume.toLocaleString() : "—"}
+          </Badge>
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+            KD: {page.keyword_difficulty != null ? page.keyword_difficulty : "—"}
+          </Badge>
+        </div>
+
+        {/* Status + Sub-cluster badges */}
+        <div className="flex gap-1 flex-wrap">
+          <Badge className={`text-[10px] px-1.5 py-0 ${statusCfg.color}`}>
+            {statusCfg.label}
+          </Badge>
+          {page.has_sub_cluster_potential && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/50 text-primary">
+              <Network className="h-2.5 w-2.5 mr-0.5" /> Sub-Cluster
+            </Badge>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex gap-1 pt-1">
+          <Button size="sm" className="flex-1 text-[11px] h-7 gap-1" disabled>
+            <Zap className="h-3 w-3" /> Generieren
+          </Button>
+          {page.has_sub_cluster_potential && (
+            <Button size="sm" variant="outline" className="text-[11px] h-7" disabled>
+              Sub-Cluster
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

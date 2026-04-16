@@ -200,7 +200,7 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
         if (!data) continue;
         if (["uploaded", "completed", "failed"].includes(data.nano_status!)) {
           setImageSlots((prev) => prev.map((s) => s.id === slot.id ? {
-            ...s, status: data.nano_status!, cloudinaryUrl: data.cloudinary_url || undefined,
+            ...s, status: toSlotStatus(data.nano_status!), cloudinaryUrl: data.cloudinary_url || undefined,
             nanoUrl: data.nano_url || undefined, altText: data.alt_text || s.altText,
           } : s));
         }

@@ -142,10 +142,8 @@ function ClusterListPage() {
             <p className="text-muted-foreground text-center max-w-md">
               Ein Cluster gruppiert eine Pillar-Seite mit allen zugehörigen Unterseiten zu einem Themengebiet.
             </p>
-            <Button asChild className="gap-2">
-              <Link to="/cluster/neu">
-                <PlusCircle className="h-4 w-4" /> Ersten Cluster anlegen
-              </Link>
+            <Button onClick={() => setModalOpen(true)} className="gap-2">
+              <PlusCircle className="h-4 w-4" /> Ersten Cluster anlegen
             </Button>
           </CardContent>
         </Card>

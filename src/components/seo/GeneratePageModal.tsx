@@ -30,6 +30,40 @@ import {
 } from "@/components/ui/collapsible";
 import { Loader2, ChevronRight, Info, Search, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import {
+  Dialog as PickerDialog,
+  DialogContent as PickerDialogContent,
+  DialogHeader as PickerDialogHeader,
+  DialogTitle as PickerDialogTitle,
+} from "@/components/ui/dialog";
+
+const PALETTES = [
+  { id: "trust_classic", name: "Trust Classic", colors: ["#1d4ed8", "#ffffff", "#dc2626"] },
+  { id: "german_precision", name: "German Precision", colors: ["#374151", "#f3f4f6", "#6b7280"] },
+  { id: "handwerk_pro", name: "Handwerk Pro", colors: ["#92400e", "#fef3c7", "#d97706"] },
+  { id: "luxury_dark", name: "Luxury Dark", colors: ["#111827", "#d4af37", "#1f2937"] },
+  { id: "futuristic_tech", name: "Futuristic Tech", colors: ["#0f0f1a", "#00f5ff", "#7c3aed"] },
+  { id: "glassmorphism", name: "Glassmorphism", colors: ["#e0e7ff", "#6366f1", "#f0f9ff"] },
+  { id: "berlin_urban", name: "Berlin Urban", colors: ["#18181b", "#e11d48", "#f4f4f5"] },
+  { id: "medical_clean", name: "Medical Clean", colors: ["#ecfdf5", "#059669", "#ffffff"] },
+  { id: "automotive", name: "Automotive", colors: ["#1e293b", "#94a3b8", "#f59e0b"] },
+  { id: "editorial_bold", name: "Editorial Bold", colors: ["#000000", "#ffffff", "#ef4444"] },
+  { id: "minimalist_swiss", name: "Minimalist Swiss", colors: ["#fafafa", "#171717", "#3b82f6"] },
+  { id: "gradient_flow", name: "Gradient Flow", colors: ["#8b5cf6", "#ec4899", "#06b6d4"] },
+  { id: "eco_green", name: "Eco Green", colors: ["#14532d", "#86efac", "#f0fdf4"] },
+  { id: "warm_trustful", name: "Warm Trustful", colors: ["#ea580c", "#fef9c3", "#1c1917"] },
+  { id: "brutalist_raw", name: "Brutalist Raw", colors: ["#fbbf24", "#000000", "#ffffff"] },
+];
+
+const ZIELGRUPPEN = [
+  { value: "privatkunden", label: "Privatkunden (Standard)" },
+  { value: "gewerblich", label: "Gewerblich / Vermieter" },
+  { value: "senioren", label: "Senioren / 60+" },
+  { value: "technik", label: "Technik-Affine / DIY" },
+  { value: "preisbewusst", label: "Preisbewusste Kunden" },
+  { value: "premium", label: "Premium-Kunden" },
+];
 
 type ClusterPageRow = Tables<"cluster_pages">;
 type ClusterRow = Tables<"clusters">;
@@ -53,6 +87,14 @@ export interface FirmData {
   author_certs?: string | null;
   rating?: number | null;
   review_count?: number | null;
+  design_philosophy?: string | null;
+  design_philosophy_custom?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  accent_color?: string | null;
+  target_audience?: string | null;
+  differentiation?: string | null;
+  theme_context?: string | null;
 }
 
 interface GeneratePageModalProps {
@@ -238,6 +280,31 @@ export function GeneratePageModal({
     getDefaultSections(clusterPage.page_type)
   );
 
+  // Design & context state
+  const resolveDesignPhilosophy = () => cluster.design_philosophy || selectedFirmObj?.design_philosophy || "trust_classic";
+  const selectedFirmObj = allFirms.find((f) => f.id === selectedFirmId) as (FirmData | undefined);
+  const [designOverride, setDesignOverride] = useState<string | null>(null);
+  const [designCustomOverride, setDesignCustomOverride] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [targetAudience, setTargetAudience] = useState("");
+  const [themeContext, setThemeContext] = useState("");
+  const [differentiation, setDifferentiation] = useState("");
+
+  // Init context from cluster/firm on open
+  useEffect(() => {
+    if (open) {
+      setTargetAudience(cluster.target_audience || selectedFirmObj?.target_audience || "privatkunden");
+      setThemeContext(cluster.theme_context || selectedFirmObj?.theme_context || "");
+      setDifferentiation(cluster.differentiation || selectedFirmObj?.differentiation || "");
+      setDesignOverride(null);
+      setDesignCustomOverride("");
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const activePhilosophy = designOverride || resolveDesignPhilosophy();
+  const activePalette = PALETTES.find((p) => p.id === activePhilosophy) || PALETTES[0];
+  const designSource = designOverride ? "Seiten-Override" : cluster.design_philosophy ? "geerbt von Cluster" : "geerbt von Firma";
+
   // Internal links — checkbox-based
   const [linkItems, setLinkItems] = useState<InternalLinkItem[]>(() => {
     const siblings = siblingPages
@@ -386,6 +453,14 @@ export function GeneratePageModal({
       kvaPrice,
       priceRange,
       designPreset,
+      designPhilosophy: activePhilosophy,
+      designPhilosophyCustom: designCustomOverride || cluster.design_philosophy_custom || selectedFirmObj?.design_philosophy_custom || "",
+      primaryColor: activePalette.colors[0],
+      secondaryColor: activePalette.colors[1],
+      accentColor: activePalette.colors[2],
+      targetAudience,
+      themeContext: themeContext.trim(),
+      differentiation: differentiation.trim(),
       outputMode,
       activeSections: activeSections.map((k) => {
         const sec = ALL_SECTIONS.find((s) => s.key === k);
@@ -408,6 +483,7 @@ export function GeneratePageModal({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(v) => { if (!generating && !v) onClose(); }}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -631,29 +707,44 @@ export function GeneratePageModal({
               {/* Design */}
               <div className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Design</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">Design-Preset</Label>
-                    <Select value={designPreset} onValueChange={setDesignPreset} disabled={generating}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="trust">Trust (Standard)</SelectItem>
-                        <SelectItem value="glassmorphism">Glassmorphism (Modern)</SelectItem>
-                        <SelectItem value="editorial">Editorial (Reduziert)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <div className="flex items-center gap-3 rounded-md border p-2.5">
+                  <div className="flex gap-1">
+                    {activePalette.colors.map((c, i) => (
+                      <span key={i} className="inline-block h-4 w-4 rounded-full border border-border/50" style={{ backgroundColor: c }} />
+                    ))}
                   </div>
-                  <div>
-                    <Label className="text-xs">Output-Mode</Label>
-                    <Select value={outputMode} onValueChange={setOutputMode} disabled={generating}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standalone">Standalone HTML</SelectItem>
-                        <SelectItem value="tinymce">TinyMCE / Contao</SelectItem>
-                        <SelectItem value="wordpress">WordPress</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{activePalette.name}</p>
+                    <p className="text-[10px] text-muted-foreground">({designSource})</p>
                   </div>
+                  <Button type="button" variant="outline" size="sm" className="h-7 text-[11px] shrink-0" onClick={() => setPickerOpen(true)} disabled={generating}>
+                    Ändern
+                  </Button>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded-full border border-border/50" style={{ backgroundColor: activePalette.colors[0] }} />
+                    Primär: {activePalette.colors[0]}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded-full border border-border/50" style={{ backgroundColor: activePalette.colors[1] }} />
+                    Sekundär: {activePalette.colors[1]}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded-full border border-border/50" style={{ backgroundColor: activePalette.colors[2] }} />
+                    Akzent: {activePalette.colors[2]}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs">Output-Mode</Label>
+                  <Select value={outputMode} onValueChange={setOutputMode} disabled={generating}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="standalone">Standalone HTML</SelectItem>
+                      <SelectItem value="tinymce">TinyMCE / Contao</SelectItem>
+                      <SelectItem value="wordpress">WordPress</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -772,6 +863,42 @@ export function GeneratePageModal({
                   Diese Seiten werden als interne Links in den Prompt eingebaut.
                 </p>
               </div>
+
+              {/* ── Kontext-Felder ── */}
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Kontext-Felder</p>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Zielgruppe</Label>
+                  <Select value={targetAudience} onValueChange={setTargetAudience} disabled={generating}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ZIELGRUPPEN.map((z) => (
+                        <SelectItem key={z.value} value={z.value}>{z.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Themen-Kontext</Label>
+                  <Textarea
+                    value={themeContext}
+                    onChange={(e) => setThemeContext(e.target.value)}
+                    placeholder="Spezifische Details für diese Seite..."
+                    rows={3}
+                    disabled={generating}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Differenzierung (Wettbewerbsvorteile)</Label>
+                  <Textarea
+                    value={differentiation}
+                    onChange={(e) => setDifferentiation(e.target.value)}
+                    placeholder={"Was bietet ihr konkret was Wettbewerber nicht bieten?\nz.B.: Einziger Miele-Spezialist in Pankow, Originalteile auf Lager"}
+                    rows={2}
+                    disabled={generating}
+                  />
+                </div>
+              </div>
             </CollapsibleContent>
           </Collapsible>
 
@@ -798,5 +925,49 @@ export function GeneratePageModal({
         </div>
       </DialogContent>
     </Dialog>
+
+      {/* Design Picker Modal */}
+      <PickerDialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <PickerDialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
+          <PickerDialogHeader>
+            <PickerDialogTitle>Design-Philosophie wählen</PickerDialogTitle>
+          </PickerDialogHeader>
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {PALETTES.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  setDesignOverride(p.id);
+                  setPickerOpen(false);
+                }}
+                className={cn(
+                  "rounded-lg border p-2 text-left transition-all hover:shadow-md cursor-pointer",
+                  (designOverride || activePhilosophy) === p.id
+                    ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                    : "border-border hover:border-muted-foreground/40"
+                )}
+              >
+                <p className="text-[11px] font-bold leading-tight truncate">{p.name}</p>
+                <div className="flex gap-1 mt-1.5">
+                  {p.colors.map((c, i) => (
+                    <span key={i} className="inline-block h-3.5 w-3.5 rounded-full border border-border/50" style={{ backgroundColor: c }} />
+                  ))}
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 space-y-1.5">
+            <Label className="text-xs">Eigene Design-Beschreibung (optional)</Label>
+            <Textarea
+              value={designCustomOverride}
+              onChange={(e) => setDesignCustomOverride(e.target.value)}
+              placeholder="Eigene Design-Beschreibung..."
+              rows={2}
+            />
+          </div>
+        </PickerDialogContent>
+      </PickerDialog>
+    </>
   );
 }

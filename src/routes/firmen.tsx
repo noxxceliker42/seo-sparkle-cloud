@@ -1,12 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,9 +34,44 @@ interface Firm {
   website: string | null;
   service_area: string | null;
   user_id: string;
+  oeffnungszeiten: string | null;
+  branche: string | null;
+  sprache: string | null;
+  author: string | null;
+  author_title: string | null;
+  author_experience: number | null;
+  author_certs: string | null;
+  rating: number | null;
+  review_count: number | null;
 }
 
-const emptyFirm = { name: "", street: "", city: "", zip: "", phone: "", email: "", website: "", service_area: "" };
+const emptyFirm = {
+  name: "", street: "", city: "", zip: "", phone: "", email: "", website: "", service_area: "",
+  oeffnungszeiten: "", branche: "hausgeraete", sprache: "de",
+  author: "", author_title: "", author_experience: "", author_certs: "",
+  rating: "", review_count: "",
+};
+
+const BRANCHEN = [
+  { value: "hausgeraete", label: "Hausgeräte" },
+  { value: "kfz", label: "KFZ" },
+  { value: "handwerk", label: "Handwerk" },
+  { value: "immobilien", label: "Immobilien" },
+  { value: "gesundheit", label: "Gesundheit" },
+  { value: "gastronomie", label: "Gastronomie" },
+  { value: "steuer-recht", label: "Steuer & Recht" },
+  { value: "it-tech", label: "IT & Tech" },
+  { value: "beauty-wellness", label: "Beauty & Wellness" },
+  { value: "bildung", label: "Bildung" },
+  { value: "ecommerce", label: "E-Commerce" },
+  { value: "bau-sanierung", label: "Bau & Sanierung" },
+];
+
+const SPRACHEN = [
+  { value: "de", label: "Deutsch" },
+  { value: "en", label: "English" },
+  { value: "tr", label: "Türkçe" },
+];
 
 function FirmenPage() {
   const [firms, setFirms] = useState<Firm[]>([]);
@@ -77,9 +115,38 @@ function FirmenPage() {
       email: firm.email || "",
       website: firm.website || "",
       service_area: firm.service_area || "",
+      oeffnungszeiten: firm.oeffnungszeiten || "",
+      branche: firm.branche || "hausgeraete",
+      sprache: firm.sprache || "de",
+      author: firm.author || "",
+      author_title: firm.author_title || "",
+      author_experience: firm.author_experience?.toString() || "",
+      author_certs: firm.author_certs || "",
+      rating: firm.rating?.toString() || "",
+      review_count: firm.review_count?.toString() || "",
     });
     setDialogOpen(true);
   };
+
+  const buildPayload = () => ({
+    name: form.name.trim(),
+    street: form.street || null,
+    city: form.city || null,
+    zip: form.zip || null,
+    phone: form.phone || null,
+    email: form.email || null,
+    website: form.website || null,
+    service_area: form.service_area || null,
+    oeffnungszeiten: form.oeffnungszeiten || null,
+    branche: form.branche || "hausgeraete",
+    sprache: form.sprache || "de",
+    author: form.author || null,
+    author_title: form.author_title || null,
+    author_experience: form.author_experience ? parseInt(form.author_experience) : null,
+    author_certs: form.author_certs || null,
+    rating: form.rating ? parseFloat(form.rating) : null,
+    review_count: form.review_count ? parseInt(form.review_count) : null,
+  });
 
   const handleSave = async () => {
     if (!validate()) return;
@@ -91,35 +158,27 @@ function FirmenPage() {
       const userId = user?.id;
 
       if (!userId && !editId) {
-        setApiError("Nicht angemeldet. Bitte zuerst einloggen.");
+        setApiError("Nicht angemeldet.");
         setSaving(false);
         return;
       }
 
+      const payload = buildPayload();
+
       if (editId) {
-        const { error } = await supabase.from("firms").update({
-          name: form.name, street: form.street || null, city: form.city || null,
-          zip: form.zip || null, phone: form.phone || null, email: form.email || null,
-          website: form.website || null, service_area: form.service_area || null,
-        }).eq("id", editId);
-        if (error) { console.error(error); setApiError(error.message); setSaving(false); return; }
+        const { error } = await supabase.from("firms").update(payload).eq("id", editId);
+        if (error) { setApiError(error.message); setSaving(false); return; }
         toast.success(`Firma "${form.name}" aktualisiert`);
       } else {
-        const { error } = await supabase.from("firms").insert({
-          name: form.name, street: form.street || null, city: form.city || null,
-          zip: form.zip || null, phone: form.phone || null, email: form.email || null,
-          website: form.website || null, service_area: form.service_area || null,
-          user_id: userId!,
-        });
-        if (error) { console.error(error); setApiError(error.message); setSaving(false); return; }
-        toast.success(`Mandant "${form.name}" wurde angelegt`);
+        const { error } = await supabase.from("firms").insert({ ...payload, user_id: userId! });
+        if (error) { setApiError(error.message); setSaving(false); return; }
+        toast.success(`Mandant "${form.name}" angelegt`);
       }
 
       setSaving(false);
       setDialogOpen(false);
       loadFirms();
-    } catch (err) {
-      console.error(err);
+    } catch {
       setApiError("Unerwarteter Fehler.");
       setSaving(false);
     }
@@ -164,8 +223,8 @@ function FirmenPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Stadt</TableHead>
+                <TableHead>Branche</TableHead>
                 <TableHead>Telefon</TableHead>
-                <TableHead>Website</TableHead>
                 <TableHead className="text-right">Aktionen</TableHead>
               </TableRow>
             </TableHeader>
@@ -174,8 +233,8 @@ function FirmenPage() {
                 <TableRow key={firm.id}>
                   <TableCell className="font-medium">{firm.name}</TableCell>
                   <TableCell>{firm.city || "–"}</TableCell>
+                  <TableCell className="text-sm">{BRANCHEN.find(b => b.value === firm.branche)?.label || firm.branche || "–"}</TableCell>
                   <TableCell>{firm.phone || "–"}</TableCell>
-                  <TableCell className="text-sm">{firm.website || "–"}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex gap-1 justify-end">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(firm)}><Pencil className="h-4 w-4" /></Button>
@@ -189,9 +248,8 @@ function FirmenPage() {
         </div>
       )}
 
-      {/* Form Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editId ? "Firma bearbeiten" : "Neue Firma"}</DialogTitle>
           </DialogHeader>
@@ -202,47 +260,130 @@ function FirmenPage() {
             </div>
           )}
 
-          <div className="grid gap-4 mt-4">
-            <div>
-              <Label className="text-sm">Firmenname *</Label>
-              <Input value={form.name} onChange={(e) => setField("name", e.target.value)} className={`mt-1 ${errors.name ? "border-destructive" : ""}`} />
-              {errors.name && <p className="text-xs text-destructive mt-1">{errors.name}</p>}
-            </div>
-            <div>
-              <Label className="text-sm">Straße + Nr.</Label>
-              <Input value={form.street} onChange={(e) => setField("street", e.target.value)} className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-sm">PLZ</Label>
-              <Input value={form.zip} onChange={(e) => setField("zip", e.target.value)} className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-sm">Stadt</Label>
-              <Input value={form.city} onChange={(e) => setField("city", e.target.value)} className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-sm">Telefon *</Label>
-              <Input value={form.phone} onChange={(e) => setField("phone", e.target.value)} className={`mt-1 ${errors.phone ? "border-destructive" : ""}`} />
-              {errors.phone && <p className="text-xs text-destructive mt-1">{errors.phone}</p>}
-            </div>
-            <div>
-              <Label className="text-sm">E-Mail</Label>
-              <Input value={form.email} onChange={(e) => setField("email", e.target.value)} className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-sm">Website</Label>
-              <Input value={form.website} onChange={(e) => setField("website", e.target.value)} className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-sm">Servicegebiet</Label>
-              <Input value={form.service_area} onChange={(e) => setField("service_area", e.target.value)} className="mt-1" />
-            </div>
-            <Button onClick={handleSave} disabled={saving || !isValid} className="w-full mt-2 min-h-[44px]">
-              {saving ? (
-                <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Wird gespeichert…</span>
-              ) : editId ? "Aktualisieren" : "Mandant anlegen"}
-            </Button>
-          </div>
+          <Tabs defaultValue="stammdaten" className="mt-2">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="stammdaten">Stammdaten</TabsTrigger>
+              <TabsTrigger value="betrieb">Betrieb</TabsTrigger>
+              <TabsTrigger value="eeat">Autor / E-E-A-T</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="stammdaten" className="space-y-3 mt-4">
+              <div>
+                <Label className="text-sm">Firmenname *</Label>
+                <Input value={form.name} onChange={(e) => setField("name", e.target.value)} className={`mt-1 ${errors.name ? "border-destructive" : ""}`} />
+                {errors.name && <p className="text-xs text-destructive mt-1">{errors.name}</p>}
+              </div>
+              <div>
+                <Label className="text-sm">Straße + Nr.</Label>
+                <Input value={form.street} onChange={(e) => setField("street", e.target.value)} className="mt-1" />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-sm">PLZ</Label>
+                  <Input value={form.zip} onChange={(e) => setField("zip", e.target.value)} className="mt-1" />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-sm">Stadt</Label>
+                  <Input value={form.city} onChange={(e) => setField("city", e.target.value)} className="mt-1" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-sm">Telefon *</Label>
+                  <Input value={form.phone} onChange={(e) => setField("phone", e.target.value)} className={`mt-1 ${errors.phone ? "border-destructive" : ""}`} />
+                  {errors.phone && <p className="text-xs text-destructive mt-1">{errors.phone}</p>}
+                </div>
+                <div>
+                  <Label className="text-sm">E-Mail</Label>
+                  <Input value={form.email} onChange={(e) => setField("email", e.target.value)} className="mt-1" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Website</Label>
+                <Input value={form.website} onChange={(e) => setField("website", e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-sm">Servicegebiet</Label>
+                <Input value={form.service_area} onChange={(e) => setField("service_area", e.target.value)} className="mt-1" placeholder="Berlin & Umland" />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="betrieb" className="space-y-3 mt-4">
+              <div>
+                <Label className="text-sm">Öffnungszeiten</Label>
+                <Textarea
+                  value={form.oeffnungszeiten}
+                  onChange={(e) => setField("oeffnungszeiten", e.target.value)}
+                  placeholder="Mo-Fr 8-18 Uhr, Sa 9-14 Uhr"
+                  className="mt-1"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <Label className="text-sm">Branche</Label>
+                <Select value={form.branche} onValueChange={(v) => setField("branche", v)}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {BRANCHEN.map((b) => (
+                      <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Sprache</Label>
+                <Select value={form.sprache} onValueChange={(v) => setField("sprache", v)}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SPRACHEN.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="eeat" className="space-y-3 mt-4">
+              <div>
+                <Label className="text-sm">Autor / Inhaber Name</Label>
+                <Input value={form.author} onChange={(e) => setField("author", e.target.value)} className="mt-1" placeholder="Max Mustermann" />
+              </div>
+              <div>
+                <Label className="text-sm">Berufsbezeichnung</Label>
+                <Input value={form.author_title} onChange={(e) => setField("author_title", e.target.value)} className="mt-1" placeholder="Meister für Hausgerätetechnik" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-sm">Erfahrung (Jahre)</Label>
+                  <Input type="number" value={form.author_experience} onChange={(e) => setField("author_experience", e.target.value)} className="mt-1" min={0} />
+                </div>
+                <div>
+                  <Label className="text-sm">Rating (z.B. 4.8)</Label>
+                  <Input type="number" step="0.1" min="1" max="5" value={form.rating} onChange={(e) => setField("rating", e.target.value)} className="mt-1" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Anzahl Bewertungen</Label>
+                <Input type="number" value={form.review_count} onChange={(e) => setField("review_count", e.target.value)} className="mt-1" min={0} />
+              </div>
+              <div>
+                <Label className="text-sm">Zertifikate / Qualifikationen</Label>
+                <Textarea
+                  value={form.author_certs}
+                  onChange={(e) => setField("author_certs", e.target.value)}
+                  placeholder="Meisterbrief, TÜV-zertifiziert, …"
+                  className="mt-1"
+                  rows={3}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <Button onClick={handleSave} disabled={saving || !isValid} className="w-full mt-4 min-h-[44px]">
+            {saving ? (
+              <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Wird gespeichert…</span>
+            ) : editId ? "Aktualisieren" : "Mandant anlegen"}
+          </Button>
         </DialogContent>
       </Dialog>
     </div>

@@ -289,39 +289,66 @@ export type Database = {
       }
       firms: {
         Row: {
+          author: string | null
+          author_certs: string | null
+          author_experience: number | null
+          author_title: string | null
+          branche: string | null
           city: string | null
           created_at: string | null
           email: string | null
           id: string
           name: string
+          oeffnungszeiten: string | null
           phone: string | null
+          rating: number | null
+          review_count: number | null
           service_area: string | null
+          sprache: string | null
           street: string | null
           user_id: string
           website: string | null
           zip: string | null
         }
         Insert: {
+          author?: string | null
+          author_certs?: string | null
+          author_experience?: number | null
+          author_title?: string | null
+          branche?: string | null
           city?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           name: string
+          oeffnungszeiten?: string | null
           phone?: string | null
+          rating?: number | null
+          review_count?: number | null
           service_area?: string | null
+          sprache?: string | null
           street?: string | null
           user_id: string
           website?: string | null
           zip?: string | null
         }
         Update: {
+          author?: string | null
+          author_certs?: string | null
+          author_experience?: number | null
+          author_title?: string | null
+          branche?: string | null
           city?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           name?: string
+          oeffnungszeiten?: string | null
           phone?: string | null
+          rating?: number | null
+          review_count?: number | null
           service_area?: string | null
+          sprache?: string | null
           street?: string | null
           user_id?: string
           website?: string | null

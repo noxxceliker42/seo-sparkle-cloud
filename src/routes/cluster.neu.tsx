@@ -176,7 +176,7 @@ function ClusterNeuPage() {
         .from("clusters")
         .insert({
           name: clusterName,
-          pillar_keyword: pillarKeyword.trim(),
+          main_keyword: pillarKeyword.trim(),
           firm_id: selectedFirm?.id || null,
           user_id: user.id,
           status: "active",
@@ -195,18 +195,14 @@ function ClusterNeuPage() {
       const pagesToInsert = selectedPages.map((p) => ({
         cluster_id: cluster.id,
         keyword: p.keyword,
+        url_slug: p.keyword.toLowerCase().replace(/[^a-z0-9äöüß]+/g, "-").replace(/^-|-$/g, ""),
         page_type: p.page_type,
-        intent: p.intent,
-        priority: p.priority,
-        reason: p.reason,
-        content_angle: p.content_angle,
-        differentiator: p.differentiator,
-        internal_link_anchor: p.internal_link_anchor,
-        estimated_volume: p.estimated_volume,
-        estimated_difficulty: p.estimated_difficulty,
-        firm_id: p.firm_id,
+        ai_description: [p.reason, p.content_angle, p.differentiator].filter(Boolean).join(" | ") || null,
+        search_volume: p.estimated_volume || null,
+        keyword_difficulty: p.estimated_difficulty || null,
+        priority: p.sort_order ?? 99,
+        user_id: user.id,
         status: "suggested",
-        sort_order: p.sort_order,
       }));
 
       const { error: pagesErr } = await supabase.from("cluster_pages").insert(pagesToInsert);

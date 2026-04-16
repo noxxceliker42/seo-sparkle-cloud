@@ -129,10 +129,8 @@ function ClusterListPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Meine Cluster</h1>
-        <Button asChild className="gap-2">
-          <Link to="/cluster/neu">
-            <PlusCircle className="h-4 w-4" /> Neuen Cluster starten
-          </Link>
+        <Button onClick={() => setModalOpen(true)} className="gap-2">
+          <PlusCircle className="h-4 w-4" /> Neuen Cluster starten
         </Button>
       </div>
 

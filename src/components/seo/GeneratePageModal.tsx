@@ -446,46 +446,87 @@ export function GeneratePageModal({
 
           {/* ── SEKTION 2: Pflicht-Felder ── */}
           <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="gpm-unique">
-                Was macht diese Seite einzigartig? <span className="text-destructive">*</span>
-              </Label>
-              <Textarea
-                ref={uniqueRef}
-                id="gpm-unique"
-                placeholder="Eigene Daten, Statistiken, Erfahrungswerte, konkrete Zahlen, echte Kundenerfahrungen..."
-                value={uniqueData}
-                onChange={(e) => setUniqueData(e.target.value)}
-                disabled={generating}
-                rows={3}
-              />
-            </div>
+            {aiLoading && !aiLoaded ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Was macht diese Seite einzigartig? <span className="text-destructive">*</span></Label>
+                  <Skeleton className="h-20 w-full rounded-md" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Welchen Mehrwert bietet diese Seite? <span className="text-destructive">*</span></Label>
+                  <Skeleton className="h-20 w-full rounded-md" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>USP-Fokus (optional)</Label>
+                  <Skeleton className="h-9 w-full rounded-md" />
+                </div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin" /> KI analysiert Keyword…
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="gpm-unique">
+                    Was macht diese Seite einzigartig? <span className="text-destructive">*</span>
+                  </Label>
+                  <Textarea
+                    ref={uniqueRef}
+                    id="gpm-unique"
+                    placeholder="Eigene Daten, Statistiken, Erfahrungswerte, konkrete Zahlen, echte Kundenerfahrungen..."
+                    value={uniqueData}
+                    onChange={(e) => setUniqueData(e.target.value)}
+                    disabled={generating}
+                    rows={3}
+                  />
+                </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="gpm-infogain">
-                Welchen Mehrwert bietet diese Seite? <span className="text-destructive">*</span>
-              </Label>
-              <Textarea
-                ref={infoGainRef}
-                id="gpm-infogain"
-                placeholder="Neue Perspektive, exklusive Einblicke, praktische Anleitungen, Informationen die Wettbewerber nicht haben..."
-                value={informationGain}
-                onChange={(e) => setInformationGain(e.target.value)}
-                disabled={generating}
-                rows={3}
-              />
-            </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="gpm-infogain">
+                    Welchen Mehrwert bietet diese Seite? <span className="text-destructive">*</span>
+                  </Label>
+                  <Textarea
+                    ref={infoGainRef}
+                    id="gpm-infogain"
+                    placeholder="Neue Perspektive, exklusive Einblicke, praktische Anleitungen, Informationen die Wettbewerber nicht haben..."
+                    value={informationGain}
+                    onChange={(e) => setInformationGain(e.target.value)}
+                    disabled={generating}
+                    rows={3}
+                  />
+                </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="gpm-usp">USP-Fokus (optional)</Label>
-              <Input
-                id="gpm-usp"
-                placeholder="z.B. 24h Notdienst, Original-Ersatzteile, 15 Jahre Erfahrung"
-                value={uspFokus}
-                onChange={(e) => setUspFokus(e.target.value)}
-                disabled={generating}
-              />
-            </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="gpm-usp">USP-Fokus (optional)</Label>
+                  <Input
+                    id="gpm-usp"
+                    placeholder="z.B. 24h Notdienst, Original-Ersatzteile, 15 Jahre Erfahrung"
+                    value={uspFokus}
+                    onChange={(e) => setUspFokus(e.target.value)}
+                    disabled={generating}
+                  />
+                </div>
+
+                {aiLoaded && (
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] text-muted-foreground">
+                      KI-Vorschlag — bitte anpassen und ergänzen
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-[11px] gap-1 px-2"
+                      onClick={() => fetchAiSuggestions()}
+                      disabled={aiLoading || generating}
+                    >
+                      {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                      Neu generieren
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* ── SEKTION 3: Firmen-Daten (Accordion) ── */}

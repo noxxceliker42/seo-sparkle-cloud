@@ -160,8 +160,8 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
     })();
   }, [page.cluster_info, page.id]);
 
-  const updatePage = useCallback(async (fields: Record<string, unknown>) => {
-    const { error } = await supabase.from("seo_pages").update(fields).eq("id", page.id);
+  const updatePage = useCallback(async (fields: Partial<SeoPage>) => {
+    const { error } = await supabase.from("seo_pages").update(fields as any).eq("id", page.id);
     if (error) { toast.error("Fehler: " + error.message); return; }
     const updated = { ...page, ...fields } as SeoPage;
     setPage(updated);

@@ -78,9 +78,9 @@ function readStorage(): { jobId: string; keyword: string; clusterPageId?: string
   }
 }
 
-function writeStorage(jobId: string, keyword: string) {
+function writeStorage(jobId: string, keyword: string, clusterPageId?: string) {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ jobId, keyword }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ jobId, keyword, clusterPageId }));
   } catch {}
 }
 

@@ -218,6 +218,17 @@ export function useGenerationJob() {
     const stored = readStorage();
     if (!stored?.jobId) return;
 
+    // Timeout: clear jobs older than 10 minutes
+    if (stored.timestamp) {
+      const jobAge = Date.now() - new Date(stored.timestamp).getTime();
+      if (jobAge > POLLING_TIMEOUT_MS) {
+        console.warn("Job-Timeout — automatisch bereinigt");
+        clearStorage();
+        setState({ jobId: "", generating: false, error: "Generierung abgelaufen (Timeout nach 10 Min). Bitte erneut starten.", htmlWarning: "", result: null });
+        return;
+      }
+    }
+
     setState((prev) => ({ ...prev, generating: true, jobId: stored.jobId, error: "" }));
 
     void (async () => {

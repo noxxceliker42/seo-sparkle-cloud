@@ -58,9 +58,29 @@ interface ClusterWithPages extends ClusterRow {
 function ClusterListPage() {
   const [clusters, setClusters] = useState<ClusterWithPages[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [activeFirm, setActiveFirm] = useState<{ id: string; name: string; city?: string | null; service_area?: string | null } | null>(null);
 
   useEffect(() => {
     async function load() {
+      // Load active firm from profile
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("firm_id")
+          .eq("id", session.user.id)
+          .single();
+        if (profile?.firm_id) {
+          const { data: firm } = await supabase
+            .from("firms")
+            .select("id, name, city, service_area")
+            .eq("id", profile.firm_id)
+            .single();
+          if (firm) setActiveFirm(firm);
+        }
+      }
+
       const { data: clusterData } = await supabase
         .from("clusters")
         .select("*")

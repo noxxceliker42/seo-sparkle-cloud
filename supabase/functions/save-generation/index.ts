@@ -31,6 +31,18 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Resolve userId from JWT if available, fallback to body.userId
+    let resolvedUserId: string | null = body.userId || null;
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser(
+          authHeader.replace("Bearer ", "")
+        );
+        if (user?.id) resolvedUserId = user.id;
+      } catch (_) { /* keep body fallback */ }
+    }
+
     // ── ACTION: create_job ──────────────────────────────────
     if (action === "create_job") {
       const { jobId, userId, keyword, status, triggeredBy } = body;

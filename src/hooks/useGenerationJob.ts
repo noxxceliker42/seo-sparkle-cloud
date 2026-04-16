@@ -1,6 +1,49 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+/** Parse internal links from generated HTML */
+function parseInternalLinks(html: string): Array<{ href: string; text: string }> {
+  if (!html) return [];
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    const anchors = doc.querySelectorAll("a[href]");
+    const internal: Array<{ href: string; text: string }> = [];
+    anchors.forEach((a) => {
+      const href = a.getAttribute("href") || "";
+      if (href.startsWith("/") || href.startsWith("./") || href.startsWith("#")) {
+        internal.push({ href, text: a.textContent?.trim() || href });
+      }
+    });
+    return internal;
+  } catch {
+    return [];
+  }
+}
+
+/** Save parsed internal links to seo_pages and optionally cluster_pages */
+async function saveInternalLinks(
+  pageId: string | null,
+  clusterPageId: string | null,
+  html: string
+) {
+  if (!pageId || !html) return;
+  const links = parseInternalLinks(html);
+  if (links.length === 0) return;
+
+  await supabase
+    .from("seo_pages")
+    .update({ internal_links: links as any })
+    .eq("id", pageId);
+
+  if (clusterPageId) {
+    await supabase
+      .from("cluster_pages")
+      .update({ internal_links_list: links as any })
+      .eq("id", clusterPageId);
+  }
+}
+
 const STORAGE_KEY = "seo_os_generation_job";
 
 interface GenerationJobState {
@@ -26,7 +69,7 @@ export interface GenerationJobResult {
   stopReason: string;
 }
 
-function readStorage(): { jobId: string; keyword: string } | null {
+function readStorage(): { jobId: string; keyword: string; clusterPageId?: string } | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -35,9 +78,9 @@ function readStorage(): { jobId: string; keyword: string } | null {
   }
 }
 
-function writeStorage(jobId: string, keyword: string) {
+function writeStorage(jobId: string, keyword: string, clusterPageId?: string) {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ jobId, keyword }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ jobId, keyword, clusterPageId }));
   } catch {}
 }
 
@@ -95,15 +138,21 @@ export function useGenerationJob() {
 
       if (job.status === "completed") {
         stopPolling();
+        const stored = readStorage();
         clearStorage();
         const html = (job as any).html_output || "";
+        const pageId = (job as any).page_id || null;
+
+        // Parse and save internal links in background
+        void saveInternalLinks(pageId, stored?.clusterPageId || null, html);
+
         setState({
           jobId: "",
           generating: false,
           error: "",
           htmlWarning: checkHtmlCompleteness(html),
           result: {
-            pageId: (job as any).page_id || null,
+            pageId,
             htmlOutput: html,
             bodyContent: (job as any).body_content || "",
             cssBlock: (job as any).css_block || "",
@@ -163,15 +212,20 @@ export function useGenerationJob() {
       }
 
       if (job.status === "completed") {
+        const clusterPageId = stored.clusterPageId || null;
         clearStorage();
         const html = (job as any).html_output || "";
+        const pageId = (job as any).page_id || null;
+
+        void saveInternalLinks(pageId, clusterPageId, html);
+
         setState({
           jobId: "",
           generating: false,
           error: "",
           htmlWarning: checkHtmlCompleteness(html),
           result: {
-            pageId: (job as any).page_id || null,
+            pageId,
             htmlOutput: html,
             bodyContent: (job as any).body_content || "",
             cssBlock: (job as any).css_block || "",
@@ -250,7 +304,7 @@ export function useGenerationJob() {
         throw new Error(result?.error || "n8n hat keine jobId zurückgegeben");
       }
 
-      writeStorage(result.jobId, (formData.keyword as string) || "");
+      writeStorage(result.jobId, (formData.keyword as string) || "", (formData.clusterPageId as string) || undefined);
       setState((prev) => ({ ...prev, jobId: result.jobId }));
       startPolling(result.jobId);
     } catch (err) {

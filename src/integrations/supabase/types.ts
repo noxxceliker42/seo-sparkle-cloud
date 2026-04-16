@@ -610,6 +610,50 @@ export type Database = {
           },
         ]
       }
+      page_versions: {
+        Row: {
+          created_at: string | null
+          html_output: string | null
+          id: string
+          json_ld: string | null
+          meta_desc: string | null
+          meta_title: string | null
+          seo_page_id: string | null
+          user_id: string | null
+          version_number: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          html_output?: string | null
+          id?: string
+          json_ld?: string | null
+          meta_desc?: string | null
+          meta_title?: string | null
+          seo_page_id?: string | null
+          user_id?: string | null
+          version_number?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          html_output?: string | null
+          id?: string
+          json_ld?: string | null
+          meta_desc?: string | null
+          meta_title?: string | null
+          seo_page_id?: string | null
+          user_id?: string | null
+          version_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_versions_seo_page_id_fkey"
+            columns: ["seo_page_id"]
+            isOneToOne: false
+            referencedRelation: "seo_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       process_logs: {
         Row: {
           created_at: string | null
@@ -876,8 +920,12 @@ export type Database = {
           meta_keywords: string | null
           meta_title: string | null
           page_type: string | null
+          published_url: string | null
+          qa_score: number | null
           score: number | null
+          sitemap_added: boolean | null
           status: string | null
+          status_changed_at: string | null
           updated_at: string | null
           user_id: string
         }
@@ -901,8 +949,12 @@ export type Database = {
           meta_keywords?: string | null
           meta_title?: string | null
           page_type?: string | null
+          published_url?: string | null
+          qa_score?: number | null
           score?: number | null
+          sitemap_added?: boolean | null
           status?: string | null
+          status_changed_at?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -926,8 +978,12 @@ export type Database = {
           meta_keywords?: string | null
           meta_title?: string | null
           page_type?: string | null
+          published_url?: string | null
+          qa_score?: number | null
           score?: number | null
+          sitemap_added?: boolean | null
           status?: string | null
+          status_changed_at?: string | null
           updated_at?: string | null
           user_id?: string
         }

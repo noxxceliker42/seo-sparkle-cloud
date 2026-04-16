@@ -706,29 +706,44 @@ export function GeneratePageModal({
               {/* Design */}
               <div className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Design</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">Design-Preset</Label>
-                    <Select value={designPreset} onValueChange={setDesignPreset} disabled={generating}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="trust">Trust (Standard)</SelectItem>
-                        <SelectItem value="glassmorphism">Glassmorphism (Modern)</SelectItem>
-                        <SelectItem value="editorial">Editorial (Reduziert)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <div className="flex items-center gap-3 rounded-md border p-2.5">
+                  <div className="flex gap-1">
+                    {activePalette.colors.map((c, i) => (
+                      <span key={i} className="inline-block h-4 w-4 rounded-full border border-border/50" style={{ backgroundColor: c }} />
+                    ))}
                   </div>
-                  <div>
-                    <Label className="text-xs">Output-Mode</Label>
-                    <Select value={outputMode} onValueChange={setOutputMode} disabled={generating}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standalone">Standalone HTML</SelectItem>
-                        <SelectItem value="tinymce">TinyMCE / Contao</SelectItem>
-                        <SelectItem value="wordpress">WordPress</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{activePalette.name}</p>
+                    <p className="text-[10px] text-muted-foreground">({designSource})</p>
                   </div>
+                  <Button type="button" variant="outline" size="sm" className="h-7 text-[11px] shrink-0" onClick={() => setPickerOpen(true)} disabled={generating}>
+                    Ändern
+                  </Button>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded-full border border-border/50" style={{ backgroundColor: activePalette.colors[0] }} />
+                    Primär: {activePalette.colors[0]}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded-full border border-border/50" style={{ backgroundColor: activePalette.colors[1] }} />
+                    Sekundär: {activePalette.colors[1]}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded-full border border-border/50" style={{ backgroundColor: activePalette.colors[2] }} />
+                    Akzent: {activePalette.colors[2]}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs">Output-Mode</Label>
+                  <Select value={outputMode} onValueChange={setOutputMode} disabled={generating}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="standalone">Standalone HTML</SelectItem>
+                      <SelectItem value="tinymce">TinyMCE / Contao</SelectItem>
+                      <SelectItem value="wordpress">WordPress</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

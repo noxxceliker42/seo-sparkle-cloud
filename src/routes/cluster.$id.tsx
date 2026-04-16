@@ -691,45 +691,90 @@ interface LinksModalProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   page: ClusterPageRow;
+  clusterId: string;
   onLinksSet: (links: Array<{ keyword: string; slug: string }>) => void;
 }
 
-function LinksModal({ open, onOpenChange, page, onLinksSet }: LinksModalProps) {
-  const [links, setLinks] = useState<Array<{ keyword: string; slug: string; checked: boolean }>>([]);
+function LinksModal({ open, onOpenChange, page, clusterId, onLinksSet }: LinksModalProps) {
+  const [siblings, setSiblings] = useState<Array<{ id: string; keyword: string; url_slug: string; status: string | null; page_type: string; checked: boolean }>>([]);
+  const [claudeLinks, setClaudeLinks] = useState<Array<{ keyword: string; slug: string }>>([]);
   const [saving, setSaving] = useState(false);
+  const [loadingSiblings, setLoadingSiblings] = useState(true);
+  const [resolvedClusterId, setResolvedClusterId] = useState(clusterId);
 
   useEffect(() => {
     if (!open) return;
-    // Parse internal_links from seo_pages via seo_page_id
-    async function loadLinks() {
-      if (!page.seo_page_id) return;
-      const { data } = await supabase
-        .from("seo_pages")
-        .select("internal_links")
-        .eq("id", page.seo_page_id)
-        .single();
 
-      if (!data?.internal_links) return;
+    async function load() {
+      setLoadingSiblings(true);
 
-      const rawLinks = data.internal_links as Array<{ keyword?: string; slug?: string; url?: string }>;
-      const existingSet = new Set(
-        ((page.internal_links_list || []) as Array<{ keyword?: string }>).map((l) => l.keyword)
-      );
+      // Resolve cluster_id if not provided
+      let cId = clusterId;
+      if (!cId && page.seo_page_id) {
+        const { data: cpData } = await supabase
+          .from("cluster_pages")
+          .select("cluster_id")
+          .eq("seo_page_id", page.seo_page_id)
+          .limit(1)
+          .single();
+        if (cpData?.cluster_id) cId = cpData.cluster_id;
+        setResolvedClusterId(cId);
+      }
 
-      setLinks(
-        rawLinks.map((l) => ({
-          keyword: l.keyword || "",
-          slug: l.slug || l.url || "",
-          checked: existingSet.has(l.keyword || ""),
-        }))
-      );
+      // Load sibling pages
+      if (cId) {
+        const { data: siblingData } = await supabase
+          .from("cluster_pages")
+          .select("id, keyword, url_slug, status, page_type")
+          .eq("cluster_id", cId)
+          .neq("id", page.id)
+          .order("priority", { ascending: true });
+
+        const existingSet = new Set(
+          ((page.internal_links_list || []) as Array<{ keyword?: string }>).map((l) => l.keyword)
+        );
+
+        setSiblings(
+          (siblingData || []).map((s) => ({
+            ...s,
+            checked:
+              existingSet.has(s.keyword) ||
+              s.status === "generated" ||
+              s.status === "live" ||
+              s.status === "published",
+          }))
+        );
+      }
+
+      // Load Claude-embedded links from seo_pages
+      if (page.seo_page_id) {
+        const { data: pageData } = await supabase
+          .from("seo_pages")
+          .select("internal_links")
+          .eq("id", page.seo_page_id)
+          .single();
+
+        if (pageData?.internal_links) {
+          const rawLinks = pageData.internal_links as Array<{ keyword?: string; slug?: string; url?: string }>;
+          setClaudeLinks(
+            rawLinks.map((l) => ({
+              keyword: l.keyword || "",
+              slug: l.slug || l.url || "",
+            }))
+          );
+        }
+      }
+
+      setLoadingSiblings(false);
     }
-    loadLinks();
-  }, [open, page.seo_page_id, page.internal_links_list]);
+    load();
+  }, [open, clusterId, page.id, page.seo_page_id, page.internal_links_list]);
 
   const handleSave = async () => {
     setSaving(true);
-    const selectedLinks = links.filter((l) => l.checked).map((l) => ({ keyword: l.keyword, slug: l.slug }));
+    const selectedLinks = siblings
+      .filter((s) => s.checked)
+      .map((s) => ({ keyword: s.keyword, url_slug: s.url_slug }));
 
     await supabase
       .from("cluster_pages")
@@ -739,50 +784,95 @@ function LinksModal({ open, onOpenChange, page, onLinksSet }: LinksModalProps) {
       })
       .eq("id", page.id);
 
-    onLinksSet(selectedLinks);
+    onLinksSet(selectedLinks.map((l) => ({ keyword: l.keyword, slug: l.url_slug })));
     setSaving(false);
     onOpenChange(false);
+    import("sonner").then(({ toast }) => toast.success("Interne Links als gesetzt markiert ✓"));
   };
+
+  const activeSiblings = siblings.filter((s) => s.status !== "planned" && s.status !== "suggested");
+  const plannedSiblings = siblings.filter((s) => s.status === "planned" || s.status === "suggested");
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!saving) onOpenChange(v); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Interne Links verwalten</DialogTitle>
           <DialogDescription>{page.keyword}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3 pt-2">
-          {links.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Keine internen Links in dieser Seite gefunden.
-            </p>
-          ) : (
-            <div className="max-h-64 overflow-y-auto space-y-1.5 border rounded-md p-2 bg-muted/30">
-              {links.map((link, idx) => (
-                <label key={idx} className="flex items-center gap-2 text-xs cursor-pointer py-0.5">
-                  <Checkbox
-                    checked={link.checked}
-                    onCheckedChange={() =>
-                      setLinks((prev) =>
-                        prev.map((l, i) => (i === idx ? { ...l, checked: !l.checked } : l))
-                      )
-                    }
-                    disabled={saving}
-                  />
-                  <span className="truncate flex-1">
-                    {link.keyword}
-                    <span className="text-muted-foreground font-mono ml-1">→ /{link.slug}</span>
-                  </span>
-                </label>
-              ))}
+        <div className="space-y-4 pt-2 max-h-[70vh] overflow-y-auto">
+          {/* Section 1: Sibling Pages */}
+          <div>
+            <h4 className="text-sm font-semibold text-foreground mb-2">Geschwister-Seiten dieses Clusters</h4>
+            {loadingSiblings ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-4 justify-center">
+                <Loader2 className="h-4 w-4 animate-spin" /> Lade Seiten…
+              </div>
+            ) : siblings.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Noch keine anderen Seiten in diesem Cluster.
+              </p>
+            ) : (
+              <div className="space-y-1 border rounded-md p-2 bg-muted/30 max-h-52 overflow-y-auto">
+                {activeSiblings.map((s) => {
+                  const sCfg = STATUS_CONFIG[s.status || "planned"] || STATUS_CONFIG.planned;
+                  return (
+                    <label key={s.id} className="flex items-center gap-2 text-xs cursor-pointer py-0.5">
+                      <Checkbox
+                        checked={s.checked}
+                        onCheckedChange={() =>
+                          setSiblings((prev) =>
+                            prev.map((x) => (x.id === s.id ? { ...x, checked: !x.checked } : x))
+                          )
+                        }
+                        disabled={saving}
+                      />
+                      <span className="truncate flex-1">
+                        {s.keyword}
+                        <span className="text-muted-foreground font-mono ml-1">→ /{s.url_slug}</span>
+                      </span>
+                      <Badge className={`text-[9px] px-1 py-0 ${sCfg.color} shrink-0`}>{sCfg.label}</Badge>
+                    </label>
+                  );
+                })}
+                {plannedSiblings.map((s) => (
+                  <label key={s.id} className="flex items-center gap-2 text-xs py-0.5 opacity-50 cursor-not-allowed">
+                    <Checkbox checked={false} disabled />
+                    <span className="truncate flex-1">
+                      {s.keyword}
+                      <span className="text-muted-foreground font-mono ml-1">→ /{s.url_slug}</span>
+                    </span>
+                    <Badge className="text-[9px] px-1 py-0 bg-muted text-muted-foreground shrink-0">Geplant</Badge>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Section 2: Claude-embedded links (read-only) */}
+          {page.seo_page_id && claudeLinks.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-1">Links im generierten HTML</h4>
+              <p className="text-[11px] text-muted-foreground mb-2">Diese Links hat Claude in die Seite eingebaut.</p>
+              <div className="space-y-1 border rounded-md p-2 bg-muted/20 max-h-40 overflow-y-auto">
+                {claudeLinks.map((link, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-xs py-0.5">
+                    <Check className="h-3 w-3 text-green-600 shrink-0" />
+                    <span className="truncate flex-1">
+                      {link.keyword}
+                      <span className="text-muted-foreground font-mono ml-1">→ /{link.slug}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving} className="flex-1">
               Abbrechen
             </Button>
-            <Button onClick={handleSave} disabled={saving || links.length === 0} className="flex-1">
+            <Button onClick={handleSave} disabled={saving || activeSiblings.filter((s) => s.checked).length === 0} className="flex-1">
               {saving ? (
                 <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Speichere…</>
               ) : (

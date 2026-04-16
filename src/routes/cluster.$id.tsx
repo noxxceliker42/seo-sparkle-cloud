@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Loader2, Zap, Network, Eye, Rocket } from "lucide-react";
 import { calculateScore, scoreColor, scoreTextColor } from "@/lib/clusterScore";
 import { GeneratePageModal } from "@/components/seo/GeneratePageModal";
@@ -64,14 +65,90 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   rejected: { label: "Abgelehnt", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
 };
 
+// ── Bulk score fetch ──────────────────────────────────────────
+async function fetchClusterScores(clusterId: string, pages: ClusterPageRow[]): Promise<ClusterPageRow[]> {
+  const keywords = pages.map((p) => p.keyword);
+
+  const { data, error } = await supabase.functions.invoke("keyword-volume", {
+    body: { keywords },
+  });
+
+  if (error || !data?.success || !data?.data) {
+    console.warn("keyword-volume bulk fetch failed:", error || data?.error);
+    return pages;
+  }
+
+  const results: Record<string, { volume: number; difficulty: number; cpc: number }> = data.data;
+
+  // Update each page in DB
+  for (const page of pages) {
+    const r = results[page.keyword];
+    if (!r) continue;
+
+    const volume = r.volume || 0;
+    const kd = r.difficulty || 50;
+    const scoreVolume = Math.round(Math.min((volume / 500) * 25, 25));
+    const scoreDifficulty = Math.round(((100 - kd) / 100) * 20);
+
+    await supabase
+      .from("cluster_pages")
+      .update({
+        search_volume: volume,
+        keyword_difficulty: kd,
+        cpc: r.cpc || null,
+        trend_direction: "stable",
+        score_volume: scoreVolume,
+        score_difficulty: scoreDifficulty,
+      })
+      .eq("cluster_id", clusterId)
+      .eq("keyword", page.keyword);
+  }
+
+  // Re-fetch all pages to compute score_total
+  const { data: updated } = await supabase
+    .from("cluster_pages")
+    .select("*")
+    .eq("cluster_id", clusterId);
+
+  if (!updated) return pages;
+
+  // Compute and save score_total
+  for (const page of updated) {
+    const total = Math.round(
+      (page.score_volume || 0) +
+      (page.score_difficulty || 10) +
+      (page.score_pillar_support || 12) +
+      (page.score_conversion || 8) +
+      (page.score_gap || 10) +
+      (page.score_trend || 3)
+    );
+    await supabase
+      .from("cluster_pages")
+      .update({ score_total: total })
+      .eq("id", page.id);
+  }
+
+  // Final re-fetch with totals
+  const { data: final } = await supabase
+    .from("cluster_pages")
+    .select("*")
+    .eq("cluster_id", clusterId)
+    .order("priority");
+
+  return final || updated;
+}
+
+// ── Main Component ────────────────────────────────────────────
 function ClusterDetailPage() {
   const { id } = Route.useParams();
   const [cluster, setCluster] = useState<ClusterRow | null>(null);
   const [pages, setPages] = useState<ClusterPageRow[]>([]);
   const [firm, setFirm] = useState<FirmData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchingScores, setFetchingScores] = useState(false);
   const [selectedPage, setSelectedPage] = useState<ClusterPageRow | null>(null);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+  const scoreFetchedRef = useRef(false);
 
   useEffect(() => {
     async function load() {
@@ -81,7 +158,6 @@ function ClusterDetailPage() {
       ]);
       if (clusterRes.data) {
         setCluster(clusterRes.data);
-        // Load firm if linked
         if (clusterRes.data.firm_id) {
           const { data: firmData } = await supabase
             .from("firms")
@@ -96,6 +172,23 @@ function ClusterDetailPage() {
     }
     load();
   }, [id]);
+
+  // Auto-fetch scores when all pages have score_volume = 0
+  useEffect(() => {
+    if (loading || scoreFetchedRef.current || pages.length === 0) return;
+    const allZero = pages.every((p) => !p.score_volume || p.score_volume === 0);
+    if (!allZero) return;
+
+    scoreFetchedRef.current = true;
+    setFetchingScores(true);
+
+    fetchClusterScores(id, pages).then((updated) => {
+      setPages(updated);
+      setFetchingScores(false);
+    }).catch(() => {
+      setFetchingScores(false);
+    });
+  }, [loading, pages, id]);
 
   const columns = useMemo(() => {
     const map = new Map<string, ClusterPageRow[]>();
@@ -124,7 +217,6 @@ function ClusterDetailPage() {
 
   const handleGenerationSuccess = useCallback(async (pageId: string, _jobId: string) => {
     if (!selectedPage) return;
-    // Update cluster_pages status
     await supabase
       .from("cluster_pages")
       .update({
@@ -134,7 +226,6 @@ function ClusterDetailPage() {
       })
       .eq("id", selectedPage.id);
 
-    // Refresh local state
     setPages((prev) =>
       prev.map((p) =>
         p.id === selectedPage.id
@@ -196,6 +287,14 @@ function ClusterDetailPage() {
         </div>
       </div>
 
+      {/* Score loading banner */}
+      {fetchingScores && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          Scores werden geladen…
+        </div>
+      )}
+
       {/* Kanban Board */}
       <ScrollArea className="w-full">
         <div className="flex gap-3 pb-4 min-w-max">
@@ -222,6 +321,7 @@ function ClusterDetailPage() {
                       key={page.id}
                       page={page}
                       isGenerating={generatingIds.has(page.id)}
+                      isFetchingScores={fetchingScores}
                       onGenerate={() => handleGenerateClick(page)}
                       onSetLive={() => handleSetLive(page)}
                     />
@@ -256,19 +356,22 @@ function ClusterDetailPage() {
   );
 }
 
+// ── Card Component ────────────────────────────────────────────
 interface ClusterPageCardProps {
   page: ClusterPageRow;
   isGenerating: boolean;
+  isFetchingScores: boolean;
   onGenerate: () => void;
   onSetLive: () => void;
 }
 
-function ClusterPageCard({ page, isGenerating, onGenerate, onSetLive }: ClusterPageCardProps) {
+function ClusterPageCard({ page, isGenerating, isFetchingScores, onGenerate, onSetLive }: ClusterPageCardProps) {
   const score = calculateScore(page);
   const status = page.status || "planned";
   const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.planned;
   const isGenerated = status === "generated" || status === "published" || status === "live";
   const canGenerate = !isGenerated && status !== "generating" && !isGenerating;
+  const showSkeleton = isFetchingScores && !page.score_volume;
 
   return (
     <Card className="shadow-sm">
@@ -276,28 +379,39 @@ function ClusterPageCard({ page, isGenerating, onGenerate, onSetLive }: ClusterP
         <p className="font-semibold text-sm text-foreground leading-tight truncate">{page.keyword}</p>
         <p className="text-[10px] text-muted-foreground font-mono truncate">/{page.url_slug}</p>
 
-        {/* Score bar */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-            <div
-              className={`h-full rounded-full ${scoreColor(score)}`}
-              style={{ width: `${Math.min(score, 100)}%` }}
-            />
+        {/* Score bar — skeleton while fetching */}
+        {showSkeleton ? (
+          <div className="space-y-1.5">
+            <Skeleton className="h-1.5 w-full rounded-full" />
+            <div className="flex gap-1">
+              <Skeleton className="h-4 w-14 rounded" />
+              <Skeleton className="h-4 w-12 rounded" />
+            </div>
           </div>
-          <span className={`text-xs font-bold ${scoreTextColor(score)}`}>
-            {score}/100
-          </span>
-        </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${scoreColor(score)}`}
+                  style={{ width: `${Math.min(score, 100)}%` }}
+                />
+              </div>
+              <span className={`text-xs font-bold ${scoreTextColor(score)}`}>
+                {score}/100
+              </span>
+            </div>
 
-        {/* Metrics */}
-        <div className="flex gap-1 flex-wrap">
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-            Vol: {page.search_volume != null ? page.search_volume.toLocaleString() : "—"}
-          </Badge>
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-            KD: {page.keyword_difficulty != null ? page.keyword_difficulty : "—"}
-          </Badge>
-        </div>
+            <div className="flex gap-1 flex-wrap">
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                Vol: {page.search_volume != null ? page.search_volume.toLocaleString() : "—"}
+              </Badge>
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                KD: {page.keyword_difficulty != null ? page.keyword_difficulty : "—"}
+              </Badge>
+            </div>
+          </>
+        )}
 
         {/* Status */}
         <div className="flex gap-1 flex-wrap">

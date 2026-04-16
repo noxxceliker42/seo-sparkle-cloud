@@ -865,6 +865,7 @@ export type Database = {
           css_block: string | null
           design_preset: string | null
           firm: string | null
+          firm_id: string | null
           html_output: string | null
           id: string
           intent: string | null
@@ -889,6 +890,7 @@ export type Database = {
           css_block?: string | null
           design_preset?: string | null
           firm?: string | null
+          firm_id?: string | null
           html_output?: string | null
           id?: string
           intent?: string | null
@@ -913,6 +915,7 @@ export type Database = {
           css_block?: string | null
           design_preset?: string | null
           firm?: string | null
+          firm_id?: string | null
           html_output?: string | null
           id?: string
           intent?: string | null

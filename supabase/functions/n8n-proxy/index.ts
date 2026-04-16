@@ -36,21 +36,32 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
 
-    const n8nBaseUrl = Deno.env.get("N8N_WEBHOOK_URL");
     const n8nKey = Deno.env.get("N8N_AUTH_KEY");
+    const { webhookPath, webhookType, payload, ...legacyBody } = body;
 
-    if (!n8nBaseUrl) {
-      return new Response(JSON.stringify({ error: "N8N_WEBHOOK_URL nicht konfiguriert" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Pick base URL based on webhookType
+    let n8nBaseUrl: string | undefined;
+    if (webhookType === "cluster-plan") {
+      n8nBaseUrl = Deno.env.get("N8N_CLUSTER_PLAN_URL");
+      if (!n8nBaseUrl) {
+        return new Response(JSON.stringify({ error: "N8N_CLUSTER_PLAN_URL nicht konfiguriert" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      n8nBaseUrl = Deno.env.get("N8N_WEBHOOK_URL");
+      if (!n8nBaseUrl) {
+        return new Response(JSON.stringify({ error: "N8N_WEBHOOK_URL nicht konfiguriert" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Build target URL: base + optional webhookPath
-    const { webhookPath, payload, ...legacyBody } = body;
     let targetUrl = n8nBaseUrl;
     if (webhookPath) {
-      // Append webhookPath to base URL
       targetUrl = n8nBaseUrl.replace(/\/+$/, "") + "/" + webhookPath;
     }
 

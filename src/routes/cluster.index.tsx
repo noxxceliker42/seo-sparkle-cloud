@@ -154,6 +154,12 @@ function ClusterListPage() {
           ))}
         </div>
       )}
+
+      <ClusterStartModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        activeFirm={activeFirm}
+      />
     </div>
   );
 }

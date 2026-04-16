@@ -299,7 +299,7 @@ export function useGenerationJob() {
         throw new Error(result?.error || "n8n hat keine jobId zurückgegeben");
       }
 
-      writeStorage(result.jobId, (formData.keyword as string) || "");
+      writeStorage(result.jobId, (formData.keyword as string) || "", (formData.clusterPageId as string) || undefined);
       setState((prev) => ({ ...prev, jobId: result.jobId }));
       startPolling(result.jobId);
     } catch (err) {

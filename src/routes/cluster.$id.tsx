@@ -9,7 +9,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Loader2, Zap, Network, Eye, Rocket } from "lucide-react";
 import { calculateScore, scoreColor, scoreTextColor } from "@/lib/clusterScore";
-import { GeneratePageModal } from "@/components/seo/GeneratePageModal";
+import { GeneratePageModal, type FirmData } from "@/components/seo/GeneratePageModal";
 import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/cluster/$id")({
@@ -25,17 +25,6 @@ export const Route = createFileRoute("/cluster/$id")({
 type ClusterRow = Tables<"clusters">;
 type ClusterPageRow = Tables<"cluster_pages">;
 
-interface FirmData {
-  id: string;
-  name: string;
-  street?: string | null;
-  city?: string | null;
-  zip?: string | null;
-  phone?: string | null;
-  email?: string | null;
-  website?: string | null;
-  service_area?: string | null;
-}
 
 const KANBAN_COLUMNS = [
   { key: "pillar_page", label: "Pillar Page" },
@@ -161,7 +150,7 @@ function ClusterDetailPage() {
         if (clusterRes.data.firm_id) {
           const { data: firmData } = await supabase
             .from("firms")
-            .select("id, name, street, city, zip, phone, email, website, service_area")
+            .select("id, name, street, city, zip, phone, email, website, service_area, oeffnungszeiten, branche, sprache, author, author_title, author_experience, author_certs, rating, review_count")
             .eq("id", clusterRes.data.firm_id)
             .single();
           if (firmData) setFirm(firmData);

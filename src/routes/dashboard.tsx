@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FileText, CheckCircle2, Clock, BarChart3, Search, Trash2, ExternalLink, Download, ArrowUpDown, Layers } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import PageDetailPanel, { type SeoPage } from "@/components/dashboard/PageDetailPanel";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
@@ -24,28 +25,6 @@ interface ClusterInfo {
   cluster_id: string;
   cluster_name: string;
   pillar_tier: number | null;
-}
-
-interface SeoPage {
-  id: string;
-  keyword: string;
-  firm: string | null;
-  firm_id: string | null;
-  firm_name?: string | null;
-  intent: string | null;
-  page_type: string | null;
-  score: number | null;
-  qa_score: number | null;
-  status: string | null;
-  created_at: string | null;
-  html_output: string | null;
-  json_ld: string | null;
-  meta_title: string | null;
-  meta_desc: string | null;
-  design_preset: string | null;
-  city: string | null;
-  active_sections: unknown;
-  cluster_info?: ClusterInfo | null;
 }
 
 interface ClusterOption {
@@ -129,8 +108,6 @@ function DashboardPage() {
 
   const loadPages = async () => {
     setLoading(true);
-
-    // Load seo_pages
     const { data: rawPages } = await supabase
       .from("seo_pages")
       .select("*")
@@ -142,7 +119,6 @@ function DashboardPage() {
       return;
     }
 
-    // Load firm names for all firm_ids
     const firmIds = [...new Set(rawPages.filter((p) => p.firm_id).map((p) => p.firm_id!))];
     let firmMap = new Map<string, string>();
     if (firmIds.length > 0) {
@@ -150,7 +126,6 @@ function DashboardPage() {
       if (firms) firms.forEach((f) => firmMap.set(f.id, f.name));
     }
 
-    // Load cluster info for all seo_page_ids
     const pageIds = rawPages.map((p) => p.id);
     let clusterMap = new Map<string, ClusterInfo>();
     if (pageIds.length > 0) {
@@ -178,9 +153,8 @@ function DashboardPage() {
       }
     }
 
-    // Calculate QA scores and update DB in background
     const enriched: SeoPage[] = rawPages.map((p) => {
-      const qaScore = calculateQAScore(p as SeoPage);
+      const qaScore = calculateQAScore(p as unknown as SeoPage);
       if (qaScore !== (p.qa_score || 0)) {
         supabase.from("seo_pages").update({ qa_score: qaScore }).eq("id", p.id).then(() => {});
       }
@@ -202,11 +176,6 @@ function DashboardPage() {
     setPages((p) => p.filter((x) => x.id !== id));
   };
 
-  const handleStatusChange = async (id: string, newStatus: string) => {
-    await supabase.from("seo_pages").update({ status: newStatus }).eq("id", id);
-    setPages((p) => p.map((x) => (x.id === id ? { ...x, status: newStatus } : x)));
-  };
-
   const exportHtml = async (page: SeoPage) => {
     const { data: freshPage } = await supabase
       .from("seo_pages")
@@ -215,25 +184,23 @@ function DashboardPage() {
       .single();
 
     const html = freshPage?.html_output || page.html_output;
-    if (!html) {
-      alert("HTML nicht gefunden in Datenbank");
-      return;
-    }
+    if (!html) { alert("HTML nicht gefunden"); return; }
 
     const slug = (freshPage?.keyword || page.keyword || "seite")
-      .toLowerCase()
-      .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
-      .replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      .toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss")
+      .replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"");
 
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `${slug}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    a.href = url; a.download = `${slug}.html`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handlePageUpdate = (updated: SeoPage) => {
+    setPages((prev) => prev.map((p) => p.id === updated.id ? updated : p));
+    setDetailPage(updated);
   };
 
   const filtered = useMemo(() => {
@@ -355,12 +322,7 @@ function DashboardPage() {
                   <TableCell>
                     {page.cluster_info ? (
                       <div className="flex items-center gap-1.5">
-                        <Link
-                          to="/cluster/$id"
-                          params={{ id: page.cluster_info.cluster_id }}
-                          className="text-sm text-primary hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <Link to="/cluster/$id" params={{ id: page.cluster_info.cluster_id }} className="text-sm text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
                           {page.cluster_info.cluster_name}
                         </Link>
                         {page.cluster_info.pillar_tier && TIER_CONFIG[page.cluster_info.pillar_tier] && (
@@ -372,29 +334,17 @@ function DashboardPage() {
                     ) : "–"}
                   </TableCell>
                   <TableCell>
-                    <span className={`font-semibold ${scoreColor(page.qa_score || 0)}`}>
-                      {page.qa_score || 0}%
-                    </span>
+                    <span className={`font-semibold ${scoreColor(page.qa_score || 0)}`}>{page.qa_score || 0}%</span>
                   </TableCell>
                   <TableCell>
-                    <Badge className={STATUS_COLORS[page.status || "draft"]}>
-                      {STATUS_LABELS[page.status || "draft"]}
-                    </Badge>
+                    <Badge className={STATUS_COLORS[page.status || "draft"]}>{STATUS_LABELS[page.status || "draft"]}</Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {formatDateTime(page.created_at)}
-                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDateTime(page.created_at)}</TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-1 justify-end">
-                      <Button variant="ghost" size="icon" onClick={() => setDetailPage(page)} title="Öffnen">
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => exportHtml(page)} title="HTML exportieren">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(page.id)} title="Löschen">
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => setDetailPage(page)} title="Öffnen"><ExternalLink className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => exportHtml(page)} title="HTML exportieren"><Download className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(page.id)} title="Löschen"><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -406,107 +356,13 @@ function DashboardPage() {
 
       {/* Detail Dialog */}
       <Dialog open={!!detailPage} onOpenChange={(open) => !open && setDetailPage(null)}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           {detailPage && (
             <>
               <DialogHeader>
                 <DialogTitle className="text-xl">{detailPage.keyword}</DialogTitle>
               </DialogHeader>
-              <div className="space-y-6 mt-4">
-                {/* Meta */}
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase">Intent</p>
-                    <p className="font-medium">{detailPage.intent || "–"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase">Seitentyp</p>
-                    <p className="font-medium">{detailPage.page_type || "–"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase">QA-Score</p>
-                    <p className={`font-bold text-lg ${scoreColor(detailPage.qa_score || 0)}`}>{detailPage.qa_score || 0}%</p>
-                  </div>
-                </div>
-
-                {/* Cluster info */}
-                {detailPage.cluster_info && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase">Cluster</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Link
-                        to="/cluster/$id"
-                        params={{ id: detailPage.cluster_info.cluster_id }}
-                        className="text-primary hover:underline font-medium"
-                      >
-                        {detailPage.cluster_info.cluster_name}
-                      </Link>
-                      {detailPage.cluster_info.pillar_tier && TIER_CONFIG[detailPage.cluster_info.pillar_tier] && (
-                        <Badge className={TIER_CONFIG[detailPage.cluster_info.pillar_tier].className}>
-                          {TIER_CONFIG[detailPage.cluster_info.pillar_tier].label}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Status change */}
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase mb-2">Status ändern</p>
-                  <div className="flex gap-2">
-                    {["draft", "reviewed", "approved", "published"].map((s) => (
-                      <Button
-                        key={s}
-                        size="sm"
-                        variant={detailPage.status === s ? "default" : "outline"}
-                        onClick={() => { handleStatusChange(detailPage.id, s); setDetailPage({ ...detailPage, status: s }); }}
-                      >
-                        {STATUS_LABELS[s]}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Meta Title/Desc */}
-                {detailPage.meta_title && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase">Meta Title</p>
-                    <p className="font-medium">{detailPage.meta_title}</p>
-                  </div>
-                )}
-                {detailPage.meta_desc && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase">Meta Description</p>
-                    <p className="text-sm">{detailPage.meta_desc}</p>
-                  </div>
-                )}
-
-                {/* HTML Preview */}
-                {detailPage.html_output && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase mb-2">HTML-Vorschau</p>
-                    <div className="border border-border rounded-lg overflow-hidden">
-                      <iframe
-                        srcDoc={detailPage.html_output}
-                        className="w-full h-[400px]"
-                        sandbox="allow-same-origin"
-                        title="Preview"
-                      />
-                    </div>
-                    <Button variant="outline" size="sm" className="mt-2" onClick={() => exportHtml(detailPage)}>
-                      <Download className="h-4 w-4 mr-1" /> HTML exportieren
-                    </Button>
-                  </div>
-                )}
-
-                {/* JSON-LD */}
-                {detailPage.json_ld && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase mb-2">JSON-LD</p>
-                    <pre className="rounded-lg bg-muted p-3 text-xs overflow-auto max-h-[200px]">{detailPage.json_ld}</pre>
-                  </div>
-                )}
-              </div>
+              <PageDetailPanel page={detailPage} onUpdate={handlePageUpdate} onClose={() => setDetailPage(null)} />
             </>
           )}
         </DialogContent>

@@ -821,10 +821,13 @@ function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, 
             )}
             {isGenerated && page.seo_page_id && (
               <>
-                <Button size="sm" variant="outline" className="flex-1 text-[11px] h-7 gap-1" asChild>
-                  <Link to="/" search={{ previewPageId: page.seo_page_id }}>
-                    <Eye className="h-3 w-3" /> Vorschau
-                  </Link>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 text-[11px] h-7 gap-1"
+                  onClick={() => window.open(`/preview/${page.seo_page_id}`, "_blank")}
+                >
+                  <Eye className="h-3 w-3" /> Vorschau
                 </Button>
                 {status !== "live" && (
                   <Button size="sm" variant="default" className="text-[11px] h-7 gap-1" onClick={onSetLive}>
@@ -837,18 +840,20 @@ function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, 
 
           {/* Links setzen button for generated pages */}
           {isGenerated && page.seo_page_id && (
-            <Button
-              size="sm"
-              variant={page.internal_links_set ? "outline" : "secondary"}
-              className={`w-full text-[11px] h-7 gap-1 ${page.internal_links_set ? "text-green-700 border-green-300 dark:text-green-400 dark:border-green-700" : ""}`}
-              onClick={() => setLinksModalOpen(true)}
-            >
-              {page.internal_links_set ? (
-                <><Check className="h-3 w-3" /> Links gesetzt ✓</>
-              ) : (
-                <><LinkIcon className="h-3 w-3" /> Links setzen</>
-              )}
-            </Button>
+            page.internal_links_set ? (
+              <div className="w-full text-center text-[11px] h-7 flex items-center justify-center gap-1 text-green-700 dark:text-green-400">
+                <Check className="h-3 w-3" /> Links gesetzt ✓
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="w-full text-[11px] h-7 gap-1"
+                onClick={() => setLinksModalOpen(true)}
+              >
+                <LinkIcon className="h-3 w-3" /> Links setzen
+              </Button>
+            )
           )}
         </CardContent>
       </Card>

@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: "nano-banana-2",
           input: {
-            prompt: promptPositive,
+            prompt: effectivePrompt,
             negative_prompt: promptNegative || undefined,
             aspect_ratio: aspectRatio || "16:9",
             image_size: resolution || "1K",

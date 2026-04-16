@@ -210,15 +210,19 @@ function ClusterDetailPage() {
     try {
       // Get firm data
       let firmData: Record<string, unknown> = {};
-      if (page.firm_id) {
-        const { data } = await supabase.from("firms").select("*").eq("id", page.firm_id).single();
-        if (data) firmData = data;
+      const clusterId = page.cluster_id;
+      if (clusterId) {
+        const { data: clusterData } = await supabase.from("clusters").select("firm_id").eq("id", clusterId).single();
+        if (clusterData?.firm_id) {
+          const { data } = await supabase.from("firms").select("*").eq("id", clusterData.firm_id).single();
+          if (data) firmData = data;
+        }
       }
 
       // Get sibling pages for internal linking
       const siblings = clusterPages
         .filter((p) => p.id !== page.id && p.status === "generated" && p.seo_page_id)
-        .map((p) => ({ keyword: p.keyword, anchor: p.internal_link_anchor }));
+        .map((p) => ({ keyword: p.keyword, slug: p.url_slug }));
 
       // Session for auth header (userId is resolved server-side by n8n-proxy)
 
@@ -246,7 +250,7 @@ function ClusterDetailPage() {
           primaryColor: "#1d4ed8",
           uniqueData: "",
           infoGain: "",
-          pillarKeyword: cluster?.pillar_keyword || "",
+          pillarKeyword: cluster?.main_keyword || "",
           clusterSiblings: siblings,
           clusterPageId: page.id,
         }),
@@ -307,7 +311,7 @@ function ClusterDetailPage() {
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-foreground">{cluster.name}</h1>
-          <p className="text-sm text-muted-foreground">Pillar: {cluster.pillar_keyword}</p>
+          <p className="text-sm text-muted-foreground">Pillar: {cluster.main_keyword}</p>
         </div>
         <div className="text-right">
           <p className="text-sm font-medium">{stats.done} / {stats.total} Seiten generiert</p>
@@ -323,11 +327,11 @@ function ClusterDetailPage() {
               {/* Pillar center */}
               <circle cx={400} cy={250} r={24} fill="#fca5a5" stroke="#ef4444" strokeWidth={3} />
               <text x={400} y={254} textAnchor="middle" className="fill-foreground text-[9px] font-semibold">
-                {cluster.pillar_keyword.length > 16 ? cluster.pillar_keyword.slice(0, 14) + "…" : cluster.pillar_keyword}
+                {cluster.main_keyword.length > 16 ? cluster.main_keyword.slice(0, 14) + "…" : cluster.main_keyword}
               </text>
               {/* Connections + Nodes */}
               {nodes.map((node) => {
-                const nc = NODE_COLORS[node.status] || NODE_COLORS.suggested;
+                const nc = NODE_COLORS[node.status || "suggested"] || NODE_COLORS.suggested;
                 return (
                   <g key={node.id}>
                     <line x1={400} y1={250} x2={node.x} y2={node.y} stroke="currentColor" strokeOpacity={0.12} strokeWidth={1.5} />
@@ -341,7 +345,7 @@ function ClusterDetailPage() {
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="font-medium">{node.keyword}</p>
-                        <p className="text-xs">{STATUS_CONFIG[node.status]?.label}</p>
+                        <p className="text-xs">{STATUS_CONFIG[node.status || "suggested"]?.label}</p>
                       </TooltipContent>
                     </Tooltip>
                     <text x={node.x} y={node.y + 26} textAnchor="middle" className="fill-foreground text-[8px]">

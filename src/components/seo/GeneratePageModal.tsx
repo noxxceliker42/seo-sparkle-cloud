@@ -483,6 +483,7 @@ export function GeneratePageModal({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(v) => { if (!generating && !v) onClose(); }}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>

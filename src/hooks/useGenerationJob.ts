@@ -212,15 +212,20 @@ export function useGenerationJob() {
       }
 
       if (job.status === "completed") {
+        const clusterPageId = stored.clusterPageId || null;
         clearStorage();
         const html = (job as any).html_output || "";
+        const pageId = (job as any).page_id || null;
+
+        void saveInternalLinks(pageId, clusterPageId, html);
+
         setState({
           jobId: "",
           generating: false,
           error: "",
           htmlWarning: checkHtmlCompleteness(html),
           result: {
-            pageId: (job as any).page_id || null,
+            pageId,
             htmlOutput: html,
             bodyContent: (job as any).body_content || "",
             cssBlock: (job as any).css_block || "",

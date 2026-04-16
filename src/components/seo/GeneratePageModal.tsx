@@ -280,6 +280,31 @@ export function GeneratePageModal({
     getDefaultSections(clusterPage.page_type)
   );
 
+  // Design & context state
+  const resolveDesignPhilosophy = () => cluster.design_philosophy || selectedFirmObj?.design_philosophy || "trust_classic";
+  const selectedFirmObj = allFirms.find((f) => f.id === selectedFirmId) as (FirmData | undefined);
+  const [designOverride, setDesignOverride] = useState<string | null>(null);
+  const [designCustomOverride, setDesignCustomOverride] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [targetAudience, setTargetAudience] = useState("");
+  const [themeContext, setThemeContext] = useState("");
+  const [differentiation, setDifferentiation] = useState("");
+
+  // Init context from cluster/firm on open
+  useEffect(() => {
+    if (open) {
+      setTargetAudience(cluster.target_audience || selectedFirmObj?.target_audience || "privatkunden");
+      setThemeContext(cluster.theme_context || selectedFirmObj?.theme_context || "");
+      setDifferentiation(cluster.differentiation || selectedFirmObj?.differentiation || "");
+      setDesignOverride(null);
+      setDesignCustomOverride("");
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const activePhilosophy = designOverride || resolveDesignPhilosophy();
+  const activePalette = PALETTES.find((p) => p.id === activePhilosophy) || PALETTES[0];
+  const designSource = designOverride ? "Seiten-Override" : cluster.design_philosophy ? "geerbt von Cluster" : "geerbt von Firma";
+
   // Internal links — checkbox-based
   const [linkItems, setLinkItems] = useState<InternalLinkItem[]>(() => {
     const siblings = siblingPages

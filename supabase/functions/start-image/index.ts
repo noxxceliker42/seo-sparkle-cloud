@@ -26,11 +26,16 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    const body = await req.json();
     const {
-      promptPositive, promptNegative, width, height,
+      prompt, promptPositive, promptNegative, width, height,
       aspectRatio, resolution, slot, slotLabel,
-      firmId, userId, keyword,
-    } = await req.json();
+      firmId, userId, keyword, pageId, mode,
+      referenceImageUrl, editStrength,
+    } = body;
+
+    // Accept either "prompt" or "promptPositive"
+    const effectivePrompt = promptPositive || prompt || "";
 
     // Job in DB anlegen
     const { data: job, error: insertErr } = await supabase

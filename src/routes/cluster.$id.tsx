@@ -25,28 +25,49 @@ export const Route = createFileRoute("/cluster/$id")({
 interface Cluster {
   id: string;
   name: string;
-  pillar_keyword: string;
+  main_keyword: string;
   firm_id: string | null;
-  status: string;
+  status: string | null;
+  cluster_type: string | null;
+  branche: string | null;
+  sprache: string | null;
+  pillar_page_id: string | null;
+  plan_generated: boolean | null;
+  user_id: string | null;
+  created_at: string | null;
 }
 
 interface ClusterPage {
   id: string;
-  cluster_id: string;
+  cluster_id: string | null;
   keyword: string;
+  url_slug: string;
   page_type: string;
-  intent: string | null;
-  priority: string;
-  reason: string | null;
-  content_angle: string | null;
-  differentiator: string | null;
-  internal_link_anchor: string | null;
-  estimated_volume: number | null;
-  estimated_difficulty: number | null;
-  firm_id: string | null;
+  ai_description: string | null;
+  search_volume: number | null;
+  keyword_difficulty: number | null;
+  cpc: number | null;
+  priority: number | null;
+  pillar_tier: number | null;
+  score_volume: number | null;
+  score_difficulty: number | null;
+  score_trend: number | null;
+  score_gap: number | null;
+  score_conversion: number | null;
+  score_pillar_support: number | null;
+  score_total: number | null;
+  trend_direction: string | null;
   seo_page_id: string | null;
-  status: string;
-  sort_order: number;
+  generation_jobs_id: string | null;
+  status: string | null;
+  user_id: string | null;
+  generated_at: string | null;
+  created_at: string | null;
+  has_sub_cluster_potential: boolean | null;
+  is_sub_cluster_suggested: boolean | null;
+  sub_cluster_id: string | null;
+  internal_links_set: boolean | null;
+  sitemap_added: boolean | null;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {

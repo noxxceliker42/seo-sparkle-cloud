@@ -30,6 +30,40 @@ import {
 } from "@/components/ui/collapsible";
 import { Loader2, ChevronRight, Info, Search, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import {
+  Dialog as PickerDialog,
+  DialogContent as PickerDialogContent,
+  DialogHeader as PickerDialogHeader,
+  DialogTitle as PickerDialogTitle,
+} from "@/components/ui/dialog";
+
+const PALETTES = [
+  { id: "trust_classic", name: "Trust Classic", colors: ["#1d4ed8", "#ffffff", "#dc2626"] },
+  { id: "german_precision", name: "German Precision", colors: ["#374151", "#f3f4f6", "#6b7280"] },
+  { id: "handwerk_pro", name: "Handwerk Pro", colors: ["#92400e", "#fef3c7", "#d97706"] },
+  { id: "luxury_dark", name: "Luxury Dark", colors: ["#111827", "#d4af37", "#1f2937"] },
+  { id: "futuristic_tech", name: "Futuristic Tech", colors: ["#0f0f1a", "#00f5ff", "#7c3aed"] },
+  { id: "glassmorphism", name: "Glassmorphism", colors: ["#e0e7ff", "#6366f1", "#f0f9ff"] },
+  { id: "berlin_urban", name: "Berlin Urban", colors: ["#18181b", "#e11d48", "#f4f4f5"] },
+  { id: "medical_clean", name: "Medical Clean", colors: ["#ecfdf5", "#059669", "#ffffff"] },
+  { id: "automotive", name: "Automotive", colors: ["#1e293b", "#94a3b8", "#f59e0b"] },
+  { id: "editorial_bold", name: "Editorial Bold", colors: ["#000000", "#ffffff", "#ef4444"] },
+  { id: "minimalist_swiss", name: "Minimalist Swiss", colors: ["#fafafa", "#171717", "#3b82f6"] },
+  { id: "gradient_flow", name: "Gradient Flow", colors: ["#8b5cf6", "#ec4899", "#06b6d4"] },
+  { id: "eco_green", name: "Eco Green", colors: ["#14532d", "#86efac", "#f0fdf4"] },
+  { id: "warm_trustful", name: "Warm Trustful", colors: ["#ea580c", "#fef9c3", "#1c1917"] },
+  { id: "brutalist_raw", name: "Brutalist Raw", colors: ["#fbbf24", "#000000", "#ffffff"] },
+];
+
+const ZIELGRUPPEN = [
+  { value: "privatkunden", label: "Privatkunden (Standard)" },
+  { value: "gewerblich", label: "Gewerblich / Vermieter" },
+  { value: "senioren", label: "Senioren / 60+" },
+  { value: "technik", label: "Technik-Affine / DIY" },
+  { value: "preisbewusst", label: "Preisbewusste Kunden" },
+  { value: "premium", label: "Premium-Kunden" },
+];
 
 type ClusterPageRow = Tables<"cluster_pages">;
 type ClusterRow = Tables<"clusters">;

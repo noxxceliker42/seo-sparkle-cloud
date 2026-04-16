@@ -61,6 +61,12 @@ function toColumnKey(pageType: string): string {
   return pageType;
 }
 
+function fromColumnKey(colKey: string): string {
+  if (colKey === "pillar_page") return "pillar";
+  if (colKey === "transactional") return "transactional_local";
+  return colKey;
+}
+
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   planned: { label: "Geplant", color: "bg-muted text-muted-foreground" },
   suggested: { label: "Vorgeschlagen", color: "bg-muted text-muted-foreground" },
@@ -155,6 +161,7 @@ function ClusterDetailPage() {
   const [fetchingScores, setFetchingScores] = useState(false);
   const [selectedPage, setSelectedPage] = useState<ClusterPageRow | null>(null);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+  const [expandingCols, setExpandingCols] = useState<Set<string>>(new Set());
   const scoreFetchedRef = useRef(false);
 
   useEffect(() => {
@@ -253,6 +260,68 @@ function ClusterDetailPage() {
       prev.map((p) => (p.id === page.id ? { ...p, status: "live" } : p))
     );
   }, []);
+
+  const handleExpandColumn = useCallback(async (colKey: string) => {
+    if (!cluster || expandingCols.has(colKey)) return;
+    const pageType = fromColumnKey(colKey);
+    const colPages = pages.filter((p) => p.page_type === pageType);
+    const prevCount = colPages.length;
+
+    setExpandingCols((prev) => new Set(prev).add(colKey));
+
+    try {
+      await supabase.functions.invoke("n8n-proxy", {
+        body: {
+          webhookType: "cluster-expand",
+          payload: {
+            clusterId: cluster.id,
+            pageType,
+            mainKeyword: cluster.main_keyword,
+            firm: firm?.name || "",
+            branche: cluster.branche || firm?.branche || "hausgeraete",
+            existingKeywords: colPages.map((p) => p.keyword),
+          },
+        },
+      });
+
+      // Poll for new pages
+      let elapsed = 0;
+      const interval = setInterval(async () => {
+        elapsed += 3000;
+        const { count } = await supabase
+          .from("cluster_pages")
+          .select("*", { count: "exact", head: true })
+          .eq("cluster_id", cluster.id)
+          .eq("page_type", pageType);
+
+        if (count !== null && count > prevCount) {
+          clearInterval(interval);
+          // Reload all pages
+          const { data: fresh } = await supabase
+            .from("cluster_pages")
+            .select("*")
+            .eq("cluster_id", cluster.id)
+            .order("priority");
+          if (fresh) setPages(fresh);
+          setExpandingCols((prev) => { const n = new Set(prev); n.delete(colKey); return n; });
+          const added = count - prevCount;
+          const { toast } = await import("sonner");
+          toast.success(`${added} neue Seite${added > 1 ? "n" : ""} vorgeschlagen`);
+        }
+
+        if (elapsed >= 30000) {
+          clearInterval(interval);
+          setExpandingCols((prev) => { const n = new Set(prev); n.delete(colKey); return n; });
+          const { toast } = await import("sonner");
+          toast.error("Zeitüberschreitung — bitte später erneut versuchen");
+        }
+      }, 3000);
+    } catch {
+      setExpandingCols((prev) => { const n = new Set(prev); n.delete(colKey); return n; });
+      const { toast } = await import("sonner");
+      toast.error("Fehler beim Erweitern der Spalte");
+    }
+  }, [cluster, firm, pages, expandingCols]);
 
   if (loading) {
     return (
@@ -356,8 +425,18 @@ function ClusterDetailPage() {
                 </div>
 
                 <div className="p-2 border-t border-border">
-                  <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground" disabled>
-                    Mehr vorschlagen
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs text-muted-foreground"
+                    disabled={expandingCols.has(col.key)}
+                    onClick={() => handleExpandColumn(col.key)}
+                  >
+                    {expandingCols.has(col.key) ? (
+                      <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Wird geladen…</>
+                    ) : (
+                      "Mehr vorschlagen"
+                    )}
                   </Button>
                 </div>
               </div>

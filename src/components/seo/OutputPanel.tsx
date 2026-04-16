@@ -238,56 +238,95 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
   const generateImage = useCallback(async (slotId: string) => {
     const slot = imageSlots.find((s) => s.id === slotId);
     if (!slot) return;
-    setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "generating" } : s)));
+    setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "generating" as SlotStatus } : s)));
     try {
       const user = (await supabase.auth.getUser()).data.user;
       const { data, error } = await supabase.functions.invoke("start-image", {
-        body: { prompt: slot.prompt, pageId: page.pageId || null, slot: slot.slot, userId: user?.id },
+        body: {
+          prompt: slot.prompt,
+          pageId: page.pageId || null,
+          slot: slot.slot,
+          slotLabel: slot.slotLabel,
+          width: slot.width,
+          height: slot.height,
+          userId: user?.id,
+        },
       });
       if (error || data?.error) {
-        setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s)));
+        setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" as SlotStatus } : s)));
         return;
       }
       if (data.status === "completed" && data.imageUrl) {
-        setImageSlots((prev) => prev.map((s) => s.id === slotId ? { ...s, status: "completed", nanoUrl: data.imageUrl } : s));
-        await supabase.from("page_images").update({ nano_url: data.imageUrl, nano_status: "completed" }).eq("id", slotId);
+        setImageSlots((prev) => prev.map((s) => s.id === slotId ? { ...s, status: "completed" as SlotStatus, nanoUrl: data.imageUrl } : s));
+        if (!slotId.startsWith("nb-")) {
+          await supabase.from("page_images").update({ nano_url: data.imageUrl, nano_status: "completed" }).eq("id", slotId);
+        }
         return;
       }
       const jobId = data.jobId; const taskId = data.taskId; let attempts = 0;
       if (slotPollRefs.current[slotId]) clearInterval(slotPollRefs.current[slotId]);
       slotPollRefs.current[slotId] = setInterval(async () => {
         attempts++;
-        if (attempts > 20) {
+        if (attempts > 60) {
           clearInterval(slotPollRefs.current[slotId]); delete slotPollRefs.current[slotId];
-          setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s)));
+          setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" as SlotStatus } : s)));
           return;
         }
         try {
           const { data: checkData } = await supabase.functions.invoke("check-image", { body: { jobId, taskId } });
           if (checkData?.status === "completed" && checkData?.imageUrl) {
             clearInterval(slotPollRefs.current[slotId]); delete slotPollRefs.current[slotId];
-            setImageSlots((prev) => prev.map((s) => s.id === slotId ? { ...s, status: "completed", nanoUrl: checkData.imageUrl } : s));
-            await supabase.from("page_images").update({ nano_url: checkData.imageUrl, nano_status: "completed" }).eq("id", slotId);
+            setImageSlots((prev) => prev.map((s) => s.id === slotId ? { ...s, status: "completed" as SlotStatus, nanoUrl: checkData.imageUrl } : s));
+            if (!slotId.startsWith("nb-")) {
+              await supabase.from("page_images").update({ nano_url: checkData.imageUrl, nano_status: "completed" }).eq("id", slotId);
+            }
           }
           if (checkData?.status === "failed") {
             clearInterval(slotPollRefs.current[slotId]); delete slotPollRefs.current[slotId];
-            setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s)));
+            setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" as SlotStatus } : s)));
           }
         } catch {}
       }, 3000);
     } catch {
-      setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" } : s)));
+      setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "failed" as SlotStatus } : s)));
     }
   }, [imageSlots, page.pageId]);
 
+  /** Approve image and insert into HTML (replace NANOBANANA_PLACEHOLDER for this slot) */
+  const approveImage = useCallback(async (slotId: string) => {
+    const slot = imageSlots.find((s) => s.id === slotId);
+    if (!slot || !slot.nanoUrl) return;
+
+    // Replace the placeholder img for this slot in the HTML
+    const slotRegex = new RegExp(
+      `<img[^>]*data-nb-slot="${slot.slot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>`,
+      "gi"
+    );
+    const replacement = `<img src="${slot.nanoUrl}" data-nb-slot="${slot.slot}" alt="${slot.altText || slot.slotLabel}" width="${slot.width}" height="${slot.height}" class="nb-image-slot" loading="${slot.slot === 'hero' ? 'eager' : 'lazy'}">`;
+
+    const updatedHtml = liveHtml.replace(slotRegex, replacement);
+    setLiveHtml(updatedHtml);
+
+    // Update in DB
+    if (page.pageId) {
+      await supabase.from("seo_pages").update({ html_output: updatedHtml }).eq("id", page.pageId);
+    }
+
+    setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, status: "approved" as SlotStatus } : s)));
+  }, [imageSlots, liveHtml, page.pageId]);
+
   const updateSlotPrompt = useCallback(async (slotId: string, prompt: string) => {
     setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, prompt } : s)));
-    await supabase.from("page_images").update({ nano_prompt: prompt }).eq("id", slotId);
+    if (!slotId.startsWith("nb-")) {
+      await supabase.from("page_images").update({ nano_prompt: prompt }).eq("id", slotId);
+    }
   }, []);
 
   const updateSlotAlt = useCallback(async (slotId: string, altText: string) => {
     setImageSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, altText } : s)));
-    await supabase.from("page_images").update({ alt_text: altText }).eq("id", slotId);
+    if (!slotId.startsWith("nb-")) {
+      await supabase.from("page_images").update({ alt_text: altText }).eq("id", slotId);
+    }
   }, []);
 
   // --- QA checks ---

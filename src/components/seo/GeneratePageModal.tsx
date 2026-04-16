@@ -453,6 +453,14 @@ export function GeneratePageModal({
       kvaPrice,
       priceRange,
       designPreset,
+      designPhilosophy: activePhilosophy,
+      designPhilosophyCustom: designCustomOverride || cluster.design_philosophy_custom || selectedFirmObj?.design_philosophy_custom || "",
+      primaryColor: activePalette.colors[0],
+      secondaryColor: activePalette.colors[1],
+      accentColor: activePalette.colors[2],
+      targetAudience,
+      themeContext: themeContext.trim(),
+      differentiation: differentiation.trim(),
       outputMode,
       activeSections: activeSections.map((k) => {
         const sec = ALL_SECTIONS.find((s) => s.key === k);

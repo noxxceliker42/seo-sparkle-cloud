@@ -69,7 +69,7 @@ export interface GenerationJobResult {
   stopReason: string;
 }
 
-function readStorage(): { jobId: string; keyword: string } | null {
+function readStorage(): { jobId: string; keyword: string; clusterPageId?: string } | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;

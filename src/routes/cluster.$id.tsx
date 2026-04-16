@@ -155,6 +155,7 @@ function ClusterDetailPage() {
   const [fetchingScores, setFetchingScores] = useState(false);
   const [selectedPage, setSelectedPage] = useState<ClusterPageRow | null>(null);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+  const [expandingCols, setExpandingCols] = useState<Set<string>>(new Set());
   const scoreFetchedRef = useRef(false);
 
   useEffect(() => {

@@ -49,6 +49,14 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+    } else if (webhookType === "cluster-expand") {
+      n8nBaseUrl = Deno.env.get("N8N_CLUSTER_EXPAND_URL");
+      if (!n8nBaseUrl) {
+        return new Response(JSON.stringify({ error: "N8N_CLUSTER_EXPAND_URL nicht konfiguriert" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     } else {
       n8nBaseUrl = Deno.env.get("N8N_WEBHOOK_URL");
       if (!n8nBaseUrl) {

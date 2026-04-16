@@ -89,28 +89,24 @@ Deno.serve(async (req) => {
 
     // ── ACTION: create_cluster ──────────────────────────────
     if (action === "create_cluster") {
-      const { userId, name, mainKeyword, firmId, clusterType, branche, sprache } = body;
+      const { userId, firmId, mainKeyword, clusterType, branche } = body;
 
-      if (!userId || !name || !mainKeyword) {
-        return jsonResponse({ error: "userId, name, and mainKeyword are required" }, 400);
+      if (!userId || !mainKeyword) {
+        return jsonResponse({ error: "userId and mainKeyword are required" }, 400);
       }
-
-      const insertData: Record<string, unknown> = {
-        user_id: userId,
-        name,
-        main_keyword: mainKeyword,
-        firm_id: firmId || null,
-        cluster_type: clusterType || "brand_pillar",
-        branche: branche || "hausgeraete",
-        sprache: sprache || "de",
-        status: "active",
-        plan_generated: false,
-        created_at: new Date().toISOString(),
-      };
 
       const { data: cluster, error } = await supabase
         .from("clusters")
-        .insert(insertData)
+        .insert({
+          user_id: userId,
+          firm_id: firmId || null,
+          name: mainKeyword,
+          main_keyword: mainKeyword,
+          cluster_type: clusterType || "brand_pillar",
+          branche: branche || null,
+          status: "planning",
+          plan_generated: false,
+        })
         .select("id")
         .single();
 
@@ -124,7 +120,7 @@ Deno.serve(async (req) => {
 
     // ── ACTION: save_cluster_plan ───────────────────────────
     if (action === "save_cluster_plan") {
-      const { clusterId, pages } = body;
+      const { clusterId, clusterName, pages } = body;
 
       if (!clusterId || !Array.isArray(pages) || pages.length === 0) {
         return jsonResponse({ error: "clusterId and pages[] are required" }, 400);
@@ -132,26 +128,22 @@ Deno.serve(async (req) => {
 
       const rows = pages.map((p: Record<string, unknown>) => ({
         cluster_id: clusterId,
-        user_id: p.userId || p.user_id || null,
+        user_id: p.user_id || null,
         keyword: p.keyword,
-        url_slug: p.urlSlug || p.url_slug,
-        page_type: p.pageType || p.page_type || "supporting_info",
-        ai_description: p.aiDescription || p.ai_description || null,
-        search_volume: p.searchVolume ?? p.search_volume ?? null,
-        keyword_difficulty: p.keywordDifficulty ?? p.keyword_difficulty ?? null,
-        cpc: p.cpc ?? null,
+        url_slug: p.url_slug,
+        page_type: p.page_type || "supporting_info",
+        pillar_tier: p.pillar_tier ?? 2,
         priority: p.priority ?? 99,
-        pillar_tier: p.pillarTier ?? p.pillar_tier ?? 2,
-        score_volume: p.scoreVolume ?? p.score_volume ?? 0,
-        score_difficulty: p.scoreDifficulty ?? p.score_difficulty ?? 0,
-        score_trend: p.scoreTrend ?? p.score_trend ?? 0,
-        score_gap: p.scoreGap ?? p.score_gap ?? 0,
-        score_conversion: p.scoreConversion ?? p.score_conversion ?? 0,
-        score_pillar_support: p.scorePillarSupport ?? p.score_pillar_support ?? 0,
-        score_total: p.scoreTotal ?? p.score_total ?? 0,
-        trend_direction: p.trendDirection || p.trend_direction || null,
-        status: "suggested",
-        created_at: new Date().toISOString(),
+        ai_description: p.ai_description || null,
+        score_pillar_support: p.score_pillar_support ?? 0,
+        score_conversion: p.score_conversion ?? 0,
+        score_gap: p.score_gap ?? 0,
+        score_trend: p.score_trend ?? 0,
+        score_volume: p.score_volume ?? 0,
+        score_difficulty: p.score_difficulty ?? 0,
+        score_total: p.score_total ?? 0,
+        has_sub_cluster_potential: p.has_sub_cluster_potential ?? false,
+        status: "planned",
       }));
 
       const { error: insertErr } = await supabase
@@ -163,9 +155,15 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Failed to insert cluster pages", detail: insertErr.message }, 500);
       }
 
+      const updateData: Record<string, unknown> = {
+        plan_generated: true,
+        status: "active",
+      };
+      if (clusterName) updateData.name = clusterName;
+
       const { error: updateErr } = await supabase
         .from("clusters")
-        .update({ plan_generated: true })
+        .update(updateData)
         .eq("id", clusterId);
 
       if (updateErr) {
@@ -173,7 +171,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Failed to update cluster", detail: updateErr.message }, 500);
       }
 
-      return jsonResponse({ success: true, clusterId, pagesInserted: rows.length });
+      return jsonResponse({ success: true, pageCount: pages.length });
     }
 
     // ── ACTION: set_cluster_error ───────────────────────────
@@ -188,6 +186,7 @@ Deno.serve(async (req) => {
         .from("clusters")
         .update({
           status: "error",
+          plan_generated: false,
         })
         .eq("id", clusterId);
 
@@ -196,7 +195,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Failed to update cluster", detail: error.message }, 500);
       }
 
-      return jsonResponse({ success: true, clusterId });
+      return jsonResponse({ success: true });
     }
 
     // ── ACTION: save (default) ──────────────────────────────

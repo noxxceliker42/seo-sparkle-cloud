@@ -56,6 +56,7 @@ export type Database = {
       cluster_pages: {
         Row: {
           ai_description: string | null
+          anchor_text: string | null
           cluster_id: string | null
           cpc: number | null
           created_at: string | null
@@ -63,6 +64,7 @@ export type Database = {
           generation_jobs_id: string | null
           has_sub_cluster_potential: boolean | null
           id: string
+          internal_links_list: Json | null
           internal_links_set: boolean | null
           is_sub_cluster_suggested: boolean | null
           keyword: string
@@ -88,6 +90,7 @@ export type Database = {
         }
         Insert: {
           ai_description?: string | null
+          anchor_text?: string | null
           cluster_id?: string | null
           cpc?: number | null
           created_at?: string | null
@@ -95,6 +98,7 @@ export type Database = {
           generation_jobs_id?: string | null
           has_sub_cluster_potential?: boolean | null
           id?: string
+          internal_links_list?: Json | null
           internal_links_set?: boolean | null
           is_sub_cluster_suggested?: boolean | null
           keyword: string
@@ -120,6 +124,7 @@ export type Database = {
         }
         Update: {
           ai_description?: string | null
+          anchor_text?: string | null
           cluster_id?: string | null
           cpc?: number | null
           created_at?: string | null
@@ -127,6 +132,7 @@ export type Database = {
           generation_jobs_id?: string | null
           has_sub_cluster_potential?: boolean | null
           id?: string
+          internal_links_list?: Json | null
           internal_links_set?: boolean | null
           is_sub_cluster_suggested?: boolean | null
           keyword?: string
@@ -862,6 +868,7 @@ export type Database = {
           html_output: string | null
           id: string
           intent: string | null
+          internal_links: Json | null
           json_ld: string | null
           keyword: string
           meta_desc: string | null
@@ -885,6 +892,7 @@ export type Database = {
           html_output?: string | null
           id?: string
           intent?: string | null
+          internal_links?: Json | null
           json_ld?: string | null
           keyword: string
           meta_desc?: string | null
@@ -908,6 +916,7 @@ export type Database = {
           html_output?: string | null
           id?: string
           intent?: string | null
+          internal_links?: Json | null
           json_ld?: string | null
           keyword?: string
           meta_desc?: string | null

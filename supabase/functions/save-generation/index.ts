@@ -87,6 +87,118 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, jobId });
     }
 
+    // ── ACTION: create_cluster ──────────────────────────────
+    if (action === "create_cluster") {
+      const { userId, name, mainKeyword, firmId, clusterType, branche, sprache } = body;
+
+      if (!userId || !name || !mainKeyword) {
+        return jsonResponse({ error: "userId, name, and mainKeyword are required" }, 400);
+      }
+
+      const insertData: Record<string, unknown> = {
+        user_id: userId,
+        name,
+        main_keyword: mainKeyword,
+        firm_id: firmId || null,
+        cluster_type: clusterType || "brand_pillar",
+        branche: branche || "hausgeraete",
+        sprache: sprache || "de",
+        status: "active",
+        plan_generated: false,
+        created_at: new Date().toISOString(),
+      };
+
+      const { data: cluster, error } = await supabase
+        .from("clusters")
+        .insert(insertData)
+        .select("id")
+        .single();
+
+      if (error) {
+        console.error("create_cluster error:", error);
+        return jsonResponse({ error: "Failed to create cluster", detail: error.message }, 500);
+      }
+
+      return jsonResponse({ success: true, clusterId: cluster.id });
+    }
+
+    // ── ACTION: save_cluster_plan ───────────────────────────
+    if (action === "save_cluster_plan") {
+      const { clusterId, pages } = body;
+
+      if (!clusterId || !Array.isArray(pages) || pages.length === 0) {
+        return jsonResponse({ error: "clusterId and pages[] are required" }, 400);
+      }
+
+      const rows = pages.map((p: Record<string, unknown>) => ({
+        cluster_id: clusterId,
+        user_id: p.userId || p.user_id || null,
+        keyword: p.keyword,
+        url_slug: p.urlSlug || p.url_slug,
+        page_type: p.pageType || p.page_type || "supporting_info",
+        ai_description: p.aiDescription || p.ai_description || null,
+        search_volume: p.searchVolume ?? p.search_volume ?? null,
+        keyword_difficulty: p.keywordDifficulty ?? p.keyword_difficulty ?? null,
+        cpc: p.cpc ?? null,
+        priority: p.priority ?? 99,
+        pillar_tier: p.pillarTier ?? p.pillar_tier ?? 2,
+        score_volume: p.scoreVolume ?? p.score_volume ?? 0,
+        score_difficulty: p.scoreDifficulty ?? p.score_difficulty ?? 0,
+        score_trend: p.scoreTrend ?? p.score_trend ?? 0,
+        score_gap: p.scoreGap ?? p.score_gap ?? 0,
+        score_conversion: p.scoreConversion ?? p.score_conversion ?? 0,
+        score_pillar_support: p.scorePillarSupport ?? p.score_pillar_support ?? 0,
+        score_total: p.scoreTotal ?? p.score_total ?? 0,
+        trend_direction: p.trendDirection || p.trend_direction || null,
+        status: "suggested",
+        created_at: new Date().toISOString(),
+      }));
+
+      const { error: insertErr } = await supabase
+        .from("cluster_pages")
+        .insert(rows);
+
+      if (insertErr) {
+        console.error("save_cluster_plan insert error:", insertErr);
+        return jsonResponse({ error: "Failed to insert cluster pages", detail: insertErr.message }, 500);
+      }
+
+      const { error: updateErr } = await supabase
+        .from("clusters")
+        .update({ plan_generated: true })
+        .eq("id", clusterId);
+
+      if (updateErr) {
+        console.error("save_cluster_plan update error:", updateErr);
+        return jsonResponse({ error: "Failed to update cluster", detail: updateErr.message }, 500);
+      }
+
+      return jsonResponse({ success: true, clusterId, pagesInserted: rows.length });
+    }
+
+    // ── ACTION: set_cluster_error ───────────────────────────
+    if (action === "set_cluster_error") {
+      const { clusterId, errorMessage } = body;
+
+      if (!clusterId) {
+        return jsonResponse({ error: "clusterId is required" }, 400);
+      }
+
+      const { error } = await supabase
+        .from("clusters")
+        .update({
+          status: "error",
+        })
+        .eq("id", clusterId);
+
+      if (error) {
+        console.error("set_cluster_error error:", error);
+        return jsonResponse({ error: "Failed to update cluster", detail: error.message }, 500);
+      }
+
+      return jsonResponse({ success: true, clusterId });
+    }
+
     // ── ACTION: save (default) ──────────────────────────────
     const {
       jobId,

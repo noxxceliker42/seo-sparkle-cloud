@@ -12,7 +12,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify user is authenticated
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Nicht autorisiert" }), {
@@ -37,27 +36,36 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
 
-    const n8nUrl = Deno.env.get("N8N_WEBHOOK_URL");
+    const n8nBaseUrl = Deno.env.get("N8N_WEBHOOK_URL");
     const n8nKey = Deno.env.get("N8N_AUTH_KEY");
 
-    if (!n8nUrl) {
+    if (!n8nBaseUrl) {
       return new Response(JSON.stringify({ error: "N8N_WEBHOOK_URL nicht konfiguriert" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Forward to n8n with auth key
-    const n8nRes = await fetch(n8nUrl, {
+    // Build target URL: base + optional webhookPath
+    const { webhookPath, payload, ...legacyBody } = body;
+    let targetUrl = n8nBaseUrl;
+    if (webhookPath) {
+      // Append webhookPath to base URL
+      targetUrl = n8nBaseUrl.replace(/\/+$/, "") + "/" + webhookPath;
+    }
+
+    // Use payload if provided (new format), otherwise use legacy body
+    const forwardBody = payload
+      ? { ...payload, userId: user.id }
+      : { ...legacyBody, userId: user.id };
+
+    const n8nRes = await fetch(targetUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(n8nKey ? { "X-SEO-OS-Key": n8nKey } : {}),
       },
-      body: JSON.stringify({
-        ...body,
-        userId: user.id,
-      }),
+      body: JSON.stringify(forwardBody),
     });
 
     if (!n8nRes.ok) {

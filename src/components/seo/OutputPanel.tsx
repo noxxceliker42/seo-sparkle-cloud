@@ -35,6 +35,8 @@ interface OutputPanelProps {
   onNewPage: () => void;
 }
 
+type SlotStatus = "pending" | "generating" | "completed" | "uploaded" | "failed" | "approved";
+
 interface ImageSlot {
   id: string;
   slot: string;
@@ -43,10 +45,48 @@ interface ImageSlot {
   altText: string;
   width: number;
   height: number;
-  status: "pending" | "generating" | "completed" | "uploaded" | "failed" | "approved";
+  status: SlotStatus;
   cloudinaryUrl?: string;
   nanoUrl?: string;
-  isNbSlot?: boolean; // from nb-image-slot in HTML
+  isNbSlot?: boolean;
+}
+
+function toSlotStatus(s: string): SlotStatus {
+  const valid: SlotStatus[] = ["pending", "generating", "completed", "uploaded", "failed", "approved"];
+  return valid.includes(s as SlotStatus) ? (s as SlotStatus) : "pending";
+}
+
+/** Parse nb-image-slot elements from HTML */
+function parseNbSlots(html: string): ImageSlot[] {
+  const slots: ImageSlot[] = [];
+  const regex = /<img[^>]*class="[^"]*nb-image-slot[^"]*"[^>]*>/gi;
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    const tag = match[0];
+    const getAttr = (name: string) => {
+      const m = tag.match(new RegExp(`${name}="([^"]*)"`));
+      return m ? m[1] : "";
+    };
+    const slot = getAttr("data-nb-slot") || `slot-${slots.length}`;
+    const prompt = getAttr("data-nb-prompt");
+    const width = parseInt(getAttr("data-nb-width")) || 800;
+    const height = parseInt(getAttr("data-nb-height")) || 450;
+    const alt = getAttr("alt");
+    const label = slot.replace(/^section-/, "").replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+    slots.push({
+      id: `nb-${slot}`,
+      slot,
+      slotLabel: label,
+      prompt,
+      altText: alt,
+      width,
+      height,
+      status: "pending",
+      isNbSlot: true,
+    });
+  }
+  return slots;
 }
 
 const SECTION_LABELS: Record<string, string> = {

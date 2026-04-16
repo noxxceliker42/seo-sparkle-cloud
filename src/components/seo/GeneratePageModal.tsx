@@ -215,47 +215,67 @@ export function GeneratePageModal({
   const [informationGain, setInformationGain] = useState("");
   const [uspFokus, setUspFokus] = useState("");
 
-  // AI suggestions
-  const [aiLoading, setAiLoading] = useState(false);
+  // AI suggestions — per-field loading state
+  const [aiFieldLoading, setAiFieldLoading] = useState<Record<string, boolean>>({});
   const [aiLoaded, setAiLoaded] = useState(false);
   const aiCalledRef = useRef(false);
 
-  const fetchAiSuggestions = useCallback(async () => {
-    setAiLoading(true);
+  const getRequestBody = useCallback((field?: string) => {
+    const selectedFirm = allFirms.find((f) => f.id === selectedFirmId);
+    return {
+      keyword: clusterPage.keyword,
+      pageType: clusterPage.page_type,
+      firm: selectedFirm?.name || firm?.name || "",
+      branche: selectedFirm?.branche || cluster.branche || "hausgeraete",
+      ...(field ? { field } : {}),
+    };
+  }, [clusterPage.keyword, clusterPage.page_type, allFirms, selectedFirmId, firm, cluster.branche]);
+
+  const applyAiData = useCallback((data: Record<string, string>) => {
+    if (data.uniqueData) setUniqueData(data.uniqueData);
+    if (data.informationGain) setInformationGain(data.informationGain);
+    if (data.uspFokus) setUspFokus(data.uspFokus);
+    if (data.themeContext) setThemeContext(data.themeContext);
+    if (data.differentiation) setDifferentiation(data.differentiation);
+  }, []);
+
+  const fetchAllSuggestions = useCallback(async () => {
+    const allFields = ["uniqueData", "informationGain", "uspFokus", "themeContext", "differentiation"];
+    setAiFieldLoading(Object.fromEntries(allFields.map((f) => [f, true])));
     try {
-      const selectedFirm = allFirms.find((f) => f.id === selectedFirmId);
-      const requestBody = {
-        keyword: clusterPage.keyword,
-        pageType: clusterPage.page_type,
-        firm: selectedFirm?.name || firm?.name || "",
-        branche: selectedFirm?.branche || cluster.branche || "hausgeraete",
-      };
-      console.log("AI Suggestions Request:", requestBody);
-      const { data, error: fnError } = await supabase.functions.invoke(
-        "generate-field-suggestions",
-        { body: requestBody }
-      );
+      const body = getRequestBody();
+      console.log("AI Suggestions Request:", body);
+      const { data, error: fnError } = await supabase.functions.invoke("generate-field-suggestions", { body });
       console.log("AI Suggestions Response:", { data, fnError });
-      if (!fnError && data) {
-        if (data.uniqueData) setUniqueData(data.uniqueData);
-        if (data.informationGain) setInformationGain(data.informationGain);
-        if (data.uspFokus) setUspFokus(data.uspFokus);
-      }
+      if (!fnError && data) applyAiData(data);
     } catch (err) {
       console.error("AI suggestions error:", err);
     } finally {
-      setAiLoading(false);
+      setAiFieldLoading({});
       setAiLoaded(true);
     }
-  }, [clusterPage.keyword, clusterPage.page_type, allFirms, selectedFirmId, firm, cluster.branche]);
+  }, [getRequestBody, applyAiData]);
+
+  const fetchSingleField = useCallback(async (field: string) => {
+    setAiFieldLoading((prev) => ({ ...prev, [field]: true }));
+    try {
+      const body = getRequestBody(field);
+      const { data, error: fnError } = await supabase.functions.invoke("generate-field-suggestions", { body });
+      if (!fnError && data) applyAiData(data);
+    } catch (err) {
+      console.error(`AI field ${field} error:`, err);
+    } finally {
+      setAiFieldLoading((prev) => ({ ...prev, [field]: false }));
+    }
+  }, [getRequestBody, applyAiData]);
 
   // Auto-fetch on open (once)
   useEffect(() => {
     if (open && !aiCalledRef.current) {
       aiCalledRef.current = true;
-      void fetchAiSuggestions();
+      void fetchAllSuggestions();
     }
-  }, [open, fetchAiSuggestions]);
+  }, [open, fetchAllSuggestions]);
 
   // Firm fields (editable overrides)
   const [firmName, setFirmName] = useState("");
@@ -523,86 +543,71 @@ export function GeneratePageModal({
 
           {/* ── SEKTION 2: Pflicht-Felder ── */}
           <div className="space-y-3">
-            {aiLoading && !aiLoaded ? (
-              <>
-                <div className="space-y-1.5">
-                  <Label>Was macht diese Seite einzigartig? <span className="text-destructive">*</span></Label>
-                  <Skeleton className="h-20 w-full rounded-md" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Welchen Mehrwert bietet diese Seite? <span className="text-destructive">*</span></Label>
-                  <Skeleton className="h-20 w-full rounded-md" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>USP-Fokus (optional)</Label>
-                  <Skeleton className="h-9 w-full rounded-md" />
-                </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <Loader2 className="h-3 w-3 animate-spin" /> KI analysiert Keyword…
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="space-y-1.5">
-                  <Label htmlFor="gpm-unique">
-                    Was macht diese Seite einzigartig? <span className="text-destructive">*</span>
-                  </Label>
-                  <Textarea
-                    ref={uniqueRef}
-                    id="gpm-unique"
-                    placeholder="Eigene Daten, Statistiken, Erfahrungswerte, konkrete Zahlen, echte Kundenerfahrungen..."
-                    value={uniqueData}
-                    onChange={(e) => setUniqueData(e.target.value)}
-                    disabled={generating}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="gpm-infogain">
-                    Welchen Mehrwert bietet diese Seite? <span className="text-destructive">*</span>
-                  </Label>
-                  <Textarea
-                    ref={infoGainRef}
-                    id="gpm-infogain"
-                    placeholder="Neue Perspektive, exklusive Einblicke, praktische Anleitungen, Informationen die Wettbewerber nicht haben..."
-                    value={informationGain}
-                    onChange={(e) => setInformationGain(e.target.value)}
-                    disabled={generating}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="gpm-usp">USP-Fokus (optional)</Label>
-                  <Input
-                    id="gpm-usp"
-                    placeholder="z.B. 24h Notdienst, Original-Ersatzteile, 15 Jahre Erfahrung"
-                    value={uspFokus}
-                    onChange={(e) => setUspFokus(e.target.value)}
-                    disabled={generating}
-                  />
-                </div>
-
+            {/* Unique Data */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="gpm-unique">Was macht diese Seite einzigartig? <span className="text-destructive">*</span></Label>
                 {aiLoaded && (
-                  <div className="flex items-center justify-between">
-                    <p className="text-[11px] text-muted-foreground">
-                      KI-Vorschlag — bitte anpassen und ergänzen
-                    </p>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-[11px] gap-1 px-2"
-                      onClick={() => fetchAiSuggestions()}
-                      disabled={aiLoading || generating}
-                    >
-                      {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                      Neu generieren
-                    </Button>
-                  </div>
+                  <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("uniqueData")} disabled={!!aiFieldLoading.uniqueData || generating}>
+                    {aiFieldLoading.uniqueData ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
+                  </Button>
                 )}
-              </>
+              </div>
+              {aiFieldLoading.uniqueData && !uniqueData ? (
+                <Skeleton className="h-20 w-full rounded-md" />
+              ) : (
+                <Textarea ref={uniqueRef} id="gpm-unique" placeholder="Eigene Daten, Statistiken, konkrete Zahlen..." value={uniqueData} onChange={(e) => setUniqueData(e.target.value)} disabled={generating} rows={3} />
+              )}
+            </div>
+
+            {/* Information Gain */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="gpm-infogain">Welchen Mehrwert bietet diese Seite? <span className="text-destructive">*</span></Label>
+                {aiLoaded && (
+                  <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("informationGain")} disabled={!!aiFieldLoading.informationGain || generating}>
+                    {aiFieldLoading.informationGain ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
+                  </Button>
+                )}
+              </div>
+              {aiFieldLoading.informationGain && !informationGain ? (
+                <Skeleton className="h-20 w-full rounded-md" />
+              ) : (
+                <Textarea ref={infoGainRef} id="gpm-infogain" placeholder="Exklusive Einblicke, Informationen die Wettbewerber nicht haben..." value={informationGain} onChange={(e) => setInformationGain(e.target.value)} disabled={generating} rows={3} />
+              )}
+            </div>
+
+            {/* USP Fokus */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="gpm-usp">USP-Fokus (optional)</Label>
+                {aiLoaded && (
+                  <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("uspFokus")} disabled={!!aiFieldLoading.uspFokus || generating}>
+                    {aiFieldLoading.uspFokus ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
+                  </Button>
+                )}
+              </div>
+              {aiFieldLoading.uspFokus && !uspFokus ? (
+                <Skeleton className="h-9 w-full rounded-md" />
+              ) : (
+                <Input id="gpm-usp" placeholder="z.B. 24h Notdienst, Original-Ersatzteile, 15 Jahre Erfahrung" value={uspFokus} onChange={(e) => setUspFokus(e.target.value)} disabled={generating} />
+              )}
+            </div>
+
+            {aiLoaded && (
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-muted-foreground">KI-Vorschlag — bitte anpassen und ergänzen</p>
+                <Button type="button" variant="ghost" size="sm" className="h-6 text-[11px] gap-1 px-2" onClick={() => fetchAllSuggestions()} disabled={Object.values(aiFieldLoading).some(Boolean) || generating}>
+                  {Object.values(aiFieldLoading).some(Boolean) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                  Alle neu generieren
+                </Button>
+              </div>
+            )}
+
+            {!aiLoaded && Object.values(aiFieldLoading).some(Boolean) && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" /> KI analysiert Keyword…
+              </p>
             )}
           </div>
 
@@ -878,25 +883,37 @@ export function GeneratePageModal({
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Themen-Kontext with AI */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Themen-Kontext</Label>
-                  <Textarea
-                    value={themeContext}
-                    onChange={(e) => setThemeContext(e.target.value)}
-                    placeholder="Spezifische Details für diese Seite..."
-                    rows={3}
-                    disabled={generating}
-                  />
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Themen-Kontext</Label>
+                    <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("themeContext")} disabled={!!aiFieldLoading.themeContext || generating}>
+                      {aiFieldLoading.themeContext ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
+                    </Button>
+                  </div>
+                  {aiFieldLoading.themeContext && !themeContext ? (
+                    <Skeleton className="h-20 w-full rounded-md" />
+                  ) : (
+                    <Textarea value={themeContext} onChange={(e) => setThemeContext(e.target.value)} placeholder="Spezifische Details für diese Seite..." rows={3} disabled={generating} />
+                  )}
+                  <p className="text-[10px] text-muted-foreground">KI-Vorschlag — anpassen und ergänzen</p>
                 </div>
+
+                {/* Differenzierung with AI */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Differenzierung (Wettbewerbsvorteile)</Label>
-                  <Textarea
-                    value={differentiation}
-                    onChange={(e) => setDifferentiation(e.target.value)}
-                    placeholder={"Was bietet ihr konkret was Wettbewerber nicht bieten?\nz.B.: Einziger Miele-Spezialist in Pankow, Originalteile auf Lager"}
-                    rows={2}
-                    disabled={generating}
-                  />
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Differenzierung (Wettbewerbsvorteile)</Label>
+                    <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("differentiation")} disabled={!!aiFieldLoading.differentiation || generating}>
+                      {aiFieldLoading.differentiation ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
+                    </Button>
+                  </div>
+                  {aiFieldLoading.differentiation && !differentiation ? (
+                    <Skeleton className="h-16 w-full rounded-md" />
+                  ) : (
+                    <Textarea value={differentiation} onChange={(e) => setDifferentiation(e.target.value)} placeholder={"Was bietet ihr konkret was Wettbewerber nicht bieten?\nz.B.: Einziger Miele-Spezialist in Pankow, Originalteile auf Lager"} rows={2} disabled={generating} />
+                  )}
+                  <p className="text-[10px] text-muted-foreground">KI-Vorschlag — anpassen und ergänzen</p>
                 </div>
               </div>
             </CollapsibleContent>

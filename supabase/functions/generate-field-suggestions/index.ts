@@ -4,13 +4,53 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
+const FIELD_PROMPTS: Record<string, (ctx: string) => string> = {
+  uniqueData: (ctx) => `${ctx}
+
+Erstelle NUR den Wert für "uniqueData":
+Konkrete einzigartige Daten/Fakten die NUR diese Firma bieten kann. 
+Echte Zahlen, echte Details. Keine generischen Phrasen.
+SCHLECHT: "Eigene Daten und Erfahrungen"
+GUT: "Über 500 Beko-Geräte repariert in Berlin, durchschnittliche Reparaturzeit 2,3 Stunden, 92% beim ersten Besuch erfolgreich"
+Antwort als JSON: {"uniqueData": "..."}`,
+
+  informationGain: (ctx) => `${ctx}
+
+Erstelle NUR den Wert für "informationGain":
+Konkreter Mehrwert dieser spezifischen Seite gegenüber Wettbewerbern.
+Was erfährt der Nutzer hier was er woanders nicht findet?
+SCHLECHT: "Neue Perspektive auf das Thema"
+GUT: "Vollständige Fehlercode-Liste für alle Beko Waschmaschinen ab 2015 mit Lösungsweg den kein Wettbewerber so detailliert anbietet"
+Antwort als JSON: {"informationGain": "..."}`,
+
+  uspFokus: (ctx) => `${ctx}
+
+Erstelle NUR den Wert für "uspFokus":
+Den stärksten 1 USP für dieses Keyword. Konkret, max 10 Wörter.
+Antwort als JSON: {"uspFokus": "..."}`,
+
+  themeContext: (ctx) => `${ctx}
+
+Erstelle NUR den Wert für "themeContext":
+Spezifische technische Details, Modellnummern, Fehlercodes, Symptome die typischerweise zu diesem Keyword gehören.
+Was suchen Nutzer konkret? 2-3 Zeilen, kommasepariert.
+Antwort als JSON: {"themeContext": "..."}`,
+
+  differentiation: (ctx) => `${ctx}
+
+Erstelle NUR den Wert für "differentiation":
+3 konkrete Wettbewerbsvorteile die ein lokaler Reparaturservice für dieses Keyword haben sollte. 
+Realistisch und umsetzbar. 3 Stichpunkte, je 1 Zeile.
+Antwort als JSON: {"differentiation": "..."}`,
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { keyword, pageType, firm, branche } = await req.json();
+    const { keyword, pageType, firm, branche, designPhilosophy, targetAudience, field } = await req.json();
 
     if (!keyword) {
       return new Response(
@@ -27,6 +67,36 @@ Deno.serve(async (req) => {
       );
     }
 
+    const contextBlock = `Keyword: "${keyword}"
+Seitentyp: ${pageType || "service"}
+Firma: ${firm || "unbekannt"}
+Branche: ${branche || "allgemein"}
+Designphilosophie: ${designPhilosophy || "trust_classic"}
+Zielgruppe: ${targetAudience || "privatkunden"}`;
+
+    let userPrompt: string;
+
+    if (field && FIELD_PROMPTS[field]) {
+      // Single field mode
+      userPrompt = FIELD_PROMPTS[field](contextBlock);
+    } else {
+      // Full mode — all 5 fields
+      userPrompt = `${contextBlock}
+
+Erstelle konkrete, spezifische Vorschläge für eine SEO-Seite:
+{
+  "uniqueData": "Konkrete einzigartige Daten/Fakten die NUR diese Firma bieten kann. Echte Zahlen, echte Details. SCHLECHT: 'Eigene Daten und Erfahrungen'. GUT: 'Über 500 Beko-Geräte repariert in Berlin, durchschnittliche Reparaturzeit 2,3 Stunden, 92% beim ersten Besuch erfolgreich' (1-2 Sätze, max 150 Zeichen)",
+  
+  "informationGain": "Konkreter Mehrwert dieser spezifischen Seite gegenüber Wettbewerbern. SCHLECHT: 'Neue Perspektive auf das Thema'. GUT: 'Vollständige Fehlercode-Liste für alle Beko Waschmaschinen ab 2015 mit Lösungsweg den kein Wettbewerber so detailliert anbietet' (1-2 Sätze, max 150 Zeichen)",
+  
+  "uspFokus": "Den stärksten 1 USP für dieses Keyword. Konkret, max 10 Wörter.",
+  
+  "themeContext": "Spezifische technische Details, Modellnummern, Fehlercodes, Symptome die typischerweise zu diesem Keyword gehören. Was suchen Nutzer konkret? (2-3 Zeilen, kommasepariert)",
+  
+  "differentiation": "3 konkrete Wettbewerbsvorteile die ein lokaler Reparaturservice für dieses Keyword haben sollte. Realistisch und umsetzbar. (3 Stichpunkte)"
+}`;
+    }
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -36,24 +106,9 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 500,
-        system: "Antworte NUR als JSON-Objekt. Kein Markdown, kein erklärenderText.",
-        messages: [
-          {
-            role: "user",
-            content: `Keyword: "${keyword}"
-Seitentyp: ${pageType || "service"}
-Firma: ${firm || "unbekannt"}
-Branche: ${branche || "allgemein"}
-
-Erstelle konkrete, branchenspezifische Vorschläge für eine SEO-Seite:
-{
-  "uniqueData": "konkrete einzigartige Daten, Fakten oder Statistiken für diese Seite (1-2 Sätze, spezifisch für die Branche)",
-  "informationGain": "konkreter Mehrwert den diese Seite bietet und den Wettbewerber nicht haben (1-2 Sätze, spezifisch)",
-  "uspFokus": "1 konkreter USP passend zur Firma (max 10 Wörter)"
-}`,
-          },
-        ],
+        max_tokens: field ? 300 : 700,
+        system: "Antworte NUR als JSON. Kein Text davor oder danach. Kein Markdown.",
+        messages: [{ role: "user", content: userPrompt }],
       }),
     });
 
@@ -69,14 +124,13 @@ Erstelle konkrete, branchenspezifische Vorschläge für eine SEO-Seite:
     const data = await response.json();
     const raw = data?.content?.[0]?.text || "{}";
 
-    // Parse JSON, stripping markdown fences if present
     const cleaned = raw.replace(/```json\s?|```/g, "").trim();
     let suggestions: Record<string, string>;
     try {
       suggestions = JSON.parse(cleaned);
     } catch {
       console.error("Failed to parse AI response:", raw);
-      suggestions = { uniqueData: "", informationGain: "", uspFokus: "" };
+      suggestions = {};
     }
 
     return new Response(JSON.stringify(suggestions), {

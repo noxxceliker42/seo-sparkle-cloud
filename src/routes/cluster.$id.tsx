@@ -378,12 +378,12 @@ function ClusterDetailPage() {
               <TableRow key={page.id} className={page.status === "rejected" ? "opacity-40 line-through" : ""}>
                 <TableCell className="font-medium">{page.keyword}</TableCell>
                 <TableCell><Badge variant="outline">{TYPE_LABELS[page.page_type] || page.page_type}</Badge></TableCell>
-                <TableCell><Badge variant="outline">{page.priority.replace("_", " ")}</Badge></TableCell>
-                <TableCell className="text-sm">{(page.estimated_volume || 0).toLocaleString()}</TableCell>
-                <TableCell className="text-sm">{page.estimated_difficulty || 0}</TableCell>
+                <TableCell><Badge variant="outline">{page.priority ?? 99}</Badge></TableCell>
+                <TableCell className="text-sm">{(page.search_volume || 0).toLocaleString()}</TableCell>
+                <TableCell className="text-sm">{page.keyword_difficulty || 0}</TableCell>
                 <TableCell>
-                  <Badge className={STATUS_CONFIG[page.status]?.color || ""}>
-                    {STATUS_CONFIG[page.status]?.label || page.status}
+                  <Badge className={STATUS_CONFIG[page.status || "suggested"]?.color || ""}>
+                    {STATUS_CONFIG[page.status || "suggested"]?.label || page.status}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
@@ -436,36 +436,17 @@ function ClusterDetailPage() {
               </SheetHeader>
               <div className="space-y-4 mt-4">
                 <div className="flex gap-2 flex-wrap">
-                  <Badge variant="outline">{previewPage.intent || "–"}</Badge>
                   <Badge variant="outline">{TYPE_LABELS[previewPage.page_type] || previewPage.page_type}</Badge>
-                  <Badge variant="outline">{previewPage.priority.replace("_", " ")}</Badge>
+                  <Badge variant="outline">Priorität: {previewPage.priority ?? 99}</Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-muted-foreground">Suchvolumen:</span> {(previewPage.estimated_volume || 0).toLocaleString()}</div>
-                  <div><span className="text-muted-foreground">KD:</span> {previewPage.estimated_difficulty || 0}</div>
+                  <div><span className="text-muted-foreground">Suchvolumen:</span> {(previewPage.search_volume || 0).toLocaleString()}</div>
+                  <div><span className="text-muted-foreground">KD:</span> {previewPage.keyword_difficulty || 0}</div>
                 </div>
-                {previewPage.reason && (
+                {previewPage.ai_description && (
                   <div>
-                    <p className="text-xs text-muted-foreground uppercase mb-1">Warum wichtig</p>
-                    <p className="text-sm">{previewPage.reason}</p>
-                  </div>
-                )}
-                {previewPage.content_angle && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase mb-1">Content Angle</p>
-                    <p className="text-sm">{previewPage.content_angle}</p>
-                  </div>
-                )}
-                {previewPage.differentiator && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase mb-1">Differentiator</p>
-                    <p className="text-sm">{previewPage.differentiator}</p>
-                  </div>
-                )}
-                {previewPage.internal_link_anchor && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase mb-1">Interner Link Anchor</p>
-                    <p className="text-sm font-mono">{previewPage.internal_link_anchor}</p>
+                    <p className="text-xs text-muted-foreground uppercase mb-1">Beschreibung</p>
+                    <p className="text-sm">{previewPage.ai_description}</p>
                   </div>
                 )}
 

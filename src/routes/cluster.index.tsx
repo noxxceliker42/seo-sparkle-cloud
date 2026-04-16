@@ -20,9 +20,9 @@ export const Route = createFileRoute("/cluster/")({
 interface ClusterRow {
   id: string;
   name: string;
-  pillar_keyword: string;
-  status: string;
-  created_at: string;
+  main_keyword: string;
+  status: string | null;
+  created_at: string | null;
   firm_id: string | null;
 }
 
@@ -93,14 +93,14 @@ function ClusterListPage() {
               {clusters.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell>{c.pillar_keyword}</TableCell>
+                  <TableCell>{c.main_keyword}</TableCell>
                   <TableCell>
-                    <Badge className={STATUS_COLORS[c.status] || ""}>
-                      {STATUS_LABELS[c.status] || c.status}
+                    <Badge className={STATUS_COLORS[c.status || "draft"] || ""}>
+                      {STATUS_LABELS[c.status || "draft"] || c.status}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {new Date(c.created_at).toLocaleDateString("de-DE")}
+                    {c.created_at ? new Date(c.created_at).toLocaleDateString("de-DE") : "–"}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="outline" asChild>

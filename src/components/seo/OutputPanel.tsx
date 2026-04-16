@@ -569,9 +569,9 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
             </div>
             <InfoBox>Externe Bilder/Fonts nicht geladen in Vorschau.</InfoBox>
             <div className="rounded-lg border border-border overflow-hidden h-[600px] bg-muted/30">
-              {page.htmlOutput ? (
+              {liveHtml ? (
                 <iframe
-                  srcDoc={page.htmlOutput.replace(/^```html\s*/i, "").replace(/```\s*$/i, "").trim()}
+                  srcDoc={liveHtml.replace(/^```html\s*/i, "").replace(/```\s*$/i, "").trim()}
                   className={`h-full border-none ${previewMode === "mobile" ? "w-[375px] mx-auto block" : "w-full"}`}
                   title="SEO-Seite Live-Vorschau"
                   sandbox="allow-same-origin allow-scripts"

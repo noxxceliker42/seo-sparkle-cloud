@@ -97,7 +97,7 @@ export function ClusterStartModal({ open, onOpenChange, activeFirm }: ClusterSta
 
       const { data, error: fnError } = await supabase.functions.invoke("n8n-proxy", {
         body: {
-          webhookPath: "seo-cluster-plan",
+          webhookType: "cluster-plan",
           payload: {
             mainKeyword: mainKeyword.trim(),
             firm: activeFirm?.name || "",

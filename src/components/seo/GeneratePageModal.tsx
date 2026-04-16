@@ -215,39 +215,61 @@ export function GeneratePageModal({
   const [informationGain, setInformationGain] = useState("");
   const [uspFokus, setUspFokus] = useState("");
 
-  // AI suggestions
-  const [aiLoading, setAiLoading] = useState(false);
+  // AI suggestions — per-field loading state
+  const [aiFieldLoading, setAiFieldLoading] = useState<Record<string, boolean>>({});
   const [aiLoaded, setAiLoaded] = useState(false);
   const aiCalledRef = useRef(false);
 
-  const fetchAiSuggestions = useCallback(async () => {
-    setAiLoading(true);
+  const getRequestBody = useCallback((field?: string) => {
+    const selectedFirm = allFirms.find((f) => f.id === selectedFirmId);
+    return {
+      keyword: clusterPage.keyword,
+      pageType: clusterPage.page_type,
+      firm: selectedFirm?.name || firm?.name || "",
+      branche: selectedFirm?.branche || cluster.branche || "hausgeraete",
+      designPhilosophy: activePhilosophy,
+      targetAudience: targetAudience || "privatkunden",
+      ...(field ? { field } : {}),
+    };
+  }, [clusterPage.keyword, clusterPage.page_type, allFirms, selectedFirmId, firm, cluster.branche, activePhilosophy, targetAudience]);
+
+  const applyAiData = useCallback((data: Record<string, string>) => {
+    if (data.uniqueData) setUniqueData(data.uniqueData);
+    if (data.informationGain) setInformationGain(data.informationGain);
+    if (data.uspFokus) setUspFokus(data.uspFokus);
+    if (data.themeContext) setThemeContext(data.themeContext);
+    if (data.differentiation) setDifferentiation(data.differentiation);
+  }, []);
+
+  const fetchAllSuggestions = useCallback(async () => {
+    const allFields = ["uniqueData", "informationGain", "uspFokus", "themeContext", "differentiation"];
+    setAiFieldLoading(Object.fromEntries(allFields.map((f) => [f, true])));
     try {
-      const selectedFirm = allFirms.find((f) => f.id === selectedFirmId);
-      const requestBody = {
-        keyword: clusterPage.keyword,
-        pageType: clusterPage.page_type,
-        firm: selectedFirm?.name || firm?.name || "",
-        branche: selectedFirm?.branche || cluster.branche || "hausgeraete",
-      };
-      console.log("AI Suggestions Request:", requestBody);
-      const { data, error: fnError } = await supabase.functions.invoke(
-        "generate-field-suggestions",
-        { body: requestBody }
-      );
+      const body = getRequestBody();
+      console.log("AI Suggestions Request:", body);
+      const { data, error: fnError } = await supabase.functions.invoke("generate-field-suggestions", { body });
       console.log("AI Suggestions Response:", { data, fnError });
-      if (!fnError && data) {
-        if (data.uniqueData) setUniqueData(data.uniqueData);
-        if (data.informationGain) setInformationGain(data.informationGain);
-        if (data.uspFokus) setUspFokus(data.uspFokus);
-      }
+      if (!fnError && data) applyAiData(data);
     } catch (err) {
       console.error("AI suggestions error:", err);
     } finally {
-      setAiLoading(false);
+      setAiFieldLoading({});
       setAiLoaded(true);
     }
-  }, [clusterPage.keyword, clusterPage.page_type, allFirms, selectedFirmId, firm, cluster.branche]);
+  }, [getRequestBody, applyAiData]);
+
+  const fetchSingleField = useCallback(async (field: string) => {
+    setAiFieldLoading((prev) => ({ ...prev, [field]: true }));
+    try {
+      const body = getRequestBody(field);
+      const { data, error: fnError } = await supabase.functions.invoke("generate-field-suggestions", { body });
+      if (!fnError && data) applyAiData(data);
+    } catch (err) {
+      console.error(`AI field ${field} error:`, err);
+    } finally {
+      setAiFieldLoading((prev) => ({ ...prev, [field]: false }));
+    }
+  }, [getRequestBody, applyAiData]);
 
   // Auto-fetch on open (once)
   useEffect(() => {

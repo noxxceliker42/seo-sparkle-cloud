@@ -924,5 +924,49 @@ export function GeneratePageModal({
         </div>
       </DialogContent>
     </Dialog>
+
+      {/* Design Picker Modal */}
+      <PickerDialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <PickerDialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
+          <PickerDialogHeader>
+            <PickerDialogTitle>Design-Philosophie wählen</PickerDialogTitle>
+          </PickerDialogHeader>
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {PALETTES.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  setDesignOverride(p.id);
+                  setPickerOpen(false);
+                }}
+                className={cn(
+                  "rounded-lg border p-2 text-left transition-all hover:shadow-md cursor-pointer",
+                  (designOverride || activePhilosophy) === p.id
+                    ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                    : "border-border hover:border-muted-foreground/40"
+                )}
+              >
+                <p className="text-[11px] font-bold leading-tight truncate">{p.name}</p>
+                <div className="flex gap-1 mt-1.5">
+                  {p.colors.map((c, i) => (
+                    <span key={i} className="inline-block h-3.5 w-3.5 rounded-full border border-border/50" style={{ backgroundColor: c }} />
+                  ))}
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 space-y-1.5">
+            <Label className="text-xs">Eigene Design-Beschreibung (optional)</Label>
+            <Textarea
+              value={designCustomOverride}
+              onChange={(e) => setDesignCustomOverride(e.target.value)}
+              placeholder="Eigene Design-Beschreibung..."
+              rows={2}
+            />
+          </div>
+        </PickerDialogContent>
+      </PickerDialog>
+    </>
   );
 }

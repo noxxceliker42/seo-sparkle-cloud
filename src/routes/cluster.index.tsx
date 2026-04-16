@@ -59,7 +59,12 @@ function ClusterListPage() {
   const [clusters, setClusters] = useState<ClusterWithPages[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [activeFirm, setActiveFirm] = useState<{ id: string; name: string; city?: string | null; service_area?: string | null } | null>(null);
+  const [activeFirm, setActiveFirm] = useState<{
+    id: string; name: string; city?: string | null; service_area?: string | null;
+    branche?: string | null; target_audience?: string | null;
+    design_philosophy?: string | null; design_philosophy_custom?: string | null;
+    primary_color?: string | null; secondary_color?: string | null; accent_color?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -74,7 +79,7 @@ function ClusterListPage() {
         if (profile?.firm_id) {
           const { data: firm } = await supabase
             .from("firms")
-            .select("id, name, city, service_area")
+            .select("id, name, city, service_area, branche, target_audience, design_philosophy, design_philosophy_custom, primary_color, secondary_color, accent_color")
             .eq("id", profile.firm_id)
             .single();
           if (firm) setActiveFirm(firm);

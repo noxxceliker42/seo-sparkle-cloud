@@ -101,7 +101,12 @@ Deno.serve(async (req) => {
 
     // ── ACTION: create_cluster ──────────────────────────────
     if (action === "create_cluster") {
-      const { userId, firmId, mainKeyword, clusterType, branche } = body;
+      const {
+        userId, firmId, mainKeyword, clusterType, branche,
+        designPhilosophy, designPhilosophyCustom,
+        primaryColor, secondaryColor, accentColor,
+        targetAudience, themeContext, differentiation,
+      } = body;
 
       if (!resolvedUserId || !mainKeyword) {
         return jsonResponse({ error: "userId and mainKeyword are required" }, 400);
@@ -116,6 +121,15 @@ Deno.serve(async (req) => {
           main_keyword: mainKeyword,
           cluster_type: clusterType || "brand_pillar",
           branche: branche || null,
+          design_philosophy: designPhilosophy || null,
+          design_philosophy_custom: designPhilosophyCustom || null,
+          primary_color: primaryColor || null,
+          secondary_color: secondaryColor || null,
+          accent_color: accentColor || null,
+          target_audience: targetAudience || null,
+          theme_context: themeContext || null,
+          differentiation: differentiation || null,
+          sprache: "de",
           status: "planning",
           plan_generated: false,
         })

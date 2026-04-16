@@ -156,30 +156,54 @@ export function OutputPanel({ page, onBack, onNewPage }: OutputPanelProps) {
 
   const htmlComplete = page.htmlOutput.trim().endsWith("</html>");
 
-  // --- Image slot logic (kept from original) ---
+  // Track current HTML for "Freigeben + einbauen"
+  const [liveHtml, setLiveHtml] = useState(page.htmlOutput);
+  useEffect(() => setLiveHtml(page.htmlOutput), [page.htmlOutput]);
+
+  // --- Image slot logic ---
   useEffect(() => {
-    if (tab !== "images" || slotsAnalyzed || !page.pageId || !page.htmlOutput) return;
+    if (tab !== "images" || slotsAnalyzed || !page.htmlOutput) return;
     async function analyzeSlots() {
       setSlotsLoading(true);
       try {
-        const { data: existing } = await supabase
-          .from("page_images")
-          .select("id, slot, slot_label, nano_prompt, alt_text, width, height, nano_status, cloudinary_url, nano_url")
-          .eq("page_id", page.pageId!);
-        if (existing && existing.length > 0) {
-          setImageSlots(existing.map((r: any) => ({
-            id: r.id, slot: r.slot, slotLabel: r.slot_label || r.slot,
-            prompt: r.nano_prompt || "", altText: r.alt_text || "",
-            width: r.width || 800, height: r.height || 450,
-            status: r.nano_status || "pending",
-            cloudinaryUrl: r.cloudinary_url, nanoUrl: r.nano_url,
-          })));
+        // 1) Check for nb-image-slot elements in HTML
+        const nbSlots = parseNbSlots(page.htmlOutput);
+
+        // 2) Check existing page_images in DB
+        if (page.pageId) {
+          const { data: existing } = await supabase
+            .from("page_images")
+            .select("id, slot, slot_label, nano_prompt, alt_text, width, height, nano_status, cloudinary_url, nano_url")
+            .eq("page_id", page.pageId);
+          if (existing && existing.length > 0) {
+            const dbSlots: ImageSlot[] = existing.map((r: any) => ({
+              id: r.id, slot: r.slot, slotLabel: r.slot_label || r.slot,
+              prompt: r.nano_prompt || "", altText: r.alt_text || "",
+              width: r.width || 800, height: r.height || 450,
+              status: toSlotStatus(r.nano_status || "pending"),
+              cloudinaryUrl: r.cloudinary_url, nanoUrl: r.nano_url,
+            }));
+            // Merge: DB slots take priority, add nb-slots not yet in DB
+            const dbSlotNames = new Set(dbSlots.map((s) => s.slot));
+            const merged = [...dbSlots, ...nbSlots.filter((nb) => !dbSlotNames.has(nb.slot))];
+            setImageSlots(merged);
+            setSlotsAnalyzed(true); setSlotsLoading(false); return;
+          }
+        }
+
+        // 3) If nb-slots found in HTML, use those
+        if (nbSlots.length > 0) {
+          setImageSlots(nbSlots);
           setSlotsAnalyzed(true); setSlotsLoading(false); return;
         }
-        const { data, error } = await supabase.functions.invoke("analyze-image-slots", {
-          body: { pageId: page.pageId, html: page.htmlOutput, keyword: page.keyword || "", firm: page.firmName || "", city: page.city || "" },
-        });
-        if (!error && data?.slots) setImageSlots(data.slots);
+
+        // 4) Fallback: analyze-image-slots edge function
+        if (page.pageId) {
+          const { data, error } = await supabase.functions.invoke("analyze-image-slots", {
+            body: { pageId: page.pageId, html: page.htmlOutput, keyword: page.keyword || "", firm: page.firmName || "", city: page.city || "" },
+          });
+          if (!error && data?.slots) setImageSlots(data.slots);
+        }
         setSlotsAnalyzed(true);
       } catch (err) { console.error("Slot analysis error:", err); }
       setSlotsLoading(false);

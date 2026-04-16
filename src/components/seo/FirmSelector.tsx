@@ -11,7 +11,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Building2, Loader2 } from "lucide-react";
+import { Plus, Building2, Loader2, Info } from "lucide-react";
 import { toast } from "sonner";
 
 interface Firm {
@@ -39,24 +39,24 @@ const emptyForm = {
 };
 
 const BRANCHEN = [
-  { value: "hausgeraete", label: "Hausgeräte" },
-  { value: "kfz", label: "KFZ" },
-  { value: "handwerk", label: "Handwerk" },
-  { value: "immobilien", label: "Immobilien" },
-  { value: "gesundheit", label: "Gesundheit" },
-  { value: "gastronomie", label: "Gastronomie" },
-  { value: "steuer-recht", label: "Steuer & Recht" },
-  { value: "it-tech", label: "IT & Tech" },
-  { value: "beauty-wellness", label: "Beauty & Wellness" },
-  { value: "bildung", label: "Bildung" },
-  { value: "ecommerce", label: "E-Commerce" },
-  { value: "bau-sanierung", label: "Bau & Sanierung" },
+  { value: "hausgeraete", label: "Haushaltsgeräte Reparatur" },
+  { value: "kfz", label: "KFZ / Autowerkstatt" },
+  { value: "handwerk", label: "Handwerk / Installation" },
+  { value: "immobilien", label: "Immobilien / Makler" },
+  { value: "gesundheit", label: "Gesundheit / Medizin" },
+  { value: "gastronomie", label: "Gastronomie / Restaurant" },
+  { value: "steuer-recht", label: "Steuer / Recht" },
+  { value: "it-tech", label: "IT / Technologie" },
+  { value: "beauty-wellness", label: "Beauty / Wellness" },
+  { value: "bildung", label: "Bildung / Coaching" },
+  { value: "ecommerce", label: "E-Commerce / Shop" },
+  { value: "bau-sanierung", label: "Bau / Sanierung" },
 ];
 
 const SPRACHEN = [
   { value: "de", label: "Deutsch" },
-  { value: "en", label: "English" },
-  { value: "tr", label: "Türkçe" },
+  { value: "en", label: "Englisch" },
+  { value: "tr", label: "Türkisch" },
 ];
 
 export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps) {
@@ -206,7 +206,7 @@ export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps
                 </div>
               </div>
               <div>
-                <Label className="text-xs">Straße</Label>
+                <Label className="text-xs">Straße + Nr.</Label>
                 <Input value={form.street} onChange={(e) => setField("street", e.target.value)} />
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -225,7 +225,7 @@ export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps
                 <Input value={form.website} onChange={(e) => setField("website", e.target.value)} />
               </div>
               <div>
-                <Label className="text-xs">Einzugsgebiet</Label>
+                <Label className="text-xs">Servicegebiet / Einzugsgebiet</Label>
                 <Input value={form.service_area} onChange={(e) => setField("service_area", e.target.value)} placeholder="Berlin & Umland" />
               </div>
             </TabsContent>
@@ -233,10 +233,10 @@ export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps
             <TabsContent value="betrieb" className="space-y-3 mt-3">
               <div>
                 <Label className="text-xs">Öffnungszeiten</Label>
-                <Textarea value={form.oeffnungszeiten} onChange={(e) => setField("oeffnungszeiten", e.target.value)} placeholder="Mo-Fr 8-18 Uhr, Sa 9-14 Uhr" rows={3} />
+                <Textarea value={form.oeffnungszeiten} onChange={(e) => setField("oeffnungszeiten", e.target.value)} placeholder="Mo–Fr 8–18 Uhr, Sa 9–14 Uhr, So geschlossen" rows={3} />
               </div>
               <div>
-                <Label className="text-xs">Branche</Label>
+                <Label className="text-xs">Branche *</Label>
                 <Select value={form.branche} onValueChange={(v) => setField("branche", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -253,34 +253,40 @@ export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Bewertung (z.B. 4.8)</Label>
+                  <Input type="number" step="0.1" min="1" max="5" value={form.rating} onChange={(e) => setField("rating", e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs">Anzahl Bewertungen (z.B. 127)</Label>
+                  <Input type="number" value={form.review_count} onChange={(e) => setField("review_count", e.target.value)} min={0} />
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="eeat" className="space-y-3 mt-3">
               <div>
-                <Label className="text-xs">Autor / Inhaber</Label>
-                <Input value={form.author} onChange={(e) => setField("author", e.target.value)} placeholder="Max Mustermann" />
+                <Label className="text-xs">Autor / Inhaber Name</Label>
+                <Input value={form.author} onChange={(e) => setField("author", e.target.value)} placeholder="z.B. Michael Müller" />
               </div>
               <div>
                 <Label className="text-xs">Berufsbezeichnung</Label>
-                <Input value={form.author_title} onChange={(e) => setField("author_title", e.target.value)} placeholder="Meister für Hausgerätetechnik" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-xs">Erfahrung (Jahre)</Label>
-                  <Input type="number" value={form.author_experience} onChange={(e) => setField("author_experience", e.target.value)} min={0} />
-                </div>
-                <div>
-                  <Label className="text-xs">Rating</Label>
-                  <Input type="number" step="0.1" min="1" max="5" value={form.rating} onChange={(e) => setField("rating", e.target.value)} />
-                </div>
+                <Input value={form.author_title} onChange={(e) => setField("author_title", e.target.value)} placeholder="z.B. Geprüfter Hausgerätetechniker" />
               </div>
               <div>
-                <Label className="text-xs">Anzahl Bewertungen</Label>
-                <Input type="number" value={form.review_count} onChange={(e) => setField("review_count", e.target.value)} min={0} />
+                <Label className="text-xs">Erfahrung in Jahren</Label>
+                <Input type="number" value={form.author_experience} onChange={(e) => setField("author_experience", e.target.value)} min={0} placeholder="z.B. 15" />
               </div>
               <div>
                 <Label className="text-xs">Zertifikate / Qualifikationen</Label>
-                <Textarea value={form.author_certs} onChange={(e) => setField("author_certs", e.target.value)} placeholder="Meisterbrief, TÜV-zertifiziert, …" rows={3} />
+                <Textarea value={form.author_certs} onChange={(e) => setField("author_certs", e.target.value)} placeholder="z.B. IHK-zertifiziert, Bosch Service Partner, Miele Fachbetrieb" rows={3} />
+              </div>
+              <div className="flex items-start gap-2 rounded-md border border-border bg-muted/50 p-3">
+                <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  Diese Daten werden für E-E-A-T Signale in den generierten Seiten verwendet.
+                </p>
               </div>
             </TabsContent>
           </Tabs>

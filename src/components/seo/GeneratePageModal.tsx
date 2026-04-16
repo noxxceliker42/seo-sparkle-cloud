@@ -222,7 +222,6 @@ export function GeneratePageModal({
 
   const getRequestBody = useCallback((field?: string) => {
     const selectedFirm = allFirms.find((f) => f.id === selectedFirmId);
-    const selectedFirm = allFirms.find((f) => f.id === selectedFirmId);
     return {
       keyword: clusterPage.keyword,
       pageType: clusterPage.page_type,
@@ -274,9 +273,9 @@ export function GeneratePageModal({
   useEffect(() => {
     if (open && !aiCalledRef.current) {
       aiCalledRef.current = true;
-      void fetchAiSuggestions();
+      void fetchAllSuggestions();
     }
-  }, [open, fetchAiSuggestions]);
+  }, [open, fetchAllSuggestions]);
 
   // Firm fields (editable overrides)
   const [firmName, setFirmName] = useState("");

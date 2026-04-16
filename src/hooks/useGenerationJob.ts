@@ -45,6 +45,7 @@ async function saveInternalLinks(
 }
 
 const STORAGE_KEY = "seo_os_generation_job";
+const POLLING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 interface GenerationJobState {
   jobId: string;
@@ -80,7 +81,7 @@ function readStorage(): { jobId: string; keyword: string; clusterPageId?: string
 
 function writeStorage(jobId: string, keyword: string, clusterPageId?: string) {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ jobId, keyword, clusterPageId }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ jobId, keyword, clusterPageId, timestamp: new Date().toISOString() }));
   } catch {}
 }
 
@@ -88,6 +89,27 @@ function clearStorage() {
   try {
     sessionStorage.removeItem(STORAGE_KEY);
   } catch {}
+}
+
+/** Clear stuck jobs older than 10 minutes from sessionStorage */
+export function clearStuckJob() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const stored = JSON.parse(raw);
+    const ts = stored.timestamp || stored.createdAt;
+    if (!ts) {
+      sessionStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    const jobAge = Date.now() - new Date(ts).getTime();
+    if (jobAge > POLLING_TIMEOUT_MS) {
+      sessionStorage.removeItem(STORAGE_KEY);
+      console.log("Steckengebliebener Job bereinigt");
+    }
+  } catch {
+    sessionStorage.removeItem(STORAGE_KEY);
+  }
 }
 
 export function useGenerationJob() {

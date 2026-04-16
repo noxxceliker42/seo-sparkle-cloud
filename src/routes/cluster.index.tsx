@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { PlusCircle, Network, Loader2 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { ClusterStartModal } from "@/components/seo/ClusterStartModal";
 
 export const Route = createFileRoute("/cluster/")({
   component: ClusterListPage,

@@ -934,16 +934,33 @@ export function GeneratePageModal({
 
           {/* ── Footer buttons ── */}
           <div className="flex gap-2 pt-1">
-            <Button variant="outline" onClick={onClose} disabled={generating} className="flex-1">
-              Abbrechen
-            </Button>
-            <Button onClick={handleGenerate} disabled={generating} className="flex-1">
-              {generating ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Generiere…</>
-              ) : (
-                "Seite generieren →"
-              )}
-            </Button>
+            {generating ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    clearResult();
+                    onClose();
+                    toast.info("Generierung abgebrochen");
+                  }}
+                  className="flex-1"
+                >
+                  Abbrechen
+                </Button>
+                <Button disabled className="flex-1">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Generiere…
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={onClose} className="flex-1">
+                  Abbrechen
+                </Button>
+                <Button onClick={handleGenerate} className="flex-1">
+                  Seite generieren →
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </DialogContent>

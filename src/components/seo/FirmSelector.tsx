@@ -3,21 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Building2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,7 +31,33 @@ interface FirmSelectorProps {
   onFirmChange: (firm: Firm | null) => void;
 }
 
-const emptyForm = { name: "", city: "", street: "", zip: "", phone: "", email: "", website: "", service_area: "" };
+const emptyForm = {
+  name: "", city: "", street: "", zip: "", phone: "", email: "", website: "", service_area: "",
+  oeffnungszeiten: "", branche: "hausgeraete", sprache: "de",
+  author: "", author_title: "", author_experience: "", author_certs: "",
+  rating: "", review_count: "",
+};
+
+const BRANCHEN = [
+  { value: "hausgeraete", label: "Hausgeräte" },
+  { value: "kfz", label: "KFZ" },
+  { value: "handwerk", label: "Handwerk" },
+  { value: "immobilien", label: "Immobilien" },
+  { value: "gesundheit", label: "Gesundheit" },
+  { value: "gastronomie", label: "Gastronomie" },
+  { value: "steuer-recht", label: "Steuer & Recht" },
+  { value: "it-tech", label: "IT & Tech" },
+  { value: "beauty-wellness", label: "Beauty & Wellness" },
+  { value: "bildung", label: "Bildung" },
+  { value: "ecommerce", label: "E-Commerce" },
+  { value: "bau-sanierung", label: "Bau & Sanierung" },
+];
+
+const SPRACHEN = [
+  { value: "de", label: "Deutsch" },
+  { value: "en", label: "English" },
+  { value: "tr", label: "Türkçe" },
+];
 
 export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps) {
   const [firms, setFirms] = useState<Firm[]>([]);
@@ -52,22 +71,23 @@ export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps
     const { data } = await supabase.from("firms").select("*").order("name");
     if (data) {
       setFirms(data);
-      if (!selectedFirmId && data.length > 0) {
-        onFirmChange(data[0]);
-      }
+      if (!selectedFirmId && data.length > 0) onFirmChange(data[0]);
     }
   }, [selectedFirmId, onFirmChange]);
 
-  useEffect(() => {
-    loadFirms();
-  }, [loadFirms]);
+  useEffect(() => { loadFirms(); }, [loadFirms]);
 
   const validate = () => {
     const e: { name?: string; phone?: string } = {};
-    if (!form.name.trim() || form.name.trim().length < 2) e.name = "Firmenname muss mind. 2 Zeichen haben.";
-    if (!form.phone.trim()) e.phone = "Telefon ist ein Pflichtfeld.";
+    if (!form.name.trim() || form.name.trim().length < 2) e.name = "Mind. 2 Zeichen.";
+    if (!form.phone.trim()) e.phone = "Pflichtfeld.";
     setErrors(e);
     return Object.keys(e).length === 0;
+  };
+
+  const setField = (key: string, val: string) => {
+    setForm((f) => ({ ...f, [key]: val }));
+    if (key === "name" || key === "phone") setErrors((e) => ({ ...e, [key]: undefined }));
   };
 
   const handleSave = async () => {
@@ -77,16 +97,10 @@ export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id;
-
-      if (!userId) {
-        setApiError("Nicht angemeldet. Bitte zuerst einloggen.");
-        setSaving(false);
-        return;
-      }
+      if (!user?.id) { setApiError("Nicht angemeldet."); setSaving(false); return; }
 
       const { data, error } = await supabase.from("firms").insert({
-        user_id: userId,
+        user_id: user.id,
         name: form.name.trim(),
         city: form.city || null,
         street: form.street || null,
@@ -95,27 +109,30 @@ export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps
         email: form.email || null,
         website: form.website || null,
         service_area: form.service_area || null,
+        oeffnungszeiten: form.oeffnungszeiten || null,
+        branche: form.branche || "hausgeraete",
+        sprache: form.sprache || "de",
+        author: form.author || null,
+        author_title: form.author_title || null,
+        author_experience: form.author_experience ? parseInt(form.author_experience) : null,
+        author_certs: form.author_certs || null,
+        rating: form.rating ? parseFloat(form.rating) : null,
+        review_count: form.review_count ? parseInt(form.review_count) : null,
       }).select().single();
 
-      if (error) {
-        console.error("Supabase insert error:", error);
-        setApiError(error.message || "Fehler beim Speichern.");
-        setSaving(false);
-        return;
-      }
+      if (error) { setApiError(error.message); setSaving(false); return; }
 
       if (data) {
         setFirms((prev) => [...prev, data]);
         onFirmChange(data);
-        toast.success(`Mandant "${data.name}" wurde angelegt`);
+        toast.success(`Mandant "${data.name}" angelegt`);
         setDialogOpen(false);
         setForm(emptyForm);
         setErrors({});
         setApiError(null);
       }
-    } catch (err: unknown) {
-      console.error(err);
-      setApiError("Unerwarteter Fehler beim Speichern.");
+    } catch {
+      setApiError("Unerwarteter Fehler.");
     } finally {
       setSaving(false);
     }
@@ -150,11 +167,10 @@ export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps
       }}>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm" className="h-9 gap-1 text-xs">
-            <Plus className="h-3.5 w-3.5" />
-            Neuer Mandant
+            <Plus className="h-3.5 w-3.5" /> Neuer Mandant
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Neuen Mandanten anlegen</DialogTitle>
             <DialogDescription>Erfasse die Stammdaten des neuen Mandanten.</DialogDescription>
@@ -166,60 +182,114 @@ export function FirmSelector({ selectedFirmId, onFirmChange }: FirmSelectorProps
             </div>
           )}
 
-          <div className="grid gap-3 py-2">
-            <div>
-              <Label className="text-xs">Firmenname *</Label>
-              <Input
-                value={form.name}
-                onChange={(e) => { setForm((p) => ({ ...p, name: e.target.value })); setErrors((p) => ({ ...p, name: undefined })); }}
-                placeholder="z.B. Kurt Reparaturdienst"
-                className={errors.name ? "border-destructive" : ""}
-              />
-              {errors.name && <p className="text-xs text-destructive mt-1">{errors.name}</p>}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="col-span-2">
-                <Label className="text-xs">Stadt</Label>
-                <Input value={form.city} onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))} placeholder="Berlin" />
+          <Tabs defaultValue="stammdaten" className="mt-2">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="stammdaten">Stammdaten</TabsTrigger>
+              <TabsTrigger value="betrieb">Betrieb</TabsTrigger>
+              <TabsTrigger value="eeat">E-E-A-T</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="stammdaten" className="space-y-3 mt-3">
+              <div>
+                <Label className="text-xs">Firmenname *</Label>
+                <Input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="z.B. Kurt Reparaturdienst" className={errors.name ? "border-destructive" : ""} />
+                {errors.name && <p className="text-xs text-destructive mt-1">{errors.name}</p>}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <Label className="text-xs">Stadt</Label>
+                  <Input value={form.city} onChange={(e) => setField("city", e.target.value)} placeholder="Berlin" />
+                </div>
+                <div>
+                  <Label className="text-xs">PLZ</Label>
+                  <Input value={form.zip} onChange={(e) => setField("zip", e.target.value)} placeholder="10115" />
+                </div>
               </div>
               <div>
-                <Label className="text-xs">PLZ</Label>
-                <Input value={form.zip} onChange={(e) => setForm((p) => ({ ...p, zip: e.target.value }))} placeholder="10115" />
+                <Label className="text-xs">Straße</Label>
+                <Input value={form.street} onChange={(e) => setField("street", e.target.value)} />
               </div>
-            </div>
-            <div>
-              <Label className="text-xs">Straße</Label>
-              <Input value={form.street} onChange={(e) => setForm((p) => ({ ...p, street: e.target.value }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Telefon *</Label>
-                <Input
-                  value={form.phone}
-                  onChange={(e) => { setForm((p) => ({ ...p, phone: e.target.value })); setErrors((p) => ({ ...p, phone: undefined })); }}
-                  className={errors.phone ? "border-destructive" : ""}
-                />
-                {errors.phone && <p className="text-xs text-destructive mt-1">{errors.phone}</p>}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Telefon *</Label>
+                  <Input value={form.phone} onChange={(e) => setField("phone", e.target.value)} className={errors.phone ? "border-destructive" : ""} />
+                  {errors.phone && <p className="text-xs text-destructive mt-1">{errors.phone}</p>}
+                </div>
+                <div>
+                  <Label className="text-xs">E-Mail</Label>
+                  <Input value={form.email} onChange={(e) => setField("email", e.target.value)} />
+                </div>
               </div>
               <div>
-                <Label className="text-xs">E-Mail</Label>
-                <Input value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
+                <Label className="text-xs">Website</Label>
+                <Input value={form.website} onChange={(e) => setField("website", e.target.value)} />
               </div>
-            </div>
-            <div>
-              <Label className="text-xs">Website</Label>
-              <Input value={form.website} onChange={(e) => setForm((p) => ({ ...p, website: e.target.value }))} />
-            </div>
-            <div>
-              <Label className="text-xs">Einzugsgebiet</Label>
-              <Input value={form.service_area} onChange={(e) => setForm((p) => ({ ...p, service_area: e.target.value }))} placeholder="Berlin & Umland" />
-            </div>
-            <Button onClick={handleSave} disabled={!isValid || saving} className="mt-2 min-h-[44px]">
-              {saving ? (
-                <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Wird gespeichert…</span>
-              ) : "Mandant anlegen"}
-            </Button>
-          </div>
+              <div>
+                <Label className="text-xs">Einzugsgebiet</Label>
+                <Input value={form.service_area} onChange={(e) => setField("service_area", e.target.value)} placeholder="Berlin & Umland" />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="betrieb" className="space-y-3 mt-3">
+              <div>
+                <Label className="text-xs">Öffnungszeiten</Label>
+                <Textarea value={form.oeffnungszeiten} onChange={(e) => setField("oeffnungszeiten", e.target.value)} placeholder="Mo-Fr 8-18 Uhr, Sa 9-14 Uhr" rows={3} />
+              </div>
+              <div>
+                <Label className="text-xs">Branche</Label>
+                <Select value={form.branche} onValueChange={(v) => setField("branche", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {BRANCHEN.map((b) => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Sprache</Label>
+                <Select value={form.sprache} onValueChange={(v) => setField("sprache", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SPRACHEN.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="eeat" className="space-y-3 mt-3">
+              <div>
+                <Label className="text-xs">Autor / Inhaber</Label>
+                <Input value={form.author} onChange={(e) => setField("author", e.target.value)} placeholder="Max Mustermann" />
+              </div>
+              <div>
+                <Label className="text-xs">Berufsbezeichnung</Label>
+                <Input value={form.author_title} onChange={(e) => setField("author_title", e.target.value)} placeholder="Meister für Hausgerätetechnik" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Erfahrung (Jahre)</Label>
+                  <Input type="number" value={form.author_experience} onChange={(e) => setField("author_experience", e.target.value)} min={0} />
+                </div>
+                <div>
+                  <Label className="text-xs">Rating</Label>
+                  <Input type="number" step="0.1" min="1" max="5" value={form.rating} onChange={(e) => setField("rating", e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Anzahl Bewertungen</Label>
+                <Input type="number" value={form.review_count} onChange={(e) => setField("review_count", e.target.value)} min={0} />
+              </div>
+              <div>
+                <Label className="text-xs">Zertifikate / Qualifikationen</Label>
+                <Textarea value={form.author_certs} onChange={(e) => setField("author_certs", e.target.value)} placeholder="Meisterbrief, TÜV-zertifiziert, …" rows={3} />
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <Button onClick={handleSave} disabled={!isValid || saving} className="mt-3 min-h-[44px] w-full">
+            {saving ? (
+              <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Wird gespeichert…</span>
+            ) : "Mandant anlegen"}
+          </Button>
         </DialogContent>
       </Dialog>
     </div>

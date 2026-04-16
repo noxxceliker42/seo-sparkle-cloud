@@ -222,16 +222,15 @@ export function GeneratePageModal({
 
   const getRequestBody = useCallback((field?: string) => {
     const selectedFirm = allFirms.find((f) => f.id === selectedFirmId);
+    const selectedFirm = allFirms.find((f) => f.id === selectedFirmId);
     return {
       keyword: clusterPage.keyword,
       pageType: clusterPage.page_type,
       firm: selectedFirm?.name || firm?.name || "",
       branche: selectedFirm?.branche || cluster.branche || "hausgeraete",
-      designPhilosophy: activePhilosophy,
-      targetAudience: targetAudience || "privatkunden",
       ...(field ? { field } : {}),
     };
-  }, [clusterPage.keyword, clusterPage.page_type, allFirms, selectedFirmId, firm, cluster.branche, activePhilosophy, targetAudience]);
+  }, [clusterPage.keyword, clusterPage.page_type, allFirms, selectedFirmId, firm, cluster.branche]);
 
   const applyAiData = useCallback((data: Record<string, string>) => {
     if (data.uniqueData) setUniqueData(data.uniqueData);

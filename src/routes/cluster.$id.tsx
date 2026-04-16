@@ -24,7 +24,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Loader2, Zap, Network, Eye, Rocket, AlertCircle, RotateCcw } from "lucide-react";
+import { ArrowLeft, Loader2, Zap, Network, Eye, Rocket, AlertCircle, RotateCcw, LinkIcon, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { calculateScore, scoreColor, scoreTextColor } from "@/lib/clusterScore";
 import { GeneratePageModal, type FirmData } from "@/components/seo/GeneratePageModal";
 import type { Tables } from "@/integrations/supabase/types";
@@ -341,6 +342,15 @@ function ClusterDetailPage() {
                           )
                         );
                       }}
+                      onLinksUpdated={(pageId, links) => {
+                        setPages((prev) =>
+                          prev.map((p) =>
+                            p.id === pageId
+                              ? { ...p, internal_links_set: true, internal_links_list: links as unknown as import("@/integrations/supabase/types").Json }
+                              : p
+                          )
+                        );
+                      }}
                     />
                   ))}
                 </div>
@@ -597,6 +607,116 @@ function SubClusterModal({ open, onOpenChange, page, cluster, firm, onCreated }:
   );
 }
 
+// ── Links Modal ───────────────────────────────────────────────
+interface LinksModalProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  page: ClusterPageRow;
+  onLinksSet: (links: Array<{ keyword: string; slug: string }>) => void;
+}
+
+function LinksModal({ open, onOpenChange, page, onLinksSet }: LinksModalProps) {
+  const [links, setLinks] = useState<Array<{ keyword: string; slug: string; checked: boolean }>>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    // Parse internal_links from seo_pages via seo_page_id
+    async function loadLinks() {
+      if (!page.seo_page_id) return;
+      const { data } = await supabase
+        .from("seo_pages")
+        .select("internal_links")
+        .eq("id", page.seo_page_id)
+        .single();
+
+      if (!data?.internal_links) return;
+
+      const rawLinks = data.internal_links as Array<{ keyword?: string; slug?: string; url?: string }>;
+      const existingSet = new Set(
+        ((page.internal_links_list || []) as Array<{ keyword?: string }>).map((l) => l.keyword)
+      );
+
+      setLinks(
+        rawLinks.map((l) => ({
+          keyword: l.keyword || "",
+          slug: l.slug || l.url || "",
+          checked: existingSet.has(l.keyword || ""),
+        }))
+      );
+    }
+    loadLinks();
+  }, [open, page.seo_page_id, page.internal_links_list]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const selectedLinks = links.filter((l) => l.checked).map((l) => ({ keyword: l.keyword, slug: l.slug }));
+
+    await supabase
+      .from("cluster_pages")
+      .update({
+        internal_links_set: true,
+        internal_links_list: selectedLinks as unknown as import("@/integrations/supabase/types").Json,
+      })
+      .eq("id", page.id);
+
+    onLinksSet(selectedLinks);
+    setSaving(false);
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!saving) onOpenChange(v); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Interne Links verwalten</DialogTitle>
+          <DialogDescription>{page.keyword}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 pt-2">
+          {links.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Keine internen Links in dieser Seite gefunden.
+            </p>
+          ) : (
+            <div className="max-h-64 overflow-y-auto space-y-1.5 border rounded-md p-2 bg-muted/30">
+              {links.map((link, idx) => (
+                <label key={idx} className="flex items-center gap-2 text-xs cursor-pointer py-0.5">
+                  <Checkbox
+                    checked={link.checked}
+                    onCheckedChange={() =>
+                      setLinks((prev) =>
+                        prev.map((l, i) => (i === idx ? { ...l, checked: !l.checked } : l))
+                      )
+                    }
+                    disabled={saving}
+                  />
+                  <span className="truncate flex-1">
+                    {link.keyword}
+                    <span className="text-muted-foreground font-mono ml-1">→ /{link.slug}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving} className="flex-1">
+              Abbrechen
+            </Button>
+            <Button onClick={handleSave} disabled={saving || links.length === 0} className="flex-1">
+              {saving ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Speichere…</>
+              ) : (
+                "Als gesetzt markieren"
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Card Component ────────────────────────────────────────────
 interface ClusterPageCardProps {
   page: ClusterPageRow;
@@ -607,10 +727,12 @@ interface ClusterPageCardProps {
   onGenerate: () => void;
   onSetLive: () => void;
   onSubClusterCreated: (subClusterId: string) => void;
+  onLinksUpdated: (pageId: string, links: Array<{ keyword: string; slug: string }>) => void;
 }
 
-function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, onGenerate, onSetLive, onSubClusterCreated }: ClusterPageCardProps) {
+function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, onGenerate, onSetLive, onSubClusterCreated, onLinksUpdated }: ClusterPageCardProps) {
   const [subModalOpen, setSubModalOpen] = useState(false);
+  const [linksModalOpen, setLinksModalOpen] = useState(false);
   const score = calculateScore(page);
   const status = page.status || "planned";
   const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.planned;
@@ -712,6 +834,22 @@ function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, 
               </>
             )}
           </div>
+
+          {/* Links setzen button for generated pages */}
+          {isGenerated && page.seo_page_id && (
+            <Button
+              size="sm"
+              variant={page.internal_links_set ? "outline" : "secondary"}
+              className={`w-full text-[11px] h-7 gap-1 ${page.internal_links_set ? "text-green-700 border-green-300 dark:text-green-400 dark:border-green-700" : ""}`}
+              onClick={() => setLinksModalOpen(true)}
+            >
+              {page.internal_links_set ? (
+                <><Check className="h-3 w-3" /> Links gesetzt ✓</>
+              ) : (
+                <><LinkIcon className="h-3 w-3" /> Links setzen</>
+              )}
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -724,6 +862,16 @@ function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, 
           cluster={cluster}
           firm={firm}
           onCreated={onSubClusterCreated}
+        />
+      )}
+
+      {/* Links Modal */}
+      {linksModalOpen && (
+        <LinksModal
+          open={linksModalOpen}
+          onOpenChange={setLinksModalOpen}
+          page={page}
+          onLinksSet={(links) => onLinksUpdated(page.id, links)}
         />
       )}
     </>

@@ -122,24 +122,69 @@ export function GeneratePageModal({
 }: GeneratePageModalProps) {
   const { startGeneration, generating, error, result, jobId, clearError } = useGenerationJob();
 
+  // All firms for the user
+  const [allFirms, setAllFirms] = useState<FirmData[]>([]);
+  const [selectedFirmId, setSelectedFirmId] = useState<string>(firm?.id || "");
+
+  // Load all firms on mount
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("firms")
+        .select("*")
+        .order("name", { ascending: true });
+      if (data) {
+        setAllFirms(data as unknown as FirmData[]);
+        // If no firm selected yet, use activeFirm or first firm
+        if (!selectedFirmId && data.length > 0) {
+          const match = firm?.id ? data.find((f) => f.id === firm.id) : data[0];
+          if (match) setSelectedFirmId(match.id);
+        }
+      }
+    })();
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Helper to populate fields from a firm
+  const populateFromFirm = useCallback((f: FirmData | undefined | null) => {
+    setFirmName(f?.name || "");
+    setFirmStreet(f?.street || "");
+    setFirmCity(f?.city || "");
+    setFirmPhone(f?.phone || "");
+    setFirmEmail(f?.email || "");
+    setFirmWebsite(f?.website || "");
+    setFirmServiceArea(f?.service_area || "");
+    setFirmOeffnungszeiten(f?.oeffnungszeiten || "");
+    setFirmAuthor(f?.author || "");
+    setFirmAuthorTitle(f?.author_title || "");
+    setFirmAuthorExp(f?.author_experience?.toString() || "");
+    setFirmAuthorCerts(f?.author_certs || "");
+  }, []);
+
+  // Populate on firm selection change
+  useEffect(() => {
+    if (!selectedFirmId) return;
+    const selected = allFirms.find((f) => f.id === selectedFirmId);
+    if (selected) populateFromFirm(selected);
+  }, [selectedFirmId, allFirms, populateFromFirm]);
+
   // Required fields
   const [uniqueData, setUniqueData] = useState("");
   const [informationGain, setInformationGain] = useState("");
   const [uspFokus, setUspFokus] = useState("");
 
   // Firm fields (editable overrides)
-  const [firmName, setFirmName] = useState(firm?.name || "");
-  const [firmStreet, setFirmStreet] = useState(firm?.street || "");
-  const [firmCity, setFirmCity] = useState(firm?.city || "");
-  const [firmPhone, setFirmPhone] = useState(firm?.phone || "");
-  const [firmEmail, setFirmEmail] = useState(firm?.email || "");
-  const [firmWebsite, setFirmWebsite] = useState(firm?.website || "");
-  const [firmServiceArea, setFirmServiceArea] = useState(firm?.service_area || "");
-  const [firmOeffnungszeiten, setFirmOeffnungszeiten] = useState(firm?.oeffnungszeiten || "");
-  const [firmAuthor, setFirmAuthor] = useState(firm?.author || "");
-  const [firmAuthorTitle, setFirmAuthorTitle] = useState(firm?.author_title || "");
-  const [firmAuthorExp, setFirmAuthorExp] = useState(firm?.author_experience?.toString() || "");
-  const [firmAuthorCerts, setFirmAuthorCerts] = useState(firm?.author_certs || "");
+  const [firmName, setFirmName] = useState("");
+  const [firmStreet, setFirmStreet] = useState("");
+  const [firmCity, setFirmCity] = useState("");
+  const [firmPhone, setFirmPhone] = useState("");
+  const [firmEmail, setFirmEmail] = useState("");
+  const [firmWebsite, setFirmWebsite] = useState("");
+  const [firmServiceArea, setFirmServiceArea] = useState("");
+  const [firmOeffnungszeiten, setFirmOeffnungszeiten] = useState("");
+  const [firmAuthor, setFirmAuthor] = useState("");
+  const [firmAuthorTitle, setFirmAuthorTitle] = useState("");
+  const [firmAuthorExp, setFirmAuthorExp] = useState("");
+  const [firmAuthorCerts, setFirmAuthorCerts] = useState("");
 
   // Advanced settings
   const [kvaPrice, setKvaPrice] = useState("");
@@ -273,6 +318,7 @@ export function GeneratePageModal({
 
     const formData: Record<string, unknown> = {
       keyword: clusterPage.keyword,
+      firmId: selectedFirmId || null,
       pageType: clusterPage.page_type,
       pillarTier: clusterPage.pillar_tier || 2,
       urlSlug: clusterPage.url_slug,
@@ -329,6 +375,21 @@ export function GeneratePageModal({
         </DialogHeader>
 
         <div className="space-y-5 pt-2">
+          {/* ── Firmen-Auswahl ── */}
+          <div className="space-y-1.5">
+            <Label>Firma auswählen</Label>
+            <Select value={selectedFirmId} onValueChange={setSelectedFirmId} disabled={generating}>
+              <SelectTrigger>
+                <SelectValue placeholder="Firma wählen…" />
+              </SelectTrigger>
+              <SelectContent>
+                {allFirms.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* ── SEKTION 1: Info Card ── */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm bg-muted/50 p-3 rounded-md">
             <div className="font-medium text-foreground truncate">{clusterPage.keyword}</div>

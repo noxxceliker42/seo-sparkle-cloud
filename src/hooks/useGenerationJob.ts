@@ -1,6 +1,49 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+/** Parse internal links from generated HTML */
+function parseInternalLinks(html: string): Array<{ href: string; text: string }> {
+  if (!html) return [];
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    const anchors = doc.querySelectorAll("a[href]");
+    const internal: Array<{ href: string; text: string }> = [];
+    anchors.forEach((a) => {
+      const href = a.getAttribute("href") || "";
+      if (href.startsWith("/") || href.startsWith("./") || href.startsWith("#")) {
+        internal.push({ href, text: a.textContent?.trim() || href });
+      }
+    });
+    return internal;
+  } catch {
+    return [];
+  }
+}
+
+/** Save parsed internal links to seo_pages and optionally cluster_pages */
+async function saveInternalLinks(
+  pageId: string | null,
+  clusterPageId: string | null,
+  html: string
+) {
+  if (!pageId || !html) return;
+  const links = parseInternalLinks(html);
+  if (links.length === 0) return;
+
+  await supabase
+    .from("seo_pages")
+    .update({ internal_links: links as any })
+    .eq("id", pageId);
+
+  if (clusterPageId) {
+    await supabase
+      .from("cluster_pages")
+      .update({ internal_links_list: links as any })
+      .eq("id", clusterPageId);
+  }
+}
+
 const STORAGE_KEY = "seo_os_generation_job";
 
 interface GenerationJobState {

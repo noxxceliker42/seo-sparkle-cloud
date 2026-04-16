@@ -43,9 +43,10 @@ interface ImageSlot {
   altText: string;
   width: number;
   height: number;
-  status: string;
+  status: "pending" | "generating" | "completed" | "uploaded" | "failed" | "approved";
   cloudinaryUrl?: string;
   nanoUrl?: string;
+  isNbSlot?: boolean; // from nb-image-slot in HTML
 }
 
 const SECTION_LABELS: Record<string, string> = {

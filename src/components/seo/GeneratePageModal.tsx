@@ -164,7 +164,7 @@ export function GeneratePageModal({
   onClose,
   onSuccess,
 }: GeneratePageModalProps) {
-  const { startGeneration, generating, error, result, jobId, clearError } = useGenerationJob();
+  const { startGeneration, generating, error, result, jobId, clearError, clearResult } = useGenerationJob();
 
   // All firms for the user
   const [allFirms, setAllFirms] = useState<FirmData[]>([]);

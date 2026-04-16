@@ -55,64 +55,100 @@ export type Database = {
       }
       cluster_pages: {
         Row: {
-          cluster_id: string
-          content_angle: string | null
-          created_at: string
-          differentiator: string | null
-          estimated_difficulty: number | null
-          estimated_volume: number | null
-          firm_id: string | null
+          ai_description: string | null
+          cluster_id: string | null
+          cpc: number | null
+          created_at: string | null
+          generated_at: string | null
+          generation_jobs_id: string | null
+          has_sub_cluster_potential: boolean | null
           id: string
-          intent: string | null
-          internal_link_anchor: string | null
+          internal_links_set: boolean | null
+          is_sub_cluster_suggested: boolean | null
           keyword: string
+          keyword_difficulty: number | null
           page_type: string
-          priority: string
-          reason: string | null
+          pillar_tier: number | null
+          priority: number | null
+          score_conversion: number | null
+          score_difficulty: number | null
+          score_gap: number | null
+          score_pillar_support: number | null
+          score_total: number | null
+          score_trend: number | null
+          score_volume: number | null
+          search_volume: number | null
           seo_page_id: string | null
-          sort_order: number
-          status: string
-          updated_at: string
+          sitemap_added: boolean | null
+          status: string | null
+          sub_cluster_id: string | null
+          trend_direction: string | null
+          url_slug: string
+          user_id: string | null
         }
         Insert: {
-          cluster_id: string
-          content_angle?: string | null
-          created_at?: string
-          differentiator?: string | null
-          estimated_difficulty?: number | null
-          estimated_volume?: number | null
-          firm_id?: string | null
+          ai_description?: string | null
+          cluster_id?: string | null
+          cpc?: number | null
+          created_at?: string | null
+          generated_at?: string | null
+          generation_jobs_id?: string | null
+          has_sub_cluster_potential?: boolean | null
           id?: string
-          intent?: string | null
-          internal_link_anchor?: string | null
+          internal_links_set?: boolean | null
+          is_sub_cluster_suggested?: boolean | null
           keyword: string
+          keyword_difficulty?: number | null
           page_type: string
-          priority?: string
-          reason?: string | null
+          pillar_tier?: number | null
+          priority?: number | null
+          score_conversion?: number | null
+          score_difficulty?: number | null
+          score_gap?: number | null
+          score_pillar_support?: number | null
+          score_total?: number | null
+          score_trend?: number | null
+          score_volume?: number | null
+          search_volume?: number | null
           seo_page_id?: string | null
-          sort_order?: number
-          status?: string
-          updated_at?: string
+          sitemap_added?: boolean | null
+          status?: string | null
+          sub_cluster_id?: string | null
+          trend_direction?: string | null
+          url_slug: string
+          user_id?: string | null
         }
         Update: {
-          cluster_id?: string
-          content_angle?: string | null
-          created_at?: string
-          differentiator?: string | null
-          estimated_difficulty?: number | null
-          estimated_volume?: number | null
-          firm_id?: string | null
+          ai_description?: string | null
+          cluster_id?: string | null
+          cpc?: number | null
+          created_at?: string | null
+          generated_at?: string | null
+          generation_jobs_id?: string | null
+          has_sub_cluster_potential?: boolean | null
           id?: string
-          intent?: string | null
-          internal_link_anchor?: string | null
+          internal_links_set?: boolean | null
+          is_sub_cluster_suggested?: boolean | null
           keyword?: string
+          keyword_difficulty?: number | null
           page_type?: string
-          priority?: string
-          reason?: string | null
+          pillar_tier?: number | null
+          priority?: number | null
+          score_conversion?: number | null
+          score_difficulty?: number | null
+          score_gap?: number | null
+          score_pillar_support?: number | null
+          score_total?: number | null
+          score_trend?: number | null
+          score_volume?: number | null
+          search_volume?: number | null
           seo_page_id?: string | null
-          sort_order?: number
-          status?: string
-          updated_at?: string
+          sitemap_added?: boolean | null
+          status?: string | null
+          sub_cluster_id?: string | null
+          trend_direction?: string | null
+          url_slug?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -123,54 +159,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "cluster_pages_firm_id_fkey"
-            columns: ["firm_id"]
-            isOneToOne: false
-            referencedRelation: "firms"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "cluster_pages_seo_page_id_fkey"
             columns: ["seo_page_id"]
             isOneToOne: false
             referencedRelation: "seo_pages"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cluster_pages_sub_cluster_id_fkey"
+            columns: ["sub_cluster_id"]
+            isOneToOne: false
+            referencedRelation: "clusters"
+            referencedColumns: ["id"]
+          },
         ]
       }
       clusters: {
         Row: {
-          created_at: string
+          branche: string | null
+          cluster_type: string | null
+          created_at: string | null
           firm_id: string | null
           id: string
+          main_keyword: string
           name: string
-          pillar_keyword: string
           pillar_page_id: string | null
-          status: string
-          updated_at: string
-          user_id: string
+          plan_generated: boolean | null
+          sprache: string | null
+          status: string | null
+          user_id: string | null
         }
         Insert: {
-          created_at?: string
+          branche?: string | null
+          cluster_type?: string | null
+          created_at?: string | null
           firm_id?: string | null
           id?: string
+          main_keyword: string
           name: string
-          pillar_keyword: string
           pillar_page_id?: string | null
-          status?: string
-          updated_at?: string
-          user_id: string
+          plan_generated?: boolean | null
+          sprache?: string | null
+          status?: string | null
+          user_id?: string | null
         }
         Update: {
-          created_at?: string
+          branche?: string | null
+          cluster_type?: string | null
+          created_at?: string | null
           firm_id?: string | null
           id?: string
+          main_keyword?: string
           name?: string
-          pillar_keyword?: string
           pillar_page_id?: string | null
-          status?: string
-          updated_at?: string
-          user_id?: string
+          plan_generated?: boolean | null
+          sprache?: string | null
+          status?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {

@@ -182,17 +182,18 @@ export function GeneratePageModal({
     setAiLoading(true);
     try {
       const selectedFirm = allFirms.find((f) => f.id === selectedFirmId);
+      const requestBody = {
+        keyword: clusterPage.keyword,
+        pageType: clusterPage.page_type,
+        firm: selectedFirm?.name || firm?.name || "",
+        branche: selectedFirm?.branche || cluster.branche || "hausgeraete",
+      };
+      console.log("AI Suggestions Request:", requestBody);
       const { data, error: fnError } = await supabase.functions.invoke(
         "generate-field-suggestions",
-        {
-          body: {
-            keyword: clusterPage.keyword,
-            pageType: clusterPage.page_type,
-            firm: selectedFirm?.name || firm?.name || "",
-            branche: selectedFirm?.branche || cluster.branche || "hausgeraete",
-          },
-        }
+        { body: requestBody }
       );
+      console.log("AI Suggestions Response:", { data, fnError });
       if (!fnError && data) {
         if (data.uniqueData) setUniqueData(data.uniqueData);
         if (data.informationGain) setInformationGain(data.informationGain);

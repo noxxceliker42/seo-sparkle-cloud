@@ -59,11 +59,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Build target URL: base + optional webhookPath
+    // Build target URL: base + optional webhookPath (avoid duplicating path)
     let targetUrl = n8nBaseUrl;
-    if (webhookPath) {
-      targetUrl = n8nBaseUrl.replace(/\/+$/, "") + "/" + webhookPath;
+    if (webhookPath && !n8nBaseUrl.endsWith(webhookPath)) {
+      targetUrl = n8nBaseUrl.endsWith("/")
+        ? n8nBaseUrl + webhookPath
+        : n8nBaseUrl + "/" + webhookPath;
     }
+
+    console.log("N8N_WEBHOOK_URL:", n8nBaseUrl);
+    console.log("webhookPath:", webhookPath);
+    console.log("Final n8n URL:", targetUrl);
 
     // Use payload if provided (new format), otherwise use legacy body
     const forwardBody = payload

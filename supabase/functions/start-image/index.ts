@@ -43,14 +43,18 @@ Deno.serve(async (req) => {
       .insert({
         user_id: userId,
         firm_id: firmId || null,
+        page_id: pageId || null,
         slot: slot || "free",
         slot_label: slotLabel || slot || null,
-        prompt: promptPositive || "",
-        prompt_positive: promptPositive || "",
+        prompt: effectivePrompt,
+        prompt_positive: effectivePrompt,
         prompt_negative: promptNegative || "",
         width: width || 1200,
         height: height || 675,
         status: "generating",
+        mode: mode || "text-to-image",
+        reference_image_url: referenceImageUrl || null,
+        edit_strength: editStrength || null,
       })
       .select("id")
       .single();

@@ -311,6 +311,11 @@ export function GeneratePageModal({
   const [themeContext, setThemeContext] = useState("");
   const [differentiation, setDifferentiation] = useState("");
 
+  // Clear stuck generation jobs on open
+  useEffect(() => {
+    if (open) clearStuckJob();
+  }, [open]);
+
   // Init context from cluster/firm on open
   useEffect(() => {
     if (open) {

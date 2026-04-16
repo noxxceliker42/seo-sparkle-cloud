@@ -342,6 +342,15 @@ function ClusterDetailPage() {
                           )
                         );
                       }}
+                      onLinksUpdated={(pageId, links) => {
+                        setPages((prev) =>
+                          prev.map((p) =>
+                            p.id === pageId
+                              ? { ...p, internal_links_set: true, internal_links_list: links as unknown as import("@/integrations/supabase/types").Json }
+                              : p
+                          )
+                        );
+                      }}
                     />
                   ))}
                 </div>

@@ -1007,22 +1007,20 @@ function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, 
             )}
           </div>
 
-          {/* Links setzen button for generated pages */}
-          {isGenerated && page.seo_page_id && (
-            page.internal_links_set ? (
-              <div className="w-full text-center text-[11px] h-7 flex items-center justify-center gap-1 text-green-700 dark:text-green-400">
-                <Check className="h-3 w-3" /> Links gesetzt ✓
-              </div>
-            ) : (
-              <Button
-                size="sm"
-                variant="secondary"
-                className="w-full text-[11px] h-7 gap-1"
-                onClick={() => setLinksModalOpen(true)}
-              >
-                <LinkIcon className="h-3 w-3" /> Links setzen
-              </Button>
-            )
+          {/* Links setzen button */}
+          {page.internal_links_set ? (
+            <div className="w-full text-center text-[11px] h-7 flex items-center justify-center gap-1 text-green-700 dark:text-green-400">
+              <Check className="h-3 w-3" /> Links gesetzt ✓
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="w-full text-[11px] h-7 gap-1"
+              onClick={() => setLinksModalOpen(true)}
+            >
+              <LinkIcon className="h-3 w-3" /> Links setzen
+            </Button>
           )}
         </CardContent>
       </Card>
@@ -1045,6 +1043,7 @@ function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, 
           open={linksModalOpen}
           onOpenChange={setLinksModalOpen}
           page={page}
+          clusterId={page.cluster_id || cluster.id}
           onLinksSet={(links) => onLinksUpdated(page.id, links)}
         />
       )}

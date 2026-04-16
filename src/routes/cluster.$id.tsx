@@ -721,8 +721,9 @@ interface ClusterPageCardProps {
   onLinksUpdated: (pageId: string, links: Array<{ keyword: string; slug: string }>) => void;
 }
 
-function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, onGenerate, onSetLive, onSubClusterCreated }: ClusterPageCardProps) {
+function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, onGenerate, onSetLive, onSubClusterCreated, onLinksUpdated }: ClusterPageCardProps) {
   const [subModalOpen, setSubModalOpen] = useState(false);
+  const [linksModalOpen, setLinksModalOpen] = useState(false);
   const score = calculateScore(page);
   const status = page.status || "planned";
   const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.planned;

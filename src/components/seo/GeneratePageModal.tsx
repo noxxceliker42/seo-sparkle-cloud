@@ -1,5 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { toast } from "sonner";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import type { Tables } from "@/integrations/supabase/types";
 import { buildMasterPrompt } from "@/lib/buildMasterPrompt";
 import { useGenerationJob, clearStuckJob, cancelCurrentJob } from "@/hooks/useGenerationJob";
@@ -12,59 +11,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Loader2, ChevronRight, Info, Search, RefreshCw } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
-import {
-  Dialog as PickerDialog,
-  DialogContent as PickerDialogContent,
-  DialogHeader as PickerDialogHeader,
-  DialogTitle as PickerDialogTitle,
-} from "@/components/ui/dialog";
-
-const PALETTES = [
-  { id: "trust_classic", name: "Trust Classic", colors: ["#1d4ed8", "#ffffff", "#dc2626"] },
-  { id: "german_precision", name: "German Precision", colors: ["#374151", "#f3f4f6", "#6b7280"] },
-  { id: "handwerk_pro", name: "Handwerk Pro", colors: ["#92400e", "#fef3c7", "#d97706"] },
-  { id: "luxury_dark", name: "Luxury Dark", colors: ["#111827", "#d4af37", "#1f2937"] },
-  { id: "futuristic_tech", name: "Futuristic Tech", colors: ["#0f0f1a", "#00f5ff", "#7c3aed"] },
-  { id: "glassmorphism", name: "Glassmorphism", colors: ["#e0e7ff", "#6366f1", "#f0f9ff"] },
-  { id: "berlin_urban", name: "Berlin Urban", colors: ["#18181b", "#e11d48", "#f4f4f5"] },
-  { id: "medical_clean", name: "Medical Clean", colors: ["#ecfdf5", "#059669", "#ffffff"] },
-  { id: "automotive", name: "Automotive", colors: ["#1e293b", "#94a3b8", "#f59e0b"] },
-  { id: "editorial_bold", name: "Editorial Bold", colors: ["#000000", "#ffffff", "#ef4444"] },
-  { id: "minimalist_swiss", name: "Minimalist Swiss", colors: ["#fafafa", "#171717", "#3b82f6"] },
-  { id: "gradient_flow", name: "Gradient Flow", colors: ["#8b5cf6", "#ec4899", "#06b6d4"] },
-  { id: "eco_green", name: "Eco Green", colors: ["#14532d", "#86efac", "#f0fdf4"] },
-  { id: "warm_trustful", name: "Warm Trustful", colors: ["#ea580c", "#fef9c3", "#1c1917"] },
-  { id: "brutalist_raw", name: "Brutalist Raw", colors: ["#fbbf24", "#000000", "#ffffff"] },
-];
-
-const ZIELGRUPPEN = [
-  { value: "privatkunden", label: "Privatkunden (Standard)" },
-  { value: "gewerblich", label: "Gewerblich / Vermieter" },
-  { value: "senioren", label: "Senioren / 60+" },
-  { value: "technik", label: "Technik-Affine / DIY" },
-  { value: "preisbewusst", label: "Preisbewusste Kunden" },
-  { value: "premium", label: "Premium-Kunden" },
-];
+import { Loader2, AlertCircle } from "lucide-react";
+import { SeoForm, type SeoFormData } from "./SeoForm";
 
 type ClusterPageRow = Tables<"cluster_pages">;
 type ClusterRow = Tables<"clusters">;
@@ -108,103 +56,33 @@ interface GeneratePageModalProps {
   onSuccess: (pageId: string, jobId: string) => void;
 }
 
-// ── Section definitions per page type ─────────────────────────
-const ALL_SECTIONS = [
-  { key: "01_hero", label: "Hero-Sektion" },
-  { key: "02_problem", label: "Problem-Sektion" },
-  { key: "03_ursachen", label: "Ursachen-Sektion" },
-  { key: "04_symptome", label: "Symptome" },
-  { key: "05_selbsthilfe", label: "Selbsthilfe" },
-  { key: "06_loesung", label: "Lösung-Sektion" },
-  { key: "07_unique", label: "Unique Data" },
-  { key: "08_infogain", label: "Information Gain" },
-  { key: "09_ablauf", label: "Ablauf-Sektion" },
-  { key: "10_preise", label: "Preise-Sektion" },
-  { key: "11_service", label: "Service-Sektion" },
-  { key: "12_inhalt", label: "Inhalt-Sektion" },
-  { key: "13_fehlercode", label: "Fehlercode-Sektion" },
-  { key: "14_faq", label: "FAQ-Sektion" },
-  { key: "15_autor", label: "Autor-Box" },
-  { key: "16_blog", label: "Blog-Sektion" },
-  // ── Landingpage / Sales-Funnel Sektionen ──────────────────
-  { key: "lp_urgency_bar", label: "Urgency Bar" },
-  { key: "lp_sticky_nav", label: "Sticky Nav" },
-  { key: "lp_social_proof_ticker", label: "Social Proof Ticker" },
-  { key: "lp_trust_badges", label: "Trust Badges" },
-  { key: "lp_testimonials_early", label: "Testimonials (früh)" },
-  { key: "lp_objection_handling", label: "Einwandbehandlung" },
-  { key: "lp_how_it_works", label: "So funktioniert es" },
-  { key: "lp_identity", label: "Identität / Über uns" },
-  { key: "lp_features", label: "Features" },
-  { key: "lp_pricing", label: "Pricing" },
-  { key: "lp_testimonials_more", label: "Weitere Testimonials" },
-  { key: "lp_guarantee", label: "Garantie" },
-  { key: "lp_lead_form", label: "Lead-Formular" },
-  { key: "lp_social_proof_widget", label: "Live Social Proof Widget" },
-  { key: "lp_sticky_cta", label: "Sticky CTA" },
-  { key: "lp_footer", label: "Footer" },
-  { key: "lp_product_showcase", label: "Produkt-Showcase" },
-  { key: "lp_value_stack", label: "Value Stack" },
-  { key: "lp_bonus_stack", label: "Bonus Stack" },
-  { key: "lp_cta_final", label: "Finaler CTA" },
-  { key: "lp_contact", label: "Kontakt-Block" },
-  { key: "lp_local_stats", label: "Lokale Statistiken" },
-  { key: "lp_services", label: "Service-Übersicht" },
-  { key: "lp_service_area", label: "Einsatzgebiet" },
-] as const;
-
-type SectionKey = (typeof ALL_SECTIONS)[number]["key"];
-
-const DEFAULTS_BY_TYPE: Record<string, SectionKey[]> = {
-  service: ["01_hero", "02_problem", "09_ablauf", "10_preise", "14_faq", "15_autor"],
-  fehlercode: ["01_hero", "03_ursachen", "06_loesung", "14_faq", "15_autor"],
-  pillar_page: ALL_SECTIONS.map((s) => s.key).filter((k) => !k.startsWith("lp_")) as SectionKey[],
-  pillar: ALL_SECTIONS.map((s) => s.key).filter((k) => !k.startsWith("lp_")) as SectionKey[],
-  transactional: ["01_hero", "11_service", "10_preise", "14_faq", "15_autor"],
-  transactional_local: ["01_hero", "11_service", "10_preise", "14_faq", "15_autor"],
-  blog: ["01_hero", "12_inhalt", "14_faq", "15_autor"],
-  supporting_info: ["01_hero", "02_problem", "08_infogain", "12_inhalt", "14_faq", "15_autor"],
-  supporting_commercial: ["01_hero", "02_problem", "07_unique", "10_preise", "11_service", "14_faq", "15_autor"],
-  deep_page: ["01_hero", "02_problem", "03_ursachen", "06_loesung", "07_unique", "14_faq", "15_autor"],
-  // ── Sales Funnels & Landingpages ─────────────────────────
-  salesfunnel_leadgen: [
-    "lp_urgency_bar", "lp_sticky_nav", "01_hero", "lp_social_proof_ticker",
-    "lp_trust_badges", "02_problem", "lp_testimonials_early", "lp_objection_handling",
-    "lp_how_it_works", "lp_identity", "lp_features", "lp_pricing",
-    "lp_testimonials_more", "lp_guarantee", "14_faq", "lp_lead_form",
-    "lp_social_proof_widget", "lp_sticky_cta", "lp_footer",
-  ],
-  salesfunnel_ecommerce: [
-    "lp_urgency_bar", "01_hero", "lp_trust_badges", "lp_product_showcase",
-    "lp_value_stack", "lp_bonus_stack", "lp_testimonials_early",
-    "lp_objection_handling", "lp_pricing", "lp_guarantee", "14_faq",
-    "lp_cta_final", "lp_social_proof_widget", "lp_sticky_cta",
-  ],
-  landingpage_service: [
-    "lp_urgency_bar", "lp_sticky_nav", "01_hero", "lp_trust_badges",
-    "02_problem", "lp_how_it_works", "lp_testimonials_early", "lp_pricing",
-    "lp_guarantee", "14_faq", "lp_contact", "lp_social_proof_widget", "lp_sticky_cta",
-  ],
-  landingpage_local: [
-    "01_hero", "lp_trust_badges", "lp_local_stats", "lp_services",
-    "lp_service_area", "lp_testimonials_early", "lp_pricing", "14_faq",
-    "lp_contact", "lp_social_proof_widget",
-  ],
-};
-
-const FALLBACK_SECTIONS: SectionKey[] = ["01_hero", "02_problem", "06_loesung", "14_faq", "15_autor"];
-
-function getDefaultSections(pageType: string): SectionKey[] {
-  return DEFAULTS_BY_TYPE[pageType] || FALLBACK_SECTIONS;
+// Map cluster_pages.page_type → SeoForm pageType (some legacy values differ)
+function normalizePageType(pt: string): string {
+  switch (pt) {
+    case "pillar":
+      return "pillar_page";
+    case "transactional_local":
+      return "transactional";
+    default:
+      return pt;
+  }
 }
 
-// ── Internal link item type ───────────────────────────────────
-interface InternalLinkItem {
-  keyword: string;
-  slug: string;
-  source: "cluster" | "search";
-  checked: boolean;
-  disabled: boolean;
+function intentFromPageType(pt: string): string {
+  switch (pt) {
+    case "service":
+    case "transactional":
+    case "transactional_local":
+    case "landingpage_service":
+    case "landingpage_local":
+    case "salesfunnel_leadgen":
+    case "salesfunnel_ecommerce":
+      return "Transactional";
+    case "supporting_commercial":
+      return "Commercial";
+    default:
+      return "Informational";
+  }
 }
 
 export function GeneratePageModal({
@@ -216,1226 +94,284 @@ export function GeneratePageModal({
   onClose,
   onSuccess,
 }: GeneratePageModalProps) {
-  const { startGeneration, generating, error, result, jobId, clearError, clearResult } = useGenerationJob();
+  const { startGeneration, generating, error, result, jobId, clearError } = useGenerationJob();
 
-  // All firms for the user
-  const [allFirms, setAllFirms] = useState<FirmData[]>([]);
-  const [selectedFirmId, setSelectedFirmId] = useState<string>(firm?.id || "");
+  // Deep pages from sibling cluster_pages
+  const [deepPagesText, setDeepPagesText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  // Load all firms on mount
   useEffect(() => {
+    if (!open) return;
+    clearStuckJob();
     (async () => {
       const { data } = await supabase
-        .from("firms")
-        .select("*")
-        .order("name", { ascending: true });
-      if (data) {
-        setAllFirms(data as unknown as FirmData[]);
-        // If no firm selected yet, use activeFirm or first firm
-        if (!selectedFirmId && data.length > 0) {
-          const match = firm?.id ? data.find((f) => f.id === firm.id) : data[0];
-          if (match) setSelectedFirmId(match.id);
-        }
+        .from("cluster_pages")
+        .select("keyword, url_slug")
+        .eq("cluster_id", cluster.id)
+        .eq("page_type", "deep_page");
+      if (data?.length) {
+        setDeepPagesText(data.map((d) => `${d.keyword} → /${d.url_slug}`).join("\n"));
       }
     })();
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, cluster.id]);
 
-  // Helper to populate fields from a firm
-  const populateFromFirm = useCallback((f: FirmData | undefined | null) => {
-    setFirmName(f?.name || "");
-    setFirmStreet(f?.street || "");
-    setFirmCity(f?.city || "");
-    setFirmPhone(f?.phone || "");
-    setFirmEmail(f?.email || "");
-    setFirmWebsite(f?.website || "");
-    setFirmServiceArea(f?.service_area || "");
-    setFirmOeffnungszeiten(f?.oeffnungszeiten || "");
-    setFirmAuthor(f?.author || "");
-    setFirmAuthorTitle(f?.author_title || "");
-    setFirmAuthorExp(f?.author_experience?.toString() || "");
-    setFirmAuthorCerts(f?.author_certs || "");
-  }, []);
-
-  // Populate on firm selection change
-  useEffect(() => {
-    if (!selectedFirmId) return;
-    const selected = allFirms.find((f) => f.id === selectedFirmId);
-    if (selected) populateFromFirm(selected);
-  }, [selectedFirmId, allFirms, populateFromFirm]);
-
-  // Required fields
-  const [uniqueData, setUniqueData] = useState("");
-  const [informationGain, setInformationGain] = useState("");
-  const [uspFokus, setUspFokus] = useState("");
-
-  // Intent + Tone of Voice (Schritt 1)
-  const intentFromPageType = (pt: string): string => {
-    switch (pt) {
-      case "service":
-      case "transactional":
-      case "transactional_local":
-        return "transactional";
-      case "supporting_commercial":
-        return "commercial";
-      case "pillar_page":
-      case "pillar":
-      case "fehlercode":
-      case "blog":
-      case "supporting_info":
-      case "deep_page":
-      default:
-        return "informational";
-    }
-  };
-  const [intent, setIntent] = useState<string>(() => intentFromPageType(clusterPage.page_type));
-  const [toneOfVoice, setToneOfVoice] = useState<string>("sachlich");
-
-  // SEO-Felder Accordion (Schritt 2)
-  const [seoOpen, setSeoOpen] = useState(false);
-  const [seoTab, setSeoTab] = useState<"keywords" | "cluster" | "eeat" | "schema" | "y2026">("keywords");
-  // 2A — Keywords
-  const [secondaryKeywords, setSecondaryKeywords] = useState("");
-  const [lsiTerms, setLsiTerms] = useState("");
-  // 2B — Cluster-Kontext
-  const [paaQuestions, setPaaQuestions] = useState("");
-  const [contentGap, setContentGap] = useState("");
-  const [deepPages, setDeepPages] = useState("");
-  // 2C — E-E-A-T
-  const [reviewer, setReviewer] = useState("");
-  const [caseStudy, setCaseStudy] = useState("");
-  // 2D — Schema
-  const SCHEMA_DEFAULTS_BY_TYPE: Record<string, string[]> = {
-    service: ["LocalBusiness", "Service", "FAQPage"],
-    fehlercode: ["FAQPage", "HowTo"],
-    pillar_page: ["WebPage", "FAQPage", "BreadcrumbList"],
-    pillar: ["WebPage", "FAQPage", "BreadcrumbList"],
-    transactional: ["LocalBusiness", "FAQPage"],
-    transactional_local: ["LocalBusiness", "FAQPage"],
-  };
-  const SCHEMA_OPTIONS = ["LocalBusiness", "Service", "FAQPage", "HowTo", "WebPage", "BreadcrumbList"];
-  const [schemaBlocks, setSchemaBlocks] = useState<string[]>(
-    () => SCHEMA_DEFAULTS_BY_TYPE[clusterPage.page_type] || ["FAQPage"]
-  );
-  const [rating, setRating] = useState<string>("");
-  const [reviewCount, setReviewCount] = useState<string>("");
-  // 2E — 2026 Features
-  const [informationGainFlag, setInformationGainFlag] = useState(true);
-  const [comparativeCheck, setComparativeCheck] = useState(true);
-  const [discoverReady, setDiscoverReady] = useState(false);
-
-  // AI suggestions — per-field loading state
-  const [aiFieldLoading, setAiFieldLoading] = useState<Record<string, boolean>>({});
-  const [aiLoaded, setAiLoaded] = useState(false);
-  const aiCalledRef = useRef(false);
-
-  const getRequestBody = useCallback((field?: string) => {
-    const selectedFirm = allFirms.find((f) => f.id === selectedFirmId);
-    return {
-      keyword: clusterPage.keyword,
-      pageType: clusterPage.page_type,
-      firm: selectedFirm?.name || firm?.name || "",
-      branche: selectedFirm?.branche || cluster.branche || "hausgeraete",
-      ...(field ? { field } : {}),
-    };
-  }, [clusterPage.keyword, clusterPage.page_type, allFirms, selectedFirmId, firm, cluster.branche]);
-
-  const applyAiData = useCallback((data: Record<string, string>) => {
-    if (data.uniqueData) setUniqueData(data.uniqueData);
-    if (data.informationGain) setInformationGain(data.informationGain);
-    if (data.uspFokus) setUspFokus(data.uspFokus);
-    if (data.themeContext) setThemeContext(data.themeContext);
-    if (data.differentiation) setDifferentiation(data.differentiation);
-    if (data.paaQuestions) setPaaQuestions(data.paaQuestions);
-    if (data.secondaryKeywords) setSecondaryKeywords(data.secondaryKeywords);
-    if (data.lsiTerms) setLsiTerms(data.lsiTerms);
-  }, []);
-
-  const fetchAllSuggestions = useCallback(async () => {
-    const allFields = ["uniqueData", "informationGain", "uspFokus", "themeContext", "differentiation"];
-    setAiFieldLoading(Object.fromEntries(allFields.map((f) => [f, true])));
-    try {
-      const body = getRequestBody();
-      console.log("AI Suggestions Request:", body);
-      const { data, error: fnError } = await supabase.functions.invoke("generate-field-suggestions", { body });
-      console.log("AI Suggestions Response:", { data, fnError });
-      if (!fnError && data) applyAiData(data);
-    } catch (err) {
-      console.error("AI suggestions error:", err);
-    } finally {
-      setAiFieldLoading({});
-      setAiLoaded(true);
-    }
-  }, [getRequestBody, applyAiData]);
-
-  const fetchSingleField = useCallback(async (field: string) => {
-    setAiFieldLoading((prev) => ({ ...prev, [field]: true }));
-    try {
-      const body = getRequestBody(field);
-      const { data, error: fnError } = await supabase.functions.invoke("generate-field-suggestions", { body });
-      if (!fnError && data) applyAiData(data);
-    } catch (err) {
-      console.error(`AI field ${field} error:`, err);
-    } finally {
-      setAiFieldLoading((prev) => ({ ...prev, [field]: false }));
-    }
-  }, [getRequestBody, applyAiData]);
-
-  // Auto-fetch on open (once)
-  useEffect(() => {
-    if (open && !aiCalledRef.current) {
-      aiCalledRef.current = true;
-      void fetchAllSuggestions();
-    }
-  }, [open, fetchAllSuggestions]);
-
-  // Firm fields (editable overrides)
-  const [firmName, setFirmName] = useState("");
-  const [firmStreet, setFirmStreet] = useState("");
-  const [firmCity, setFirmCity] = useState("");
-  const [firmPhone, setFirmPhone] = useState("");
-  const [firmEmail, setFirmEmail] = useState("");
-  const [firmWebsite, setFirmWebsite] = useState("");
-  const [firmServiceArea, setFirmServiceArea] = useState("");
-  const [firmOeffnungszeiten, setFirmOeffnungszeiten] = useState("");
-  const [firmAuthor, setFirmAuthor] = useState("");
-  const [firmAuthorTitle, setFirmAuthorTitle] = useState("");
-  const [firmAuthorExp, setFirmAuthorExp] = useState("");
-  const [firmAuthorCerts, setFirmAuthorCerts] = useState("");
-
-  // Advanced settings
-  const [kvaPrice, setKvaPrice] = useState("");
-  const [priceRange, setPriceRange] = useState("");
-  // Schritt 3 — Image Strategy, Repair-vs-Buy, Price Cards
-  const [imageStrategy, setImageStrategy] = useState<"nanobanana" | "placeholder" | "none">("nanobanana");
-  const [repairVsBuy, setRepairVsBuy] = useState(false);
-  const [priceCard1Label, setPriceCard1Label] = useState("Diagnose");
-  const [priceCard1Price, setPriceCard1Price] = useState("");
-  const [priceCard2Label, setPriceCard2Label] = useState("Standard-Reparatur");
-  const [priceCard2Price, setPriceCard2Price] = useState("");
-  const [priceCard3Label, setPriceCard3Label] = useState("Komplett-Service");
-  const [priceCard3Price, setPriceCard3Price] = useState("");
-  const [designPreset, setDesignPreset] = useState("trust");
-  const [outputMode, setOutputMode] = useState("standalone");
-  const [activeSections, setActiveSections] = useState<SectionKey[]>(() =>
-    getDefaultSections(clusterPage.page_type)
-  );
-
-  // Design & context state
-  const resolveDesignPhilosophy = () => cluster.design_philosophy || selectedFirmObj?.design_philosophy || "trust_classic";
-  const selectedFirmObj = allFirms.find((f) => f.id === selectedFirmId) as (FirmData | undefined);
-  const [designOverride, setDesignOverride] = useState<string | null>(null);
-  const [designCustomOverride, setDesignCustomOverride] = useState("");
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [targetAudience, setTargetAudience] = useState("");
-  const [themeContext, setThemeContext] = useState("");
-  const [differentiation, setDifferentiation] = useState("");
-
-  // Clear stuck generation jobs on open
-  useEffect(() => {
-    if (open) clearStuckJob();
-  }, [open]);
-
-  // Init context from cluster/firm on open
-  useEffect(() => {
-    if (open) {
-      setTargetAudience(cluster.target_audience || selectedFirmObj?.target_audience || "privatkunden");
-      setThemeContext(String(cluster.theme_context || selectedFirmObj?.theme_context || ""));
-      setDifferentiation(String(cluster.differentiation || selectedFirmObj?.differentiation || ""));
-      setDesignOverride(selectedFirmObj?.design_philosophy || null);
-      setDesignCustomOverride(String(selectedFirmObj?.design_philosophy_custom || ""));
-      // Schritt 2 — E-E-A-T defaults aus Firma
-      setRating(selectedFirmObj?.rating != null ? String(selectedFirmObj.rating) : "");
-      setReviewCount(selectedFirmObj?.review_count != null ? String(selectedFirmObj.review_count) : "");
-      // Schritt 2B — Deep Pages aus cluster_pages
-      (async () => {
-        const { data } = await supabase
-          .from("cluster_pages")
-          .select("keyword, url_slug")
-          .eq("cluster_id", cluster.id)
-          .eq("page_type", "deep_page");
-        if (data && data.length) {
-          setDeepPages(data.map((d) => `${d.keyword} → /${d.url_slug}`).join("\n"));
-        }
-      })();
-    }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const activePhilosophy = designOverride || resolveDesignPhilosophy();
-  const activePalette = PALETTES.find((p) => p.id === activePhilosophy) || PALETTES[0];
-  const designSource = designOverride ? "Seiten-Override" : cluster.design_philosophy ? "geerbt von Cluster" : "geerbt von Firma";
-
-  // Internal links — checkbox-based
-  const [linkItems, setLinkItems] = useState<InternalLinkItem[]>(() => {
-    const siblings = siblingPages
+  // Build sibling links string for prompt
+  const siblingPagesString = useMemo(() => {
+    return siblingPages
       .filter((p) => p.id !== clusterPage.id)
       .slice(0, 30)
-      .map((p) => ({
-        keyword: p.keyword,
-        slug: p.url_slug,
-        source: "cluster" as const,
-        checked: p.status === "generated" || p.status === "published" || p.status === "live",
-        disabled: p.status === "planned" || p.status === "suggested",
-      }));
-    return siblings;
-  });
-
-  // Search for additional seo_pages
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<{ keyword: string; url_slug: string; firm: string | null }[]>([]);
-  const [searching, setSearching] = useState(false);
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const doSearch = useCallback(async (q: string) => {
-    if (q.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    setSearching(true);
-    const { data } = await supabase
-      .from("seo_pages")
-      .select("keyword, intent, firm, meta_title, id")
-      .ilike("keyword", `%${q}%`)
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    if (data) {
-      // Filter out already-added items
-      const existingSlugs = new Set(linkItems.map((l) => l.slug));
-      // seo_pages don't have url_slug, derive from keyword
-      setSearchResults(
-        data
-          .filter((d) => !existingSlugs.has(d.keyword.toLowerCase().replace(/\s+/g, "-")))
-          .map((d) => ({
-            keyword: d.keyword,
-            url_slug: d.keyword.toLowerCase().replace(/\s+/g, "-"),
-            firm: d.firm,
-          }))
-      );
-    }
-    setSearching(false);
-  }, [linkItems]);
-
-  useEffect(() => {
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (searchQuery.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    searchTimeoutRef.current = setTimeout(() => doSearch(searchQuery), 300);
-    return () => {
-      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    };
-  }, [searchQuery, doSearch]);
-
-  const addSearchResult = (r: { keyword: string; url_slug: string }) => {
-    setLinkItems((prev) => [
-      ...prev,
-      { keyword: r.keyword, slug: r.url_slug, source: "search", checked: true, disabled: false },
-    ]);
-    setSearchResults((prev) => prev.filter((x) => x.keyword !== r.keyword));
-    setSearchQuery("");
-  };
-
-  const toggleLink = (idx: number) => {
-    setLinkItems((prev) =>
-      prev.map((item, i) =>
-        i === idx && !item.disabled ? { ...item, checked: !item.checked } : item
-      )
-    );
-  };
-
-  // Compute combined output
-  const siblingPagesString = useMemo(() => {
-    return linkItems
-      .filter((l) => l.checked)
-      .map((l) => `${l.keyword} → /${l.slug}`)
+      .map((p) => `${p.keyword} → /${p.url_slug}`)
       .join(", ");
-  }, [linkItems]);
+  }, [siblingPages, clusterPage.id]);
 
-  // Accordion state
-  const [firmOpen, setFirmOpen] = useState(false);
-  const [advOpen, setAdvOpen] = useState(false);
-
-  // Validation
-  const [validationError, setValidationError] = useState("");
-  const uniqueRef = useRef<HTMLTextAreaElement>(null);
-  const infoGainRef = useRef<HTMLTextAreaElement>(null);
-
-  // Handle result arriving via polling
-  useEffect(() => {
-    if (result?.pageId && !generating) {
-      onSuccess(result.pageId, jobId || "");
-    }
-  }, [result, generating]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleGenerate = async () => {
-    clearError();
-    setValidationError("");
-
-    if (!uniqueData.trim()) {
-      setValidationError("Unique Data ist ein Pflichtfeld");
-      uniqueRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      uniqueRef.current?.focus();
-      return;
-    }
-    if (!informationGain.trim()) {
-      setValidationError("Information Gain ist ein Pflichtfeld");
-      infoGainRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      infoGainRef.current?.focus();
-      return;
-    }
-
-    const formData: Record<string, unknown> = {
+  // Build initial SeoFormData from cluster + firm + clusterPage
+  const initialData = useMemo<Partial<SeoFormData>>(() => {
+    const normalizedPT = normalizePageType(clusterPage.page_type);
+    return {
       keyword: clusterPage.keyword,
-      firmId: selectedFirmId || null,
-      pageType: clusterPage.page_type,
-      pillarTier: clusterPage.pillar_tier || 2,
-      urlSlug: clusterPage.url_slug,
+      pageType: normalizedPT,
+      pillarTier: String(clusterPage.pillar_tier || 2),
       branche: cluster.branche || firm?.branche || "hausgeraete",
       sprache: cluster.sprache || firm?.sprache || "de",
-      firm: firmName,
-      street: firmStreet,
-      city: firmCity,
-      phone: firmPhone,
-      email: firmEmail,
-      website: firmWebsite,
-      serviceArea: firmServiceArea,
-      oeffnungszeiten: firmOeffnungszeiten,
-      author: firmAuthor,
-      authorTitle: firmAuthorTitle,
-      authorExperience: firmAuthorExp,
-      authorCerts: firmAuthorCerts,
-      uniqueData,
-      infoGain: informationGain,
-      uspFokus,
-      intent,
-      toneOfVoice,
-      // Schritt 2 — SEO-Felder
-      secondaryKeywords,
-      lsiTerms,
-      paaQuestions,
-      contentGap,
-      deepPages,
-      reviewer,
-      caseStudy,
-      schemaBlocks,
-      rating: rating || (selectedFirmObj?.rating?.toString() || ""),
-      reviewCount: reviewCount || (selectedFirmObj?.review_count?.toString() || ""),
-      informationGainFlag,
-      comparativeCheck,
-      discoverReady,
-      kvaPrice,
-      priceRange,
-      // Schritt 3 — Image Strategy, Repair-vs-Buy, Price Cards
-      imageStrategy,
-      repairVsBuy,
-      priceCards: [
-        { label: priceCard1Label, price: priceCard1Price },
-        { label: priceCard2Label, price: priceCard2Price },
-        { label: priceCard3Label, price: priceCard3Price },
-      ].filter((c) => c.label.trim() && c.price.trim()),
-      designPreset,
-      designPhilosophy: activePhilosophy,
-      designPhilosophyCustom: designCustomOverride || cluster.design_philosophy_custom || selectedFirmObj?.design_philosophy_custom || "",
-      primaryColor: activePalette.colors[0],
-      secondaryColor: activePalette.colors[1],
-      accentColor: activePalette.colors[2],
-      targetAudience,
-      themeContext: themeContext.trim(),
-      differentiation: differentiation.trim(),
-      outputMode,
-      activeSections: activeSections.map((k) => {
-        const sec = ALL_SECTIONS.find((s) => s.key === k);
-        return sec ? sec.label : k;
-      }),
+      intent: intentFromPageType(clusterPage.page_type),
+      // Cluster context
+      pillarTitle: cluster.name || "",
       siblingPages: siblingPagesString,
-      clusterPageId: clusterPage.id,
-      clusterId: cluster.id,
-      webhookPath: "seo-generate",
+      deepPages: deepPagesText,
+      // Firm / NAP
+      firmName: firm?.name || "",
+      street: firm?.street || "",
+      zip: firm?.zip || "",
+      city: firm?.city || "",
+      phone: firm?.phone || "",
+      email: firm?.email || "",
+      website: firm?.website || "",
+      serviceArea: firm?.service_area || "",
+      oeffnungszeiten: firm?.oeffnungszeiten || "",
+      // Author / E-E-A-T
+      authorName: firm?.author || "",
+      authorTitle: firm?.author_title || "",
+      experienceYears: firm?.author_experience?.toString() || "",
+      certificates: firm?.author_certs || "",
+      // Schema rating
+      rating: firm?.rating?.toString() || "4.9",
+      reviewCount: firm?.review_count?.toString() || "",
+      // Design — cluster wins, then firm
+      designPreset: "trust",
+      primaryColor:
+        cluster.primary_color || firm?.primary_color || "#1d4ed8",
     };
+  }, [clusterPage, cluster, firm, siblingPagesString, deepPagesText]);
 
-    const basePrompt = buildMasterPrompt(formData);
-    await startGeneration({ ...formData, basePrompt });
-  };
+  // When job result arrives, propagate
+  useEffect(() => {
+    if (result?.pageId && !generating && submitting) {
+      setSubmitting(false);
+      onSuccess(result.pageId, jobId || "");
+    }
+  }, [result, generating, submitting, jobId, onSuccess]);
 
-  const toggleSection = (key: SectionKey) => {
-    setActiveSections((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
-  };
+  const handleSubmit = useCallback(
+    async (form: SeoFormData) => {
+      clearError();
+      setSubmitting(true);
+
+      // Resolve design philosophy (cluster wins, then firm)
+      const designPhilosophy =
+        cluster.design_philosophy || firm?.design_philosophy || "trust_classic";
+      const designPhilosophyCustom =
+        cluster.design_philosophy_custom || firm?.design_philosophy_custom || "";
+
+      // Build complete formData payload — merge SeoFormData with cluster/job-specific fields
+      const formData: Record<string, unknown> = {
+        // Page identity
+        keyword: form.keyword,
+        firmId: firm?.id || null,
+        pageType: form.pageType,
+        pillarTier: parseInt(form.pillarTier, 10) || 2,
+        urlSlug: clusterPage.url_slug,
+        branche: form.branche,
+        sprache: form.sprache,
+
+        // Firm / NAP
+        firm: form.firmName,
+        street: form.street,
+        zip: form.zip,
+        city: form.city,
+        phone: form.phone,
+        email: form.email,
+        website: form.website,
+        serviceArea: form.serviceArea,
+        oeffnungszeiten: form.oeffnungszeiten,
+
+        // Author / E-E-A-T
+        author: form.authorName,
+        authorTitle: form.authorTitle,
+        authorExperience: form.experienceYears,
+        authorCerts: form.certificates,
+        reviewer: form.reviewer,
+        caseStudy: form.caseStudy,
+
+        // Core SEO
+        uniqueData: form.uniqueData,
+        infoGain: form.informationGain,
+        informationGain: form.informationGain,
+        uspFokus: form.uspFokus,
+        intent: form.intent,
+        toneOfVoice: form.toneOfVoice,
+        secondaryKeywords: form.secondaryKeywords,
+        lsiTerms: form.lsiTerms,
+        negativeKeywords: form.negativeKeywords,
+        paaQuestions: form.paaQuestions,
+        contentGap: form.contentGap,
+        deepPages: form.deepPages,
+        pillarUrl: form.pillarUrl,
+        pillarTitle: form.pillarTitle,
+
+        // Schema
+        schemaBlocks: form.schemaBlocks,
+        breadcrumb: form.breadcrumb,
+        rating: form.rating,
+        reviewCount: form.reviewCount,
+        informationGainFlag: !!form.informationGain.trim(),
+        comparativeCheck: form.comparativeCheck === "Top-3 analysiert",
+        discoverReady: form.discoverReady === "Ja-Bild vorhanden",
+
+        // Pricing
+        kvaPrice: form.kvaPrice,
+        priceRange: form.priceRange,
+        priceCard1: form.priceCard1,
+        priceCard2: form.priceCard2,
+        priceCard3: form.priceCard3,
+        repairVsBuy: form.repairVsBuy,
+
+        // Design
+        outputMode: form.outputMode,
+        designPreset: form.designPreset,
+        designPhilosophy,
+        designPhilosophyCustom,
+        primaryColor: form.primaryColor,
+        secondaryColor: firm?.secondary_color || "#ffffff",
+        accentColor: firm?.accent_color || "#dc2626",
+        targetAudience: cluster.target_audience || firm?.target_audience || "privatkunden",
+        themeContext: cluster.theme_context || firm?.theme_context || "",
+        differentiation: cluster.differentiation || firm?.differentiation || "",
+        imageStrategy: form.imageStrategy,
+
+        // Sections (as labels for n8n compatibility)
+        activeSections: form.activeSections,
+
+        // Cluster linking
+        siblingPages: siblingPagesString,
+        clusterPageId: clusterPage.id,
+        clusterId: cluster.id,
+        webhookPath: "seo-generate",
+
+        // Landingpage / Sales Funnel fields
+        landingPageGoal: form.landingPageGoal,
+        mainHeadline: form.mainHeadline,
+        primaryCtaText: form.primaryCtaText,
+        secondaryCtaText: form.secondaryCtaText,
+        videoUrl: form.videoUrl,
+        formType: form.formType,
+        countdownActive: form.countdownActive,
+        countdownEndDate: form.countdownEndDate,
+        countdownText: form.countdownText,
+        urgencyBarActive: form.urgencyBarActive,
+        urgencyBarText: form.urgencyBarText,
+        guaranteeTitle: form.guaranteeTitle,
+        guaranteeText: form.guaranteeText,
+        socialProofCustomers: form.socialProofCustomers,
+        socialProofRating: form.socialProofRating,
+        socialProofReviews: form.socialProofReviews,
+        socialProofYears: form.socialProofYears,
+        socialProofWidgetActive: form.socialProofWidgetActive,
+        painPoints: form.painPoints,
+        personas: form.personas,
+        bonusStack: form.bonusStack,
+        leadMagnetTitle: form.leadMagnetTitle,
+        leadMagnetDescription: form.leadMagnetDescription,
+      };
+
+      const basePrompt = buildMasterPrompt(formData);
+      await startGeneration({ ...formData, basePrompt });
+    },
+    [
+      clearError,
+      cluster,
+      firm,
+      clusterPage,
+      siblingPagesString,
+      startGeneration,
+    ],
+  );
+
+  const handleCancel = useCallback(async () => {
+    await cancelCurrentJob("Vom Nutzer abgebrochen");
+    setSubmitting(false);
+  }, []);
 
   return (
-    <>
     <Dialog open={open} onOpenChange={(v) => { if (!generating && !v) onClose(); }}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-5xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Seite generieren</DialogTitle>
           <DialogDescription>
             {clusterPage.keyword} · {clusterPage.page_type}
+            {firm && <> · {firm.name}</>}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 pt-2">
-          {/* ── Firmen-Auswahl ── */}
-          <div className="space-y-1.5">
-            <Label>Firma auswählen</Label>
-            <Select value={selectedFirmId} onValueChange={setSelectedFirmId} disabled={generating}>
-              <SelectTrigger>
-                <SelectValue placeholder="Firma wählen…" />
-              </SelectTrigger>
-              <SelectContent>
-                {allFirms.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* ── SEKTION 1: Info Card ── */}
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm bg-muted/50 p-3 rounded-md">
-            <div className="font-medium text-foreground truncate">{clusterPage.keyword}</div>
-            <div className="text-right">
-              <Badge variant="secondary" className="text-[11px]">{clusterPage.page_type}</Badge>
-            </div>
-            <div className="text-xs text-muted-foreground font-mono truncate">/{clusterPage.url_slug}</div>
-            <div className="text-right">
-              <Badge variant="outline" className="text-[11px]">Tier {clusterPage.pillar_tier || 2}</Badge>
-            </div>
-          </div>
-
-          {/* ── SEKTION 2: Pflicht-Felder ── */}
-          <div className="space-y-3">
-            {/* Unique Data */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="gpm-unique">Was macht diese Seite einzigartig? <span className="text-destructive">*</span></Label>
-                {aiLoaded && (
-                  <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("uniqueData")} disabled={!!aiFieldLoading.uniqueData || generating}>
-                    {aiFieldLoading.uniqueData ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
-                  </Button>
-                )}
-              </div>
-              {aiFieldLoading.uniqueData && !uniqueData ? (
-                <Skeleton className="h-20 w-full rounded-md" />
-              ) : (
-                <Textarea ref={uniqueRef} id="gpm-unique" placeholder="Eigene Daten, Statistiken, konkrete Zahlen..." value={uniqueData} onChange={(e) => setUniqueData(e.target.value)} disabled={generating} rows={3} />
-              )}
-            </div>
-
-            {/* Information Gain */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="gpm-infogain">Welchen Mehrwert bietet diese Seite? <span className="text-destructive">*</span></Label>
-                {aiLoaded && (
-                  <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("informationGain")} disabled={!!aiFieldLoading.informationGain || generating}>
-                    {aiFieldLoading.informationGain ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
-                  </Button>
-                )}
-              </div>
-              {aiFieldLoading.informationGain && !informationGain ? (
-                <Skeleton className="h-20 w-full rounded-md" />
-              ) : (
-                <Textarea ref={infoGainRef} id="gpm-infogain" placeholder="Exklusive Einblicke, Informationen die Wettbewerber nicht haben..." value={informationGain} onChange={(e) => setInformationGain(e.target.value)} disabled={generating} rows={3} />
-              )}
-            </div>
-
-            {/* USP Fokus */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="gpm-usp">USP-Fokus (optional)</Label>
-                {aiLoaded && (
-                  <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("uspFokus")} disabled={!!aiFieldLoading.uspFokus || generating}>
-                    {aiFieldLoading.uspFokus ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
-                  </Button>
-                )}
-              </div>
-              {aiFieldLoading.uspFokus && !uspFokus ? (
-                <Skeleton className="h-9 w-full rounded-md" />
-              ) : (
-                <Input id="gpm-usp" placeholder="z.B. 24h Notdienst, Original-Ersatzteile, 15 Jahre Erfahrung" value={uspFokus} onChange={(e) => setUspFokus(e.target.value)} disabled={generating} />
-              )}
-            </div>
-
-            {/* Intent + Tone of Voice (Schritt 1) */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="gpm-intent">Such-Intent</Label>
-                <Select value={intent} onValueChange={setIntent} disabled={generating}>
-                  <SelectTrigger id="gpm-intent"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="informational">Informational (Ratgeber)</SelectItem>
-                    <SelectItem value="commercial">Commercial (Vergleich/Entscheidung)</SelectItem>
-                    <SelectItem value="transactional">Transactional (Kaufbereit/Lokal)</SelectItem>
-                    <SelectItem value="navigational">Navigational (Marken-Suche)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="gpm-tone">Tonalität</Label>
-                <Select value={toneOfVoice} onValueChange={setToneOfVoice} disabled={generating}>
-                  <SelectTrigger id="gpm-tone"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sachlich">Sachlich-kompetent (Standard)</SelectItem>
-                    <SelectItem value="freundlich">Freundlich-nahbar</SelectItem>
-                    <SelectItem value="premium">Premium-exklusiv</SelectItem>
-                    <SelectItem value="technisch">Technisch-präzise</SelectItem>
-                    <SelectItem value="emotional">Emotional-empathisch</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {aiLoaded && (
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] text-muted-foreground">KI-Vorschlag — bitte anpassen und ergänzen</p>
-                <Button type="button" variant="ghost" size="sm" className="h-6 text-[11px] gap-1 px-2" onClick={() => fetchAllSuggestions()} disabled={Object.values(aiFieldLoading).some(Boolean) || generating}>
-                  {Object.values(aiFieldLoading).some(Boolean) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                  Alle neu generieren
-                </Button>
-              </div>
-            )}
-
-            {!aiLoaded && Object.values(aiFieldLoading).some(Boolean) && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <Loader2 className="h-3 w-3 animate-spin" /> KI analysiert Keyword…
+        {(generating || submitting) ? (
+          <div className="space-y-4 py-8">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <p className="text-sm font-medium text-foreground">
+                Seite wird generiert…
               </p>
-            )}
-          </div>
-
-          {/* ── SEKTION 3: Firmen-Daten (Accordion) ── */}
-          <Collapsible open={firmOpen} onOpenChange={setFirmOpen}>
-            <CollapsibleTrigger className="flex items-center gap-2 w-full text-left text-sm font-semibold py-2 hover:text-primary transition-colors">
-              <ChevronRight className={`h-4 w-4 transition-transform ${firmOpen ? "rotate-90" : ""}`} />
-              Firmen-Daten
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-4 pt-2 pl-6">
-              {/* NAP */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">NAP-Daten</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="col-span-2">
-                    <Label className="text-xs">Firma</Label>
-                    <Input value={firmName} onChange={(e) => setFirmName(e.target.value)} disabled={generating} />
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs">Straße</Label>
-                    <Input value={firmStreet} onChange={(e) => setFirmStreet(e.target.value)} disabled={generating} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">PLZ + Stadt</Label>
-                    <Input value={firmCity} onChange={(e) => setFirmCity(e.target.value)} disabled={generating} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Telefon</Label>
-                    <Input value={firmPhone} onChange={(e) => setFirmPhone(e.target.value)} disabled={generating} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">E-Mail</Label>
-                    <Input value={firmEmail} onChange={(e) => setFirmEmail(e.target.value)} disabled={generating} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Website</Label>
-                    <Input value={firmWebsite} onChange={(e) => setFirmWebsite(e.target.value)} disabled={generating} />
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs">Servicegebiet</Label>
-                    <Input value={firmServiceArea} onChange={(e) => setFirmServiceArea(e.target.value)} disabled={generating} />
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs">Öffnungszeiten</Label>
-                    <Textarea value={firmOeffnungszeiten} onChange={(e) => setFirmOeffnungszeiten(e.target.value)} disabled={generating} rows={2} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Autor */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Autor / E-E-A-T</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="col-span-2">
-                    <Label className="text-xs">Autor</Label>
-                    <Input value={firmAuthor} onChange={(e) => setFirmAuthor(e.target.value)} disabled={generating} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Berufsbezeichnung</Label>
-                    <Input value={firmAuthorTitle} onChange={(e) => setFirmAuthorTitle(e.target.value)} disabled={generating} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Erfahrung (Jahre)</Label>
-                    <Input type="number" value={firmAuthorExp} onChange={(e) => setFirmAuthorExp(e.target.value)} disabled={generating} />
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs">Zertifikate</Label>
-                    <Textarea value={firmAuthorCerts} onChange={(e) => setFirmAuthorCerts(e.target.value)} disabled={generating} rows={2} />
-                  </div>
-                </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                Daten aus Firma-Stammdaten. Änderungen hier gelten nur für diese Seite.
+              <p className="text-xs text-muted-foreground">
+                Das kann 1–3 Minuten dauern. Du kannst diesen Tab geschlossen lassen — die Generierung läuft im Hintergrund weiter.
               </p>
-            </CollapsibleContent>
-          </Collapsible>
-
-          {/* ── SEKTION 3.5: SEO-Felder (Accordion mit Tabs) ── */}
-          <Collapsible open={seoOpen} onOpenChange={setSeoOpen}>
-            <CollapsibleTrigger className="flex items-center gap-2 w-full text-left text-sm font-semibold py-2 hover:text-primary transition-colors">
-              <ChevronRight className={`h-4 w-4 transition-transform ${seoOpen ? "rotate-90" : ""}`} />
-              SEO-Felder
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-3 pt-2 pl-6">
-              {/* Tab Headers */}
-              <div className="flex flex-wrap gap-1 border-b">
-                {([
-                  { id: "keywords", label: "Keywords" },
-                  { id: "cluster", label: "Cluster-Kontext" },
-                  { id: "eeat", label: "E-E-A-T" },
-                  { id: "schema", label: "Schema" },
-                  { id: "y2026", label: "2026" },
-                ] as const).map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setSeoTab(t.id)}
-                    className={cn(
-                      "px-2.5 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors",
-                      seoTab === t.id
-                        ? "border-primary text-primary"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    )}
-                    disabled={generating}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Tab A — Keywords */}
-              {seoTab === "keywords" && (
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs">Sekundär-Keywords</Label>
-                      <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("secondaryKeywords")} disabled={!!aiFieldLoading.secondaryKeywords || generating}>
-                        {aiFieldLoading.secondaryKeywords ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Vorschläge
-                      </Button>
-                    </div>
-                    <Textarea placeholder="Kommasepariert: Beko Reparatur, Beko Service Berlin, Beko Kundendienst" value={secondaryKeywords} onChange={(e) => setSecondaryKeywords(e.target.value)} disabled={generating} rows={2} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs">LSI / Verwandte Begriffe</Label>
-                      <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("lsiTerms")} disabled={!!aiFieldLoading.lsiTerms || generating}>
-                        {aiFieldLoading.lsiTerms ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Vorschläge
-                      </Button>
-                    </div>
-                    <Textarea placeholder="Heizelement, Laugenpumpe, Fehlercode E3, Einlaufventil..." value={lsiTerms} onChange={(e) => setLsiTerms(e.target.value)} disabled={generating} rows={2} />
-                  </div>
-                </div>
-              )}
-
-              {/* Tab B — Cluster-Kontext */}
-              {seoTab === "cluster" && (
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs">People Also Ask — Fragen</Label>
-                      <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("paaQuestions")} disabled={!!aiFieldLoading.paaQuestions || generating}>
-                        {aiFieldLoading.paaQuestions ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ PAA generieren
-                      </Button>
-                    </div>
-                    <Textarea placeholder={"Was kostet Beko Reparatur?\nWie lange dauert Beko Reparatur?\nKommt Beko Techniker nach Hause?"} value={paaQuestions} onChange={(e) => setPaaQuestions(e.target.value)} disabled={generating} rows={3} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Content-Gap (was Wettbewerber nicht haben)</Label>
-                    <Textarea placeholder="Wir haben als einzige eine vollständige Fehlercode-Datenbank für alle Beko-Modelle seit 2015..." value={contentGap} onChange={(e) => setContentGap(e.target.value)} disabled={generating} rows={2} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Unterseiten die verlinkt werden sollen</Label>
-                    <Textarea placeholder="Beko Waschmaschine Fehlercode E3, Beko Trockner Reparatur Berlin..." value={deepPages} onChange={(e) => setDeepPages(e.target.value)} disabled={generating} rows={2} />
-                    <p className="text-[10px] text-muted-foreground">Auto-befüllt aus Cluster (deep_page-Seiten)</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Tab C — E-E-A-T */}
-              {seoTab === "eeat" && (
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Fachlich geprüft von</Label>
-                    <Input placeholder="z.B. TÜV geprüft, IHK zertifiziert" value={reviewer} onChange={(e) => setReviewer(e.target.value)} disabled={generating} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Referenz / Fallbeispiel</Label>
-                    <Textarea placeholder="Beko WMB714 — Laugenpumpe defekt, repariert in 90 Min, Kosten 89€" value={caseStudy} onChange={(e) => setCaseStudy(e.target.value)} disabled={generating} rows={2} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Bewertung</Label>
-                      <Input type="number" step="0.1" min="0" max="5" placeholder="z.B. 4.8" value={rating} onChange={(e) => setRating(e.target.value)} disabled={generating} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Anzahl Bewertungen</Label>
-                      <Input type="number" min="0" placeholder="z.B. 247" value={reviewCount} onChange={(e) => setReviewCount(e.target.value)} disabled={generating} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Tab D — Schema */}
-              {seoTab === "schema" && (
-                <div className="space-y-3">
-                  <Label className="text-xs">Schema-Typen aktivieren</Label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {SCHEMA_OPTIONS.map((s) => (
-                      <label key={s} className="flex items-center gap-2 text-xs cursor-pointer">
-                        <Checkbox
-                          checked={schemaBlocks.includes(s)}
-                          onCheckedChange={(checked) => {
-                            setSchemaBlocks((prev) => checked ? [...prev, s] : prev.filter((x) => x !== s));
-                          }}
-                          disabled={generating}
-                        />
-                        {s}
-                      </label>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">Vorausgefüllt nach pageType: <span className="font-mono">{clusterPage.page_type}</span></p>
-                </div>
-              )}
-
-              {/* Tab E — 2026 Features */}
-              {seoTab === "y2026" && (
-                <div className="space-y-2">
-                  <label className="flex items-start gap-2 text-xs cursor-pointer">
-                    <Checkbox checked={informationGainFlag} onCheckedChange={(v) => setInformationGainFlag(!!v)} disabled={generating} />
-                    <div>
-                      <div className="font-medium">AI Overview Optimierung</div>
-                      <div className="text-[10px] text-muted-foreground">2-Satz-Antworten für KI-Snippets</div>
-                    </div>
-                  </label>
-                  <label className="flex items-start gap-2 text-xs cursor-pointer">
-                    <Checkbox checked={comparativeCheck} onCheckedChange={(v) => setComparativeCheck(!!v)} disabled={generating} />
-                    <div>
-                      <div className="font-medium">Comparative Check</div>
-                      <div className="text-[10px] text-muted-foreground">Vergleiche mit Wettbewerbern einbauen</div>
-                    </div>
-                  </label>
-                  <label className="flex items-start gap-2 text-xs cursor-pointer">
-                    <Checkbox checked={discoverReady} onCheckedChange={(v) => setDiscoverReady(!!v)} disabled={generating} />
-                    <div>
-                      <div className="font-medium">Discover Ready</div>
-                      <div className="text-[10px] text-muted-foreground">Visuelle Elemente für Google Discover</div>
-                    </div>
-                  </label>
-                </div>
-              )}
-            </CollapsibleContent>
-          </Collapsible>
-
-          {/* ── SEKTION 4: Erweiterte Einstellungen (Accordion) ── */}
-          <Collapsible open={advOpen} onOpenChange={setAdvOpen}>
-            <CollapsibleTrigger className="flex items-center gap-2 w-full text-left text-sm font-semibold py-2 hover:text-primary transition-colors">
-              <ChevronRight className={`h-4 w-4 transition-transform ${advOpen ? "rotate-90" : ""}`} />
-              Erweiterte Einstellungen
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-4 pt-2 pl-6">
-              {/* Preise */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Preise</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">KVA-Preis</Label>
-                    <Input placeholder="z.B. ab 79€" value={kvaPrice} onChange={(e) => setKvaPrice(e.target.value)} disabled={generating} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Preisspanne</Label>
-                    <Input placeholder="z.B. 79€ – 299€" value={priceRange} onChange={(e) => setPriceRange(e.target.value)} disabled={generating} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Price Cards (3) */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Price Cards (3)</p>
-                <p className="text-[11px] text-muted-foreground">Strukturierte Preiskarten für die Preise-Sektion. Leere Karten werden ignoriert.</p>
-                {[
-                  { label: priceCard1Label, setLabel: setPriceCard1Label, price: priceCard1Price, setPrice: setPriceCard1Price, ph: "Diagnose" },
-                  { label: priceCard2Label, setLabel: setPriceCard2Label, price: priceCard2Price, setPrice: setPriceCard2Price, ph: "Standard-Reparatur" },
-                  { label: priceCard3Label, setLabel: setPriceCard3Label, price: priceCard3Price, setPrice: setPriceCard3Price, ph: "Komplett-Service" },
-                ].map((card, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_140px] gap-2">
-                    <Input
-                      placeholder={`Karte ${i + 1} Label (z.B. ${card.ph})`}
-                      value={card.label}
-                      onChange={(e) => card.setLabel(e.target.value)}
-                      disabled={generating}
-                    />
-                    <Input
-                      placeholder="Preis (z.B. 79€)"
-                      value={card.price}
-                      onChange={(e) => card.setPrice(e.target.value)}
-                      disabled={generating}
-                    />
-                  </div>
-                ))}
-              </div>
-
-              {/* Image Strategy */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bilder-Strategie</p>
-                <Select value={imageStrategy} onValueChange={(v) => setImageStrategy(v as typeof imageStrategy)} disabled={generating}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="nanobanana">NanoBanana 2 (KI-generiert)</SelectItem>
-                    <SelectItem value="placeholder">Platzhalter (später ersetzen)</SelectItem>
-                    <SelectItem value="none">Keine Bilder (Text-only)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[11px] text-muted-foreground">
-                  {imageStrategy === "nanobanana" && "Bild-Slots werden nach Generierung via NanoBanana 2 gefüllt."}
-                  {imageStrategy === "placeholder" && "Bild-Slots erhalten Platzhalter mit alt-Text — später manuell ersetzen."}
-                  {imageStrategy === "none" && "Keine Bild-Slots im Output. Reine Text-Seite."}
-                </p>
-              </div>
-
-              {/* Repair vs Buy */}
-              <div className="flex items-start gap-2 rounded-md border p-3">
-                <Checkbox
-                  id="repairVsBuy"
-                  checked={repairVsBuy}
-                  onCheckedChange={(v) => setRepairVsBuy(v === true)}
-                  disabled={generating}
-                />
-                <div className="grid gap-0.5">
-                  <Label htmlFor="repairVsBuy" className="text-sm cursor-pointer">Repair-vs-Buy Sektion</Label>
-                  <p className="text-[11px] text-muted-foreground">
-                    Fügt eine Vergleichsbox „Reparieren oder neu kaufen?" mit Entscheidungs-Kriterien ein.
-                  </p>
-                </div>
-              </div>
-
-              {/* Design */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Design</p>
-                <div className="flex items-center gap-3 rounded-md border p-2.5">
-                  <div className="flex gap-1">
-                    {activePalette.colors.map((c, i) => (
-                      <span key={i} className="inline-block h-4 w-4 rounded-full border border-border/50" style={{ backgroundColor: c }} />
-                    ))}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">{activePalette.name}</p>
-                    <p className="text-[10px] text-muted-foreground">({designSource})</p>
-                  </div>
-                  <Button type="button" variant="outline" size="sm" className="h-7 text-[11px] shrink-0" onClick={() => setPickerOpen(true)} disabled={generating}>
-                    Ändern
-                  </Button>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-3 w-3 rounded-full border border-border/50" style={{ backgroundColor: activePalette.colors[0] }} />
-                    Primär: {activePalette.colors[0]}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-3 w-3 rounded-full border border-border/50" style={{ backgroundColor: activePalette.colors[1] }} />
-                    Sekundär: {activePalette.colors[1]}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-3 w-3 rounded-full border border-border/50" style={{ backgroundColor: activePalette.colors[2] }} />
-                    Akzent: {activePalette.colors[2]}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-xs">Output-Mode</Label>
-                  <Select value={outputMode} onValueChange={setOutputMode} disabled={generating}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="standalone">Standalone HTML</SelectItem>
-                      <SelectItem value="tinymce">TinyMCE / Contao</SelectItem>
-                      <SelectItem value="wordpress">WordPress</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Sektionen */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Aktive Sektionen</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {ALL_SECTIONS.map((sec) => (
-                    <label key={sec.key} className="flex items-center gap-2 text-xs cursor-pointer">
-                      <Checkbox
-                        checked={activeSections.includes(sec.key)}
-                        onCheckedChange={() => toggleSection(sec.key)}
-                        disabled={generating}
-                      />
-                      {sec.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* ── Interne Verlinkung (Checkbox-based) ── */}
-              <div className="space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Seiten intern verlinken</p>
-
-                {/* QUELLE A: Cluster siblings */}
-                {linkItems.filter((l) => l.source === "cluster").length > 0 && (
-                  <div className="space-y-1.5">
-                    <p className="text-[11px] font-medium text-muted-foreground">Aus diesem Cluster</p>
-                    <div className="max-h-40 overflow-y-auto space-y-1 border rounded-md p-2 bg-muted/30">
-                      {linkItems.map((item, idx) => {
-                        if (item.source !== "cluster") return null;
-                        return (
-                          <label
-                            key={`cluster-${idx}`}
-                            className={`flex items-center gap-2 text-xs py-0.5 ${item.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                          >
-                            <Checkbox
-                              checked={item.checked}
-                              onCheckedChange={() => toggleLink(idx)}
-                              disabled={item.disabled || generating}
-                            />
-                            <span className="truncate flex-1">
-                              {item.keyword}
-                              <span className="text-muted-foreground font-mono ml-1">→ /{item.slug}</span>
-                            </span>
-                            {item.disabled && (
-                              <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0">geplant</Badge>
-                            )}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* QUELLE B: Search other pages */}
-                <div className="space-y-1.5">
-                  <p className="text-[11px] font-medium text-muted-foreground">Weitere Seiten verlinken</p>
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input
-                      placeholder="Keyword suchen..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      disabled={generating}
-                      className="pl-8 h-8 text-xs"
-                    />
-                  </div>
-                  {(searchResults.length > 0 || searching) && (
-                    <div className="border rounded-md bg-popover shadow-md max-h-36 overflow-y-auto">
-                      {searching && (
-                        <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-                          <Loader2 className="h-3 w-3 animate-spin" /> Suche…
-                        </div>
-                      )}
-                      {searchResults.map((r) => (
-                        <button
-                          key={r.keyword}
-                          type="button"
-                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors flex items-center gap-2"
-                          onClick={() => addSearchResult(r)}
-                        >
-                          <span className="truncate flex-1">{r.keyword}</span>
-                          {r.firm && (
-                            <span className="text-[10px] text-muted-foreground shrink-0">{r.firm}</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Show search-added items */}
-                  {linkItems.filter((l) => l.source === "search").length > 0 && (
-                    <div className="space-y-1 border rounded-md p-2 bg-muted/30">
-                      {linkItems.map((item, idx) => {
-                        if (item.source !== "search") return null;
-                        return (
-                          <label key={`search-${idx}`} className="flex items-center gap-2 text-xs cursor-pointer py-0.5">
-                            <Checkbox
-                              checked={item.checked}
-                              onCheckedChange={() => toggleLink(idx)}
-                              disabled={generating}
-                            />
-                            <span className="truncate flex-1">
-                              {item.keyword}
-                              <span className="text-muted-foreground font-mono ml-1">→ /{item.slug}</span>
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <p className="text-[11px] text-muted-foreground">
-                  Diese Seiten werden als interne Links in den Prompt eingebaut.
-                </p>
-              </div>
-
-              {/* ── Kontext-Felder ── */}
-              <div className="space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Kontext-Felder</p>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Zielgruppe</Label>
-                  <Select value={targetAudience} onValueChange={setTargetAudience} disabled={generating}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {ZIELGRUPPEN.map((z) => (
-                        <SelectItem key={z.value} value={z.value}>{z.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Themen-Kontext with AI */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">Themen-Kontext</Label>
-                    <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("themeContext")} disabled={!!aiFieldLoading.themeContext || generating}>
-                      {aiFieldLoading.themeContext ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
-                    </Button>
-                  </div>
-                  {aiFieldLoading.themeContext && !themeContext ? (
-                    <Skeleton className="h-20 w-full rounded-md" />
-                  ) : (
-                    <Textarea value={themeContext} onChange={(e) => setThemeContext(e.target.value)} placeholder="Spezifische Details für diese Seite..." rows={3} disabled={generating} />
-                  )}
-                  <p className="text-[10px] text-muted-foreground">KI-Vorschlag — anpassen und ergänzen</p>
-                </div>
-
-                {/* Differenzierung with AI */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">Differenzierung (Wettbewerbsvorteile)</Label>
-                    <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("differentiation")} disabled={!!aiFieldLoading.differentiation || generating}>
-                      {aiFieldLoading.differentiation ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
-                    </Button>
-                  </div>
-                  {aiFieldLoading.differentiation && !differentiation ? (
-                    <Skeleton className="h-16 w-full rounded-md" />
-                  ) : (
-                    <Textarea value={differentiation} onChange={(e) => setDifferentiation(e.target.value)} placeholder={"Was bietet ihr konkret was Wettbewerber nicht bieten?\nz.B.: Einziger Miele-Spezialist in Pankow, Originalteile auf Lager"} rows={2} disabled={generating} />
-                  )}
-                  <p className="text-[10px] text-muted-foreground">KI-Vorschlag — anpassen und ergänzen</p>
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-
-          {/* ── Errors ── */}
-          {(error || validationError) && (
-            <p className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-2">
-              {validationError || error}
-            </p>
-          )}
-
-          {/* ── Footer buttons ── */}
-          <div className="flex gap-2 pt-1">
-            {generating ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={async () => {
-                    await cancelCurrentJob();
-                    clearResult();
-                    onClose();
-                    toast.info("Generierung abgebrochen");
-                  }}
-                  className="flex-1 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                >
-                  ✕ Abbrechen
-                </Button>
-                <Button disabled className="flex-1">
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Generiere…
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="outline" onClick={onClose} className="flex-1">
-                  Abbrechen
-                </Button>
-                <Button onClick={handleGenerate} className="flex-1">
-                  Seite generieren →
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-
-      {/* Design Picker Modal */}
-      <PickerDialog open={pickerOpen} onOpenChange={setPickerOpen}>
-        <PickerDialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
-          <PickerDialogHeader>
-            <PickerDialogTitle>Design-Philosophie wählen</PickerDialogTitle>
-          </PickerDialogHeader>
-          {designCustomOverride.length >= 10 && (
-            <p className="text-[10px] text-muted-foreground mt-1">Optional — eigene Beschreibung aktiv</p>
-          )}
-          <div className="grid grid-cols-3 gap-2 mt-2">
-            {PALETTES.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  setDesignOverride(p.id);
-                }}
-                className={cn(
-                  "rounded-lg border p-2 text-left transition-all hover:shadow-md cursor-pointer",
-                  (designOverride || activePhilosophy) === p.id
-                    ? "border-primary ring-2 ring-primary/30 bg-primary/5"
-                    : "border-border hover:border-muted-foreground/40"
-                )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancel}
+                className="mt-2 border-red-300 text-red-600 hover:bg-red-50"
               >
-                <p className="text-[11px] font-bold leading-tight truncate">{p.name}</p>
-                <div className="flex gap-1 mt-1.5">
-                  {p.colors.map((c, i) => (
-                    <span key={i} className="inline-block h-3.5 w-3.5 rounded-full border border-border/50" style={{ backgroundColor: c }} />
-                  ))}
-                </div>
-              </button>
-            ))}
+                ✕ Generierung abbrechen
+              </Button>
+            </div>
+            {error && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-800">{error}</p>
+              </div>
+            )}
           </div>
-          <div className="mt-3 space-y-1.5">
-            <Label className="text-xs">Eigene Design-Beschreibung (optional)</Label>
-            <Textarea
-              value={designCustomOverride}
-              onChange={(e) => setDesignCustomOverride(e.target.value)}
-              placeholder="Eigene Design-Beschreibung..."
-              rows={2}
+        ) : (
+          <div className="pt-2">
+            {error && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 mb-4 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-800">{error}</p>
+              </div>
+            )}
+            <SeoForm
+              initialData={initialData}
+              autoFilledFields={{
+                keyword: true,
+                pageType: true,
+                firmName: !!firm?.name,
+                city: !!firm?.city,
+                phone: !!firm?.phone,
+                authorName: !!firm?.author,
+              }}
+              onSubmit={handleSubmit}
+              onBack={onClose}
             />
           </div>
-          {!designOverride && designCustomOverride.length < 10 && (
-            <p className="text-[10px] text-destructive mt-1">Bitte Preset wählen oder eigene Beschreibung eingeben</p>
-          )}
-          <Button
-            className="w-full mt-3"
-            disabled={!designOverride && designCustomOverride.length < 10}
-            onClick={async () => {
-              if (selectedFirmObj?.id) {
-                await supabase
-                  .from("firms")
-                  .update({
-                    design_philosophy: designOverride || selectedFirmObj.design_philosophy,
-                    design_philosophy_custom: designCustomOverride || null,
-                  })
-                  .eq("id", selectedFirmObj.id);
-                toast.success("Design gespeichert ✓");
-              }
-              setPickerOpen(false);
-            }}
-          >
-            Design übernehmen →
-          </Button>
-        </PickerDialogContent>
-      </PickerDialog>
-    </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -596,8 +596,36 @@ export function GeneratePageModal({
                   <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("informationGain")} disabled={!!aiFieldLoading.informationGain || generating}>
                     {aiFieldLoading.informationGain ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
                   </Button>
-                )}
+            </div>
+
+            {/* Intent + Tone of Voice (Schritt 1) */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="gpm-intent">Such-Intent</Label>
+                <Select value={intent} onValueChange={setIntent} disabled={generating}>
+                  <SelectTrigger id="gpm-intent"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="informational">Informational (Ratgeber)</SelectItem>
+                    <SelectItem value="commercial">Commercial (Vergleich/Entscheidung)</SelectItem>
+                    <SelectItem value="transactional">Transactional (Kaufbereit/Lokal)</SelectItem>
+                    <SelectItem value="navigational">Navigational (Marken-Suche)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="gpm-tone">Tonalität</Label>
+                <Select value={toneOfVoice} onValueChange={setToneOfVoice} disabled={generating}>
+                  <SelectTrigger id="gpm-tone"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sachlich">Sachlich-kompetent (Standard)</SelectItem>
+                    <SelectItem value="freundlich">Freundlich-nahbar</SelectItem>
+                    <SelectItem value="premium">Premium-exklusiv</SelectItem>
+                    <SelectItem value="technisch">Technisch-präzise</SelectItem>
+                    <SelectItem value="emotional">Emotional-empathisch</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
               {aiFieldLoading.informationGain && !informationGain ? (
                 <Skeleton className="h-20 w-full rounded-md" />
               ) : (

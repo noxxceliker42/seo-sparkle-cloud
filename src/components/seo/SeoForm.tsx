@@ -192,7 +192,41 @@ const DESIGN_PRESETS = [
   { id: "craft", label: "Warm Craft", color: "#9a3412", desc: "Handwerklich & warm", gradient: "linear-gradient(135deg, #9a3412, #fb923c)" },
   { id: "tech", label: "Tech Precision", color: "#0c4a6e", desc: "Technisch & präzise", gradient: "linear-gradient(135deg, #0c4a6e, #0284c7)" },
 ];
-const TONE_OPTIONS = ["Sachlich-kompetent", "Freundlich-nahbar", "Direkt-verkaufend"];
+
+const DESIGN_PHILOSOPHIES = [
+  { value: "trust_classic", label: "Trust Classic", desc: "Professionell & vertrauenswürdig", primary: "#1d4ed8", secondary: "#ffffff", accent: "#dc2626" },
+  { value: "german_precision", label: "German Precision", desc: "Technisch, sachlich, präzise", primary: "#374151", secondary: "#f9fafb", accent: "#6b7280" },
+  { value: "handwerk_pro", label: "Handwerk Pro", desc: "Erdtöne, robust, bodenständig", primary: "#d97706", secondary: "#fffbeb", accent: "#92400e" },
+  { value: "luxury_dark", label: "Luxury Dark", desc: "Dunkel, Gold, exklusiv", primary: "#d4af37", secondary: "#111827", accent: "#d4af37" },
+  { value: "futuristic_tech", label: "Futuristic Tech", desc: "Neon, modern, digital", primary: "#00f5ff", secondary: "#0f0f1a", accent: "#7c3aed" },
+  { value: "glassmorphism", label: "Glassmorphism", desc: "Transparent, Blur, clean", primary: "#6366f1", secondary: "#f0f9ff", accent: "#f59e0b" },
+  { value: "berlin_urban", label: "Berlin Urban", desc: "Urban, jung, direkt", primary: "#e11d48", secondary: "#18181b", accent: "#f4f4f5" },
+  { value: "medical_clean", label: "Medical Clean", desc: "Weiß, Mint, klinisch", primary: "#059669", secondary: "#ffffff", accent: "#0891b2" },
+  { value: "automotive", label: "Automotive", desc: "Dunkel, Chrom, stark", primary: "#f59e0b", secondary: "#1e293b", accent: "#94a3b8" },
+  { value: "editorial_bold", label: "Editorial Bold", desc: "Große Typografie, S/W", primary: "#ef4444", secondary: "#ffffff", accent: "#000000" },
+  { value: "minimalist_swiss", label: "Minimalist Swiss", desc: "Grid, Weißraum, präzise", primary: "#3b82f6", secondary: "#fafafa", accent: "#171717" },
+  { value: "gradient_flow", label: "Gradient Flow", desc: "Farbverläufe, weich, modern", primary: "#8b5cf6", secondary: "#faf5ff", accent: "#ec4899" },
+  { value: "eco_green", label: "Eco Green", desc: "Grün, natürlich, nachhaltig", primary: "#16a34a", secondary: "#f0fdf4", accent: "#854d0e" },
+  { value: "warm_trustful", label: "Warm Trustful", desc: "Orange/Gelb, einladend", primary: "#ea580c", secondary: "#fff7ed", accent: "#d97706" },
+  { value: "brutalist_raw", label: "Brutalist Raw", desc: "Direkt, mutig, unkonventionell", primary: "#fbbf24", secondary: "#000000", accent: "#ffffff" },
+];
+
+const TARGET_AUDIENCES = [
+  { value: "privatkunden", label: "Privatkunden (Standard)" },
+  { value: "gewerblich", label: "Gewerblich / Vermieter" },
+  { value: "senioren", label: "Senioren / 60+" },
+  { value: "technik", label: "Technik-Affine / DIY" },
+  { value: "preisbewusst", label: "Preisbewusste Kunden" },
+  { value: "premium", label: "Premium-Kunden" },
+];
+
+const TONE_OPTIONS = [
+  "Sachlich-kompetent",
+  "Freundlich-nahbar",
+  "Premium-exklusiv",
+  "Technisch-präzise",
+  "Emotional-empathisch",
+];
 const IMAGE_STRATEGIES = ["NanoBanana KI", "Upload + Alt-Text", "Platzhalter"];
 const SCHEMA_OPTIONS = ["FAQPage", "HowTo", "LocalBusiness", "BreadcrumbList", "Service", "AggregateRating", "SpeakableSpec", "ImageObject"];
 

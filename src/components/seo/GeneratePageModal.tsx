@@ -544,7 +544,6 @@ export function GeneratePageModal({
       authorTitle: firmAuthorTitle,
       authorExperience: firmAuthorExp,
       authorCerts: firmAuthorCerts,
-      rating: firm?.rating?.toString() || "",
       uniqueData,
       infoGain: informationGain,
       uspFokus,

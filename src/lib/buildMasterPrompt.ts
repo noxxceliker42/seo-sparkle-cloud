@@ -448,7 +448,7 @@ SPRACHLICHE QUALITÄTSREGELN (PFLICHT)
 - Max. 3x dasselbe Keyword pro Seite — danach nur Synonyme und LSI-Begriffe
 - Keine Werksbindung ohne Nachweis: kein "autorisierter Fachbetrieb"
 - Testimonials nur mit konkretem Ortsteil + Gerät/Modell + echtem Detail
-
+${imageStrategyBlock}${features2026Block}
 ══════════════════════════════════════
 AUSGABE-FORMAT (exakt einhalten)
 ══════════════════════════════════════

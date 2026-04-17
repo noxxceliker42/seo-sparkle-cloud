@@ -154,7 +154,7 @@ Erstelle konkrete, spezifische Vorschläge für eine SEO-Seite:
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: field ? 300 : 700,
+        max_tokens: field === "painPoints" || field === "personas" ? 800 : field ? 400 : 700,
         system: "Antworte NUR als JSON. Kein Text davor oder danach. Kein Markdown.",
         messages: [{ role: "user", content: userPrompt }],
       }),

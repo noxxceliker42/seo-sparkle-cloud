@@ -71,6 +71,30 @@ export interface SeoFormData {
   comparativeCheck: string;
   // S — Sektionen
   activeSections: string[];
+  // L — Landingpage / Sales-Funnel (optional, nur bei isLandingPageType)
+  landingPageGoal?: string;
+  mainHeadline?: string;
+  primaryCtaText?: string;
+  secondaryCtaText?: string;
+  videoUrl?: string;
+  countdownActive?: boolean;
+  countdownEndDate?: string;
+  countdownText?: string;
+  urgencyBarActive?: boolean;
+  urgencyBarText?: string;
+  guaranteeTitle?: string;
+  guaranteeText?: string;
+  socialProofCustomers?: string;
+  socialProofRating?: string;
+  socialProofReviews?: string;
+  socialProofYears?: string;
+  socialProofWidgetActive?: boolean;
+  painPoints?: string[];
+  personas?: { emoji: string; title: string; description: string }[];
+  bonusStack?: { title: string; value: string }[];
+  leadMagnetTitle?: string;
+  leadMagnetDescription?: string;
+  formType?: string;
 }
 
 interface AutoFilledFields {

@@ -112,6 +112,42 @@ export function clearStuckJob() {
   }
 }
 
+/**
+ * Bricht den aktuell laufenden Job ab — setzt DB-Status auf "error"
+ * und bereinigt sessionStorage. Wird von allen Abbrechen-Buttons
+ * (Modal, Karte, globaler Indikator, Dashboard) aufgerufen.
+ */
+export async function cancelCurrentJob(reason: string = "Vom Nutzer abgebrochen"): Promise<string | null> {
+  let jobId: string | null = null;
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY) || sessionStorage.getItem("currentGenerationJob");
+    if (raw) {
+      try {
+        const job = JSON.parse(raw);
+        jobId = job.jobId || null;
+      } catch {}
+    }
+  } catch {}
+
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem("currentGenerationJob");
+  } catch {}
+
+  if (jobId) {
+    try {
+      await supabase
+        .from("generation_jobs")
+        .update({ status: "error", error_message: reason })
+        .eq("id", jobId);
+    } catch (e) {
+      console.error("cancelCurrentJob DB update failed:", e);
+    }
+  }
+
+  return jobId;
+}
+
 export function useGenerationJob() {
   const [state, setState] = useState<GenerationJobState>({
     jobId: "",

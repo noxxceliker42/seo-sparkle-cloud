@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, CheckCircle2, Clock, BarChart3, Search, Trash2, ExternalLink, Download, ArrowUpDown, Layers } from "lucide-react";
+import { FileText, CheckCircle2, Clock, BarChart3, Search, Trash2, ExternalLink, Download, ArrowUpDown, Layers, X, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { cancelCurrentJob } from "@/hooks/useGenerationJob";
 import PageDetailPanel, { type SeoPage } from "@/components/dashboard/PageDetailPanel";
 
 export const Route = createFileRoute("/dashboard")({
@@ -92,11 +94,50 @@ function DashboardPage() {
   const [detailPage, setDetailPage] = useState<SeoPage | null>(null);
   const [clusterCount, setClusterCount] = useState(0);
   const [clusters, setClusters] = useState<ClusterOption[]>([]);
+  const [runningJobs, setRunningJobs] = useState<Record<string, string>>({}); // page_id → job_id
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadPages();
     loadClusters();
+    loadRunningJobs();
+    const interval = setInterval(loadRunningJobs, 5000);
+    return () => clearInterval(interval);
   }, []);
+
+  const loadRunningJobs = async () => {
+    const { data } = await supabase
+      .from("generation_jobs")
+      .select("id, page_id")
+      .eq("status", "running");
+    if (!data) return;
+    const map: Record<string, string> = {};
+    data.forEach((j) => {
+      if (j.page_id) map[j.page_id] = j.id;
+    });
+    setRunningJobs(map);
+  };
+
+  const handleCancelJob = async (jobId: string, pageId: string, keyword: string) => {
+    setCancellingId(jobId);
+    try {
+      await cancelCurrentJob("Vom Nutzer abgebrochen");
+      await supabase
+        .from("generation_jobs")
+        .update({ status: "error", error_message: "Vom Nutzer abgebrochen" })
+        .eq("id", jobId);
+      setRunningJobs((prev) => {
+        const next = { ...prev };
+        delete next[pageId];
+        return next;
+      });
+      toast.success("Abgebrochen", {
+        description: `Generierung für „${keyword}" gestoppt`,
+      });
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   const loadClusters = async () => {
     const { data } = await supabase.from("clusters").select("id, name").order("name");
@@ -342,6 +383,19 @@ function DashboardPage() {
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDateTime(page.created_at)}</TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-1 justify-end">
+                      {runningJobs[page.id] && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Generierung abbrechen"
+                          disabled={cancellingId === runningJobs[page.id]}
+                          onClick={() => handleCancelJob(runningJobs[page.id], page.id, page.keyword)}
+                        >
+                          {cancellingId === runningJobs[page.id]
+                            ? <Loader2 className="h-4 w-4 animate-spin text-red-500" />
+                            : <X className="h-4 w-4 text-red-500" />}
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => setDetailPage(page)} title="Öffnen"><ExternalLink className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => exportHtml(page)} title="HTML exportieren"><Download className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(page.id)} title="Löschen"><Trash2 className="h-4 w-4 text-destructive" /></Button>

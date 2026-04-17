@@ -320,7 +320,7 @@ E-MAIL: ${data.email || "nicht angegeben"}
 WEBSITE: ${data.website || ""}
 ÖFFNUNGSZEITEN: ${data.oeffnungszeiten || "nicht angegeben"}
 SERVICEGEBIET: ${data.serviceArea || "Berlin und Umland"}
-
+${schemaBlock}
 ══════════════════════════════════════
 AUTOR & E-E-A-T
 ══════════════════════════════════════

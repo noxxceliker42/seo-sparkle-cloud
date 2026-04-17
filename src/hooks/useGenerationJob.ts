@@ -341,12 +341,20 @@ export function useGenerationJob() {
 
   const startGeneration = useCallback(async (formData: Record<string, unknown>) => {
     stopPolling();
-    setState({ jobId: "", generating: true, error: "", htmlWarning: "", result: null });
+    // Sofort sichtbarer Status — bevor irgendein await läuft
+    const tempJobId = `pending-${Date.now()}`;
+    const keyword = (formData.keyword as string) || "";
+    const clusterPageId = (formData.clusterPageId as string) || undefined;
+    writeStorage(tempJobId, keyword, clusterPageId);
+    setState({ jobId: tempJobId, generating: true, error: "", htmlWarning: "", result: null });
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setState((prev) => ({ ...prev, generating: false, error: "Nicht eingeloggt. Bitte erneut anmelden." }));
+        clearStorage();
+        // Kurz warten, damit Cancel-Button im Fehlerfall sichtbar war
+        await new Promise((r) => setTimeout(r, 400));
+        setState((prev) => ({ ...prev, jobId: "", generating: false, error: "Nicht eingeloggt. Bitte erneut anmelden." }));
         return;
       }
 
@@ -373,13 +381,17 @@ export function useGenerationJob() {
         throw new Error(result?.error || "n8n hat keine jobId zurückgegeben");
       }
 
-      writeStorage(result.jobId, (formData.keyword as string) || "", (formData.clusterPageId as string) || undefined);
+      writeStorage(result.jobId, keyword, clusterPageId);
       setState((prev) => ({ ...prev, jobId: result.jobId }));
       startPolling(result.jobId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Fehler";
+      clearStorage();
+      // Mini-Delay damit der Cancel-Button kurz sichtbar war (UX feedback)
+      await new Promise((r) => setTimeout(r, 500));
       setState((prev) => ({
         ...prev,
+        jobId: "",
         generating: false,
         error: msg.includes("Failed to fetch") || msg.includes("NetworkError")
           ? "n8n nicht erreichbar — Bitte N8N_WEBHOOK_URL in den Cloud-Secrets prüfen."

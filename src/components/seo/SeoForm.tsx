@@ -625,7 +625,6 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
   }, []);
 
   const toggleSection = useCallback((sectionId: string) => {
-    if (CORE_SECTIONS.some((s) => s.id === sectionId)) return; // core can't be toggled
     setForm((prev) => {
       const sections = prev.activeSections.includes(sectionId)
         ? prev.activeSections.filter((s) => s !== sectionId)
@@ -633,6 +632,15 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
       return { ...prev, activeSections: sections };
     });
   }, []);
+
+  // Auto-apply section defaults when pageType changes
+  const lastPageTypeRef = useState<{ value: string }>(() => ({ value: "" }))[0];
+  useEffect(() => {
+    if (lastPageTypeRef.value === form.pageType) return;
+    lastPageTypeRef.value = form.pageType;
+    const defaults = DEFAULTS_BY_TYPE[form.pageType] || DEFAULTS_BY_TYPE.service;
+    setForm((prev) => ({ ...prev, activeSections: defaults }));
+  }, [form.pageType, lastPageTypeRef]);
 
   // ─── Step Renderers ──────────────────────────────────────────────────────
 
@@ -1164,36 +1172,55 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
     </div>
   );
 
-  const renderStepS = () => (
-    <div className="space-y-5">
+  const renderStepS = () => {
+    const isLp = isLandingPageType(form.pageType);
+    const seoSections = ALL_SECTIONS.filter((s) => s.group === "seo");
+    const lpSections = ALL_SECTIONS.filter((s) => s.group === "lp");
+
+    const renderGroup = (title: string, sections: typeof ALL_SECTIONS, hint?: string) => (
       <div>
-        <h4 className="text-sm font-semibold text-foreground mb-3">Kern-Sektionen (nicht deaktivierbar)</h4>
-        <div className="space-y-2">
-          {CORE_SECTIONS.map((s) => (
-            <label key={s.id} className="flex items-center gap-3 rounded-md border border-border bg-card p-3 opacity-90">
-              <Switch checked disabled />
-              <span className="text-sm font-medium">{s.id}. {s.label}</span>
-              <Badge variant="outline" className="ml-auto text-[10px]">Pflicht</Badge>
-            </label>
-          ))}
+        <h4 className="text-sm font-semibold text-foreground mb-1">{title}</h4>
+        {hint && <p className="text-[10px] text-muted-foreground mb-3">{hint}</p>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {sections.map((s) => {
+            const checked = form.activeSections.includes(s.id);
+            return (
+              <label
+                key={s.id}
+                className="flex items-center gap-3 rounded-md border border-border bg-card p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+              >
+                <Switch checked={checked} onCheckedChange={() => toggleSection(s.id)} />
+                <span className="text-sm font-medium flex-1">{s.label}</span>
+                <code className="text-[9px] text-muted-foreground font-mono">{s.id}</code>
+              </label>
+            );
+          })}
         </div>
       </div>
-      <div>
-        <h4 className="text-sm font-semibold text-foreground mb-3">Optionale Sektionen</h4>
-        <div className="space-y-2">
-          {OPTIONAL_SECTIONS.map((s) => (
-            <label key={s.id} className="flex items-center gap-3 rounded-md border border-border bg-card p-3 cursor-pointer hover:bg-accent/50 transition-colors">
-              <Switch
-                checked={form.activeSections.includes(s.id)}
-                onCheckedChange={() => toggleSection(s.id)}
-              />
-              <span className="text-sm font-medium">{s.id}. {s.label}</span>
-            </label>
-          ))}
+    );
+
+    return (
+      <div className="space-y-5">
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+          <p className="text-xs text-amber-800">
+            ✨ Sektionen wurden automatisch nach Seitentyp <strong>{form.pageType}</strong> vorausgewählt. Du kannst sie jederzeit anpassen.
+          </p>
+          <p className="text-[10px] text-amber-700 mt-1">
+            Aktiv: {form.activeSections.length} von {ALL_SECTIONS.length} Sektionen
+          </p>
         </div>
+
+        {isLp ? (
+          <>
+            {renderGroup("Landingpage-Sektionen", lpSections, "Conversion-optimierte Sales-Funnel Bausteine")}
+            {renderGroup("Basis-Sektionen", seoSections, "SEO-Inhalte für Authority & E-E-A-T")}
+          </>
+        ) : (
+          renderGroup("SEO-Sektionen", seoSections, "Inhalte für Suchmaschinen-Ranking & E-E-A-T")
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   const stepRenderers = [renderStepA, renderStepB, renderStepC, renderStepD, renderStepE, renderStepF, renderStepG, renderStepH, renderStepS];
 

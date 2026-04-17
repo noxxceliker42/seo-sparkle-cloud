@@ -61,7 +61,14 @@ export interface SeoFormData {
   // F — Design & Bild
   outputMode: string;
   designPreset: string;
+  designPhilosophy: string;
+  designPhilosophyCustom: string;
   primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  targetAudience: string;
+  themeContext: string;
+  differentiation: string;
   toneOfVoice: string;
   imageStrategy: string;
   // G — Schema

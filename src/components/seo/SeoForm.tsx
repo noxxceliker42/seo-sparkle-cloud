@@ -945,13 +945,57 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
         </div>
       </FieldWrapper>
 
-      {/* Design-Philosophie — 15 Karten */}
-      <FieldWrapper label="Design-Philosophie">
+      {/* Design-Philosophien — 15 Karten */}
+      <FieldWrapper label="Design-Philosophien (15)">
         <p className="text-[10px] text-muted-foreground mb-2">
           Wähle eine Philosophie — Farben werden automatisch übernommen (anpassbar unten).
         </p>
         <div className="grid grid-cols-3 gap-2">
           {DESIGN_PHILOSOPHIES.map((p) => {
+            const selected = form.designPhilosophy === p.value;
+            return (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => {
+                  update("designPhilosophy", p.value);
+                  update("primaryColor", p.primary);
+                  update("secondaryColor", p.secondary);
+                  update("accentColor", p.accent);
+                }}
+                className={`relative rounded-lg overflow-hidden text-left transition-all ${
+                  selected
+                    ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                    : "ring-1 ring-border hover:ring-primary/40"
+                }`}
+              >
+                <div className="h-12 w-full flex">
+                  <div className="flex-1" style={{ backgroundColor: p.primary }} />
+                  <div className="flex-1" style={{ backgroundColor: p.secondary }} />
+                  <div className="w-1/4" style={{ backgroundColor: p.accent }} />
+                </div>
+                <div className="p-2 bg-card">
+                  <p className="text-[11px] font-bold text-foreground leading-tight">{p.label}</p>
+                  <p className="text-[9px] text-muted-foreground leading-tight mt-0.5">{p.desc}</p>
+                </div>
+                {selected && (
+                  <div className="absolute top-1 right-1 h-4 w-4 rounded-full bg-primary flex items-center justify-center">
+                    <span className="text-primary-foreground text-[9px] font-bold">✓</span>
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Trennlinie + Bewährte Pakete */}
+        <div className="my-4 border-t border-border" />
+        <p className="text-xs font-semibold text-foreground mb-1">Bewährte Pakete (6)</p>
+        <p className="text-[10px] text-muted-foreground mb-2">
+          Klassische, getestete Design-Pakete — gleiche Auswahl-Logik.
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {LEGACY_DESIGN_PACKS.map((p) => {
             const selected = form.designPhilosophy === p.value;
             return (
               <button

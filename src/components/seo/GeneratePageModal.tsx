@@ -216,6 +216,28 @@ export function GeneratePageModal({
   const [informationGain, setInformationGain] = useState("");
   const [uspFokus, setUspFokus] = useState("");
 
+  // Intent + Tone of Voice (Schritt 1)
+  const intentFromPageType = (pt: string): string => {
+    switch (pt) {
+      case "service":
+      case "transactional":
+      case "transactional_local":
+        return "transactional";
+      case "supporting_commercial":
+        return "commercial";
+      case "pillar_page":
+      case "pillar":
+      case "fehlercode":
+      case "blog":
+      case "supporting_info":
+      case "deep_page":
+      default:
+        return "informational";
+    }
+  };
+  const [intent, setIntent] = useState<string>(() => intentFromPageType(clusterPage.page_type));
+  const [toneOfVoice, setToneOfVoice] = useState<string>("sachlich");
+
   // AI suggestions — per-field loading state
   const [aiFieldLoading, setAiFieldLoading] = useState<Record<string, boolean>>({});
   const [aiLoaded, setAiLoaded] = useState(false);
@@ -476,6 +498,8 @@ export function GeneratePageModal({
       uniqueData,
       infoGain: informationGain,
       uspFokus,
+      intent,
+      toneOfVoice,
       kvaPrice,
       priceRange,
       designPreset,
@@ -598,6 +622,35 @@ export function GeneratePageModal({
               ) : (
                 <Input id="gpm-usp" placeholder="z.B. 24h Notdienst, Original-Ersatzteile, 15 Jahre Erfahrung" value={uspFokus} onChange={(e) => setUspFokus(e.target.value)} disabled={generating} />
               )}
+            </div>
+
+            {/* Intent + Tone of Voice (Schritt 1) */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="gpm-intent">Such-Intent</Label>
+                <Select value={intent} onValueChange={setIntent} disabled={generating}>
+                  <SelectTrigger id="gpm-intent"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="informational">Informational (Ratgeber)</SelectItem>
+                    <SelectItem value="commercial">Commercial (Vergleich/Entscheidung)</SelectItem>
+                    <SelectItem value="transactional">Transactional (Kaufbereit/Lokal)</SelectItem>
+                    <SelectItem value="navigational">Navigational (Marken-Suche)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="gpm-tone">Tonalität</Label>
+                <Select value={toneOfVoice} onValueChange={setToneOfVoice} disabled={generating}>
+                  <SelectTrigger id="gpm-tone"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sachlich">Sachlich-kompetent (Standard)</SelectItem>
+                    <SelectItem value="freundlich">Freundlich-nahbar</SelectItem>
+                    <SelectItem value="premium">Premium-exklusiv</SelectItem>
+                    <SelectItem value="technisch">Technisch-präzise</SelectItem>
+                    <SelectItem value="emotional">Emotional-empathisch</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {aiLoaded && (

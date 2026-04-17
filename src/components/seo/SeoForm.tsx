@@ -108,7 +108,22 @@ const PAGE_TYPE_OPTIONS = [
   { value: "transactional", label: "Transactional — Ortsteil/lokale Landingpage" },
   { value: "deep_page", label: "Deep Page — Spezifisches Thema/Modell" },
   { value: "blog", label: "Blog / Ratgeber-Artikel" },
+  { value: "salesfunnel_leadgen", label: "🎯 Sales Funnel — Lead Generation" },
+  { value: "salesfunnel_ecommerce", label: "🛒 Sales Funnel — E-Commerce/Direktkauf" },
+  { value: "landingpage_service", label: "📞 Landingpage — Service/Lokal" },
+  { value: "landingpage_local", label: "📍 Landingpage — Ortsteil/Stadt" },
 ];
+
+export const LANDINGPAGE_TYPES = [
+  "salesfunnel_leadgen",
+  "salesfunnel_ecommerce",
+  "landingpage_service",
+  "landingpage_local",
+] as const;
+
+export function isLandingPageType(pageType: string): boolean {
+  return (LANDINGPAGE_TYPES as readonly string[]).includes(pageType);
+}
 const PILLAR_TIERS = [
   { value: "1", label: "Tier 1", desc: "Haupt-Pillar", sub: "Brand oder Generic Hauptseite" },
   { value: "2", label: "Tier 2", desc: "Device-Pillar", sub: "Gerätetyp oder Unterkategorie" },

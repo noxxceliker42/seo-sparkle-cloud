@@ -353,7 +353,7 @@ PREISE
 ══════════════════════════════════════
 KVA-PREIS: ${data.kvaPrice || "k.A."} €
 PREISSPANNE: ${data.priceRange || "k.A."}
-
+${priceCardsBlock}${repairVsBuyBlock}
 ══════════════════════════════════════
 DESIGN-SYSTEM: ${ds.name}
 ══════════════════════════════════════

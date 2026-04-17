@@ -95,6 +95,192 @@ export function buildMasterPrompt(data: Record<string, any>): string {
 
   const intent = (data.intent || "Informational").toLowerCase();
 
+  // ── Conditional blocks (Schritt 4: Felder aus erweitertem Modal) ──
+
+  // Tonalität
+  const toneRaw = String(data.toneOfVoice || "").toLowerCase().trim();
+  const toneBlock = toneRaw && toneRaw !== "sachlich" && toneRaw !== "sachlich-kompetent"
+    ? `
+══════════════════════════════════════
+TONALITÄT
+══════════════════════════════════════
+${
+  toneRaw === "freundlich" ? "Freundlich-nahbar. Du-Ansprache möglich. Warm und persönlich." :
+  toneRaw === "premium" ? "Premium-exklusiv. Gehoben, distanziert, kein Umgangssprachlich." :
+  toneRaw === "technisch" ? "Technisch-präzise. Fachbegriffe erwünscht. Zahlen und Fakten." :
+  toneRaw === "emotional" ? "Emotional-empathisch. Schmerzpunkte ansprechen. Verständnisvoll." :
+  "Sachlich-kompetent."
+}
+`
+    : "";
+
+  // Schema-Markup
+  const schemaArr: string[] = Array.isArray(data.schemaBlocks) ? data.schemaBlocks : [];
+  const schemaBlock = schemaArr.length > 0
+    ? `
+══════════════════════════════════════
+SCHEMA-MARKUP AKTIVIERT
+══════════════════════════════════════
+Folgende Schema-Typen MÜSSEN als JSON-LD implementiert werden:
+${schemaArr.join(", ")}
+
+Pflicht-Regeln:
+- FAQPage: alle FAQ-Fragen als Question/Answer Items
+- LocalBusiness: NAP-Daten vollständig (name, address, telephone, openingHours, geo)
+- HowTo: Schritt-für-Schritt mit name, text, image pro Step
+- BreadcrumbList: immer mit position + name + item
+- Service: Dienstleistungs-Details (serviceType, areaServed, provider)
+- WebPage: name, description, breadcrumb, mainEntity
+`
+    : "";
+
+  // Preiskarten — unterstützt sowohl priceCards-Array als auch priceCard1/2/3
+  const cards: Array<{ label: string; price: string }> = (() => {
+    if (Array.isArray(data.priceCards) && data.priceCards.length) {
+      return data.priceCards
+        .map((c: any) => ({ label: String(c?.label || "").trim(), price: String(c?.price || "").trim() }))
+        .filter((c: any) => c.label && c.price);
+    }
+    return [data.priceCard1, data.priceCard2, data.priceCard3]
+      .map((s, i) => {
+        if (!s) return null;
+        const str = String(s).trim();
+        if (!str) return null;
+        // "Label — 79€" oder "Label: 79€" → splitten
+        const m = str.match(/^(.+?)\s*[—:\-–]\s*(.+)$/);
+        return m ? { label: m[1].trim(), price: m[2].trim() } : { label: `Karte ${i + 1}`, price: str };
+      })
+      .filter(Boolean) as Array<{ label: string; price: string }>;
+  })();
+
+  const priceCardsBlock = cards.length > 0
+    ? `
+══════════════════════════════════════
+PREISKARTEN (als visuelles Grid darstellen)
+══════════════════════════════════════
+${cards.map((c, i) => `- Karte ${i + 1}: ${c.label} — ${c.price}`).join("\n")}
+
+Format pro Karte: Name (H3) + Preis prominent + 3 enthaltene Leistungen als Bullet-Liste.
+Layout: 3-Spalten-Grid auf Desktop, 1-Spalte auf Mobile. Mittlere Karte als "Empfohlen" hervorheben.
+`
+    : "";
+
+  // Repair vs Buy
+  const repairVsBuyBlock = data.repairVsBuy === true
+    ? `
+══════════════════════════════════════
+REPARIEREN vs. KAUFEN VERGLEICH (Pflicht-Sektion)
+══════════════════════════════════════
+Zeige konkret wann sich Reparatur lohnt vs. Neukauf.
+Faustregel: Reparatur lohnt wenn Reparaturkosten < 50% des Neupreises.
+Mit echten Zahlen für die Gerätekategorie aus dem Keyword "${data.keyword || ""}".
+Layout: 2-Spalten-Vergleichsbox mit "Reparieren wenn …" vs. "Neu kaufen wenn …".
+`
+    : "";
+
+  // E-E-A-T Erweiterung
+  const reviewer = String(data.reviewer || "").trim();
+  const caseStudy = String(data.caseStudy || "").trim();
+  const eeatExtBlock = (reviewer || caseStudy)
+    ? `
+══════════════════════════════════════
+E-E-A-T ERWEITERUNG
+══════════════════════════════════════
+${reviewer ? `FACHLICHE PRÜFUNG:
+Dieser Artikel wurde fachlich geprüft von: ${reviewer}
+→ Als sichtbares Trust-Signal in Autor-Box oder eigener Zeile einbauen ("Fachlich geprüft von …").
+` : ""}${caseStudy ? `FALLBEISPIEL / REFERENZ (als echte Case Study einbauen):
+${caseStudy}
+→ Als konkretes Beispiel mit Ortsteil + Gerät/Modell + Ergebnis in passendem Abschnitt einbauen.
+` : ""}`
+    : "";
+
+  // Bild-Strategie
+  const imageStrategy = String(data.imageStrategy || "nanobanana").toLowerCase();
+  const imageStrategyBlock = imageStrategy === "nanobanana"
+    ? `
+══════════════════════════════════════
+BILD-STRATEGIE: NANOBANANA-PLATZHALTER (PFLICHT)
+══════════════════════════════════════
+Für JEDE Sektion die ein Bild benötigt MUSS exakt dieser Platzhalter verwendet werden:
+
+Hero Section (PFLICHT auf jeder Seite):
+<img
+  src="NANOBANANA_PLACEHOLDER"
+  data-nb-slot="hero"
+  data-nb-prompt="${data.keyword || ""} ${data.pageType || ""}, professionell, premium Qualität, ${branche}, ${data.city || "Berlin"}, Techniker bei der Arbeit"
+  data-nb-width="1200"
+  data-nb-height="675"
+  data-nb-ratio="16:9"
+  alt="${data.keyword || ""}"
+  class="nb-image-slot"
+  loading="eager"
+>
+
+Für H2-Sektionen (nur wenn Bild Mehrwert bringt):
+<img
+  src="NANOBANANA_PLACEHOLDER"
+  data-nb-slot="section-[sektionsname]"
+  data-nb-prompt="[spezifischer Kontext dieser Sektion], professionell, ${branche}"
+  data-nb-width="800"
+  data-nb-height="450"
+  data-nb-ratio="16:9"
+  alt="[Sektions-Beschreibung]"
+  class="nb-image-slot"
+  loading="lazy"
+>
+
+VERBOTEN:
+- src mit echten URLs oder Pfaden
+- <img> ohne data-nb-slot
+- <div class="img-placeholder"> statt <img>
+- Andere Platzhalter-Formate
+`
+    : imageStrategy === "placeholder"
+    ? `
+══════════════════════════════════════
+BILD-STRATEGIE: EINFACHE PLATZHALTER
+══════════════════════════════════════
+Bilder nur als einfache Platzhalter-Divs darstellen (z.B. <div class="img-placeholder" aria-label="…">).
+Kein NANOBANANA_PLACEHOLDER verwenden. Kein <img>-Tag mit data-nb-slot.
+`
+    : `
+══════════════════════════════════════
+BILD-STRATEGIE: KEINE BILDER
+══════════════════════════════════════
+Keine <img>-Tags und keine Bild-Platzhalter im Output. Reine Textseite.
+Bild-Slots in den Sektionen werden komplett weggelassen.
+`;
+
+  // 2026 Features
+  const discoverReady = data.discoverReady === true;
+  const comparativeCheck = data.comparativeCheck === true;
+  const infoGainFlag = data.informationGainFlag === true;
+
+  const features2026Block = (discoverReady || comparativeCheck || infoGainFlag)
+    ? `
+══════════════════════════════════════
+2026 FEATURES
+══════════════════════════════════════
+${discoverReady ? `GOOGLE DISCOVER OPTIMIERUNG:
+- Titel zwischen 50-90 Zeichen (emotional, neugierig)
+- Hero-Bild mindestens 1200px breit (16:9)
+- Ersten Absatz als eigenständige Zusammenfassung
+- Keine Click-Bait, aber starke Emotion im H1
+- max-image-preview:large im Robots-Meta
+` : ""}${comparativeCheck ? `WETTBEWERBS-VERGLEICH EINBAUEN:
+- Mindestens 1 Sektion die uns von Wettbewerbern abhebt
+- Konkrete Zahlen/Fakten statt Floskeln
+- "Warum wir" Sektion mit messbaren Vorteilen (z.B. Reaktionszeit, Garantie, Preis)
+` : ""}${(infoGainFlag || discoverReady) ? `AI OVERVIEW OPTIMIERUNG:
+- Jeden Hauptpunkt in 2 prägnanten Sätzen zusammenfassen
+- Direkte Antworten auf Fragen ohne Umschweife
+- Strukturierte Listen wo möglich
+- Erste 150 Wörter als vollständige Zusammenfassung der ganzen Seite
+` : ""}`
+    : "";
+
+
   return `Du bist gleichzeitig:
 - Senior SEO-Stratege (Topical Authority, Content Cluster, Topic Universe, Search Intent Präzision)
 - Conversion-Copywriter (AIDA-Struktur, lokale USPs, Vertrauensaufbau, CTA-Hierarchie)

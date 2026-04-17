@@ -328,7 +328,7 @@ AUTOR: ${data.authorName || data.author || ""}
 BERUFSBEZEICHNUNG: ${data.authorTitle || data.role || ""}
 ERFAHRUNG: ${data.experienceYears || data.experience || ""} Jahre
 ZERTIFIKATE: ${data.certificates || ""}
-
+${eeatExtBlock}
 ══════════════════════════════════════
 CONTENT-STRATEGIE
 ══════════════════════════════════════

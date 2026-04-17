@@ -450,6 +450,41 @@ SPRACHLICHE QUALITÄTSREGELN (PFLICHT)
 - Testimonials nur mit konkretem Ortsteil + Gerät/Modell + echtem Detail
 ${imageStrategyBlock}${features2026Block}
 ══════════════════════════════════════
+MOBILE-FIRST PFLICHT
+══════════════════════════════════════
+Die gesamte HTML-Seite MUSS mobile-ready sein. Pflicht-Regeln:
+
+1. <meta name="viewport" content="width=device-width, initial-scale=1.0"> im <head> (PFLICHT)
+2. Alle Breiten: max-width statt fixe width
+3. Container: max-width: 1140px; margin: 0 auto; padding: 0 16px
+4. Images: max-width: 100%; height: auto (responsive)
+5. Media Query @media (max-width: 768px):
+   - Hero stackt vertikal (flex-direction: column / grid-template-columns: 1fr)
+   - Alle Grids werden 1-spaltig
+   - Buttons werden width: 100%
+   - Schriften minimum 16px (kein Zoom auf iOS)
+   - Reduziertes Padding (padding: 0 12px)
+6. Sticky Mobile-CTA (PFLICHT auf Mobile):
+   <a href="tel:..." class="mobile-sticky-cta">Jetzt anrufen</a>
+   CSS: position: fixed; bottom: 0; left: 0; right: 0; z-index: 999;
+   padding: 14px; text-align: center; background: var(--c-primary);
+   color: #fff; font-weight: 700; display: none;
+   @media (max-width: 768px) { display: block; }
+   body { padding-bottom: 60px; } /* Platz für Sticky-CTA */
+7. Touch-Targets: ALLE klickbaren Elemente (Buttons, Links, Inputs) min-height: 44px; min-width: 44px
+8. Responsive Typografie via clamp():
+   h1 { font-size: clamp(1.75rem, 4vw + 1rem, 3rem); }
+   h2 { font-size: clamp(1.4rem, 2.5vw + 0.5rem, 2.2rem); }
+   h3 { font-size: clamp(1.15rem, 1.5vw + 0.5rem, 1.6rem); }
+   body { font-size: clamp(1rem, 0.5vw + 0.9rem, 1.125rem); }
+
+VERBOTEN:
+- Fixe Pixel-Breiten ohne max-width
+- horizontal scrollbare Tabellen ohne overflow-x: auto Wrapper
+- Schriftgrößen < 16px im Body
+- Buttons unter 44px Höhe
+
+══════════════════════════════════════
 AUSGABE-FORMAT (exakt einhalten)
 ══════════════════════════════════════
 

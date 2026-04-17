@@ -329,16 +329,35 @@ function RequiredMark() {
   return <span className="text-red-600 ml-0.5">*</span>;
 }
 
-function FieldWrapper({ label, required, autoFilled, children }: {
-  label: string; required?: boolean; autoFilled?: boolean; children: React.ReactNode;
+function FieldWrapper({ label, required, autoFilled, action, children }: {
+  label: string; required?: boolean; autoFilled?: boolean; action?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-sm font-medium">
-        {label}{required && <RequiredMark />}{autoFilled && <AutoBadge />}
-      </Label>
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium">
+          {label}{required && <RequiredMark />}{autoFilled && <AutoBadge />}
+        </Label>
+        {action}
+      </div>
       {children}
     </div>
+  );
+}
+
+function AiButton({ loading, onClick, label = "KI-Vorschlag" }: {
+  loading: boolean; onClick: () => void; label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+    >
+      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+      {label}
+    </button>
   );
 }
 

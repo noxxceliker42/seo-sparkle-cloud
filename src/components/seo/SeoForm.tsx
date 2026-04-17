@@ -6,8 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Sparkles, Loader2 } from "lucide-react";
 import { LandingPageAccordion } from "./LandingPageAccordion";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -327,16 +329,35 @@ function RequiredMark() {
   return <span className="text-red-600 ml-0.5">*</span>;
 }
 
-function FieldWrapper({ label, required, autoFilled, children }: {
-  label: string; required?: boolean; autoFilled?: boolean; children: React.ReactNode;
+function FieldWrapper({ label, required, autoFilled, action, children }: {
+  label: string; required?: boolean; autoFilled?: boolean; action?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-sm font-medium">
-        {label}{required && <RequiredMark />}{autoFilled && <AutoBadge />}
-      </Label>
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium">
+          {label}{required && <RequiredMark />}{autoFilled && <AutoBadge />}
+        </Label>
+        {action}
+      </div>
       {children}
     </div>
+  );
+}
+
+function AiButton({ loading, onClick, label = "KI-Vorschlag" }: {
+  loading: boolean; onClick: () => void; label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+    >
+      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+      {label}
+    </button>
   );
 }
 
@@ -375,6 +396,51 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
   const update = useCallback(<K extends keyof SeoFormData>(key: K, value: SeoFormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  // ─── KI-Vorschläge ────────────────────────────────────────────────────────
+  const [suggestingField, setSuggestingField] = useState<string | null>(null);
+
+  const fetchSuggestions = useCallback(
+    async (field: string, apply: (data: Record<string, unknown>) => void) => {
+      setSuggestingField(field);
+      try {
+        const { data, error } = await supabase.functions.invoke("generate-field-suggestions", {
+          body: {
+            keyword: form.keyword || "",
+            pageType: form.pageType || "service",
+            firm: form.firmName || "",
+            branche: form.branche || "hausgeraete",
+            targetAudience: "privatkunden",
+            field,
+          },
+        });
+        if (error) throw error;
+        if (data && typeof data === "object") {
+          apply(data as Record<string, unknown>);
+          toast.success("KI-Vorschlag übernommen", {
+            description: "Bitte prüfen und ggf. anpassen.",
+          });
+        }
+      } catch (err) {
+        console.error("AI Suggestion Error:", err);
+        toast.error("KI-Vorschlag fehlgeschlagen", {
+          description: "Bitte manuell ausfüllen.",
+        });
+      } finally {
+        setSuggestingField(null);
+      }
+    },
+    [form.keyword, form.pageType, form.firmName, form.branche],
+  );
+
+  const applyString = useCallback(
+    <K extends keyof SeoFormData>(key: K) =>
+      (data: Record<string, unknown>) => {
+        const v = data[key as string];
+        if (typeof v === "string") update(key, v as SeoFormData[K]);
+      },
+    [update],
+  );
 
   const isAuto = useCallback((key: string) => !!autoFilledFields[key], [autoFilledFields]);
 
@@ -485,10 +551,28 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
           ))}
         </div>
       </FieldWrapper>
-      <FieldWrapper label="Sekundär-Keywords" autoFilled={isAuto("secondaryKeywords")}>
+      <FieldWrapper
+        label="Sekundär-Keywords"
+        autoFilled={isAuto("secondaryKeywords")}
+        action={
+          <AiButton
+            loading={suggestingField === "secondaryKeywords"}
+            onClick={() => fetchSuggestions("secondaryKeywords", applyString("secondaryKeywords"))}
+          />
+        }
+      >
         <Textarea value={form.secondaryKeywords} onChange={(e) => update("secondaryKeywords", e.target.value)} className={inputClass("secondaryKeywords")} rows={3} />
       </FieldWrapper>
-      <FieldWrapper label="LSI-Begriffe" autoFilled={isAuto("lsiTerms")}>
+      <FieldWrapper
+        label="LSI-Begriffe"
+        autoFilled={isAuto("lsiTerms")}
+        action={
+          <AiButton
+            loading={suggestingField === "lsiTerms"}
+            onClick={() => fetchSuggestions("lsiTerms", applyString("lsiTerms"))}
+          />
+        }
+      >
         <Textarea value={form.lsiTerms} onChange={(e) => update("lsiTerms", e.target.value)} className={inputClass("lsiTerms")} rows={3} />
       </FieldWrapper>
       <FieldWrapper label="Negative Keywords">
@@ -497,7 +581,15 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
       <FieldWrapper label="Pillar-URL">
         <Input value={form.pillarUrl} onChange={(e) => update("pillarUrl", e.target.value)} placeholder="https://example.com/pillar-page" />
       </FieldWrapper>
-      <FieldWrapper label="Wettbewerbs-USP">
+      <FieldWrapper
+        label="Wettbewerbs-USP"
+        action={
+          <AiButton
+            loading={suggestingField === "uspFokus"}
+            onClick={() => fetchSuggestions("uspFokus", applyString("uspFokus"))}
+          />
+        }
+      >
         <Textarea value={form.uspFokus} onChange={(e) => update("uspFokus", e.target.value)} rows={3} placeholder="Was unterscheidet diesen Betrieb von Wettbewerbern für dieses Keyword? z.B. Einziger Betrieb mit 24h-Notdienst, günstigste Anfahrt, 20 Jahre Erfahrung..." />
         <p className="text-[10px] text-muted-foreground mt-1">Steuert Conversion-Texte und EEAT-Differenzierung der Seite</p>
       </FieldWrapper>
@@ -519,10 +611,28 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
       <FieldWrapper label="Deep Pages" autoFilled={isAuto("deepPages")}>
         <Textarea value={form.deepPages} onChange={(e) => update("deepPages", e.target.value)} className={inputClass("deepPages")} rows={3} />
       </FieldWrapper>
-      <FieldWrapper label="Content-Gap" required>
+      <FieldWrapper
+        label="Content-Gap"
+        required
+        action={
+          <AiButton
+            loading={suggestingField === "contentGap"}
+            onClick={() => fetchSuggestions("contentGap", applyString("contentGap"))}
+          />
+        }
+      >
         <Textarea value={form.contentGap} onChange={(e) => update("contentGap", e.target.value)} rows={4} placeholder="Was haben die Top-3, was hier fehlt?" className={!form.contentGap.trim() ? "border-red-500" : ""} />
       </FieldWrapper>
-      <FieldWrapper label="PAA-Fragen (Kie.AI + DataForSEO)" autoFilled={isAuto("paaQuestions")}>
+      <FieldWrapper
+        label="PAA-Fragen (Kie.AI + DataForSEO)"
+        autoFilled={isAuto("paaQuestions")}
+        action={
+          <AiButton
+            loading={suggestingField === "paaQuestions"}
+            onClick={() => fetchSuggestions("paaQuestions", applyString("paaQuestions"))}
+          />
+        }
+      >
         <Textarea value={form.paaQuestions} onChange={(e) => update("paaQuestions", e.target.value)} className={inputClass("paaQuestions")} rows={6} />
       </FieldWrapper>
     </div>
@@ -561,7 +671,16 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
       <FieldWrapper label="Öffnungszeiten / Verfügbarkeit">
         <Input value={form.oeffnungszeiten} onChange={(e) => update("oeffnungszeiten", e.target.value)} placeholder="Mo-Fr 8-18 Uhr, Sa 9-14 Uhr" />
       </FieldWrapper>
-      <FieldWrapper label="Unique Data" required>
+      <FieldWrapper
+        label="Unique Data"
+        required
+        action={
+          <AiButton
+            loading={suggestingField === "uniqueData"}
+            onClick={() => fetchSuggestions("uniqueData", applyString("uniqueData"))}
+          />
+        }
+      >
         <p className="text-xs text-muted-foreground mb-1">Eigene Zahlen, Erfahrungswerte, Statistiken — kein API ersetzt das!</p>
         <Textarea value={form.uniqueData} onChange={(e) => update("uniqueData", e.target.value)} rows={4} className={!form.uniqueData.trim() ? "border-red-500" : ""} placeholder="z.B. '2.847 Reparaturen in 2025', 'Durchschnittl. Anfahrt 22 Min.'" />
       </FieldWrapper>
@@ -731,7 +850,17 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
           ⚠️ Seit März 2026 Core Update Pflicht für Top-Ranking
         </p>
       </div>
-      <FieldWrapper label="Information Gain" required autoFilled={isAuto("informationGain")}>
+      <FieldWrapper
+        label="Information Gain"
+        required
+        autoFilled={isAuto("informationGain")}
+        action={
+          <AiButton
+            loading={suggestingField === "informationGain"}
+            onClick={() => fetchSuggestions("informationGain", applyString("informationGain"))}
+          />
+        }
+      >
         <div className="flex items-center gap-2 mb-1">
           <Badge className="bg-amber-500 text-white text-[10px] px-1.5 py-0 h-4 hover:bg-amber-500">NEU 2026</Badge>
           <span className="text-xs text-muted-foreground">Was gibt es hier, was kein Wettbewerber hat?</span>

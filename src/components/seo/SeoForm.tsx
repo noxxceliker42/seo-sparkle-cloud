@@ -474,6 +474,13 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
       rating: firm.rating?.toString() || prev.rating,
       reviewCount: firm.review_count?.toString() || "",
       primaryColor: firm.primary_color || prev.primaryColor,
+      secondaryColor: firm.secondary_color || prev.secondaryColor,
+      accentColor: firm.accent_color || prev.accentColor,
+      designPhilosophy: firm.design_philosophy || prev.designPhilosophy,
+      designPhilosophyCustom: firm.design_philosophy_custom || prev.designPhilosophyCustom,
+      targetAudience: firm.target_audience || prev.targetAudience,
+      themeContext: firm.theme_context || prev.themeContext,
+      differentiation: firm.differentiation || prev.differentiation,
       branche: firm.branche || prev.branche,
       sprache: firm.sprache || prev.sprache,
     }));

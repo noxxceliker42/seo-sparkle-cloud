@@ -379,6 +379,20 @@ export function GeneratePageModal({
       setDifferentiation(String(cluster.differentiation || selectedFirmObj?.differentiation || ""));
       setDesignOverride(selectedFirmObj?.design_philosophy || null);
       setDesignCustomOverride(String(selectedFirmObj?.design_philosophy_custom || ""));
+      // Schritt 2 — E-E-A-T defaults aus Firma
+      setRating(selectedFirmObj?.rating != null ? String(selectedFirmObj.rating) : "");
+      setReviewCount(selectedFirmObj?.review_count != null ? String(selectedFirmObj.review_count) : "");
+      // Schritt 2B — Deep Pages aus cluster_pages
+      (async () => {
+        const { data } = await supabase
+          .from("cluster_pages")
+          .select("keyword, url_slug")
+          .eq("cluster_id", cluster.id)
+          .eq("page_type", "deep_page");
+        if (data && data.length) {
+          setDeepPages(data.map((d) => `${d.keyword} → /${d.url_slug}`).join("\n"));
+        }
+      })();
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 

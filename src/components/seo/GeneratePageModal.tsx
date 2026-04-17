@@ -293,6 +293,9 @@ export function GeneratePageModal({
     if (data.uspFokus) setUspFokus(data.uspFokus);
     if (data.themeContext) setThemeContext(data.themeContext);
     if (data.differentiation) setDifferentiation(data.differentiation);
+    if (data.paaQuestions) setPaaQuestions(data.paaQuestions);
+    if (data.secondaryKeywords) setSecondaryKeywords(data.secondaryKeywords);
+    if (data.lsiTerms) setLsiTerms(data.lsiTerms);
   }, []);
 
   const fetchAllSuggestions = useCallback(async () => {

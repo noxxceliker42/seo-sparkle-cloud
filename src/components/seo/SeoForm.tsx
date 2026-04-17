@@ -501,6 +501,10 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
         <Textarea value={form.uspFokus} onChange={(e) => update("uspFokus", e.target.value)} rows={3} placeholder="Was unterscheidet diesen Betrieb von Wettbewerbern für dieses Keyword? z.B. Einziger Betrieb mit 24h-Notdienst, günstigste Anfahrt, 20 Jahre Erfahrung..." />
         <p className="text-[10px] text-muted-foreground mt-1">Steuert Conversion-Texte und EEAT-Differenzierung der Seite</p>
       </FieldWrapper>
+
+      {isLandingPageType(form.pageType) && (
+        <LandingPageAccordion form={form} update={update} />
+      )}
     </div>
   );
 

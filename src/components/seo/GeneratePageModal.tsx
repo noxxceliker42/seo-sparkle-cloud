@@ -1290,6 +1290,10 @@ export function GeneratePageModal({
                 <Button
                   variant="outline"
                   onClick={() => {
+                    try {
+                      sessionStorage.removeItem("seo_os_generation_job");
+                      sessionStorage.removeItem("currentGenerationJob");
+                    } catch {}
                     clearResult();
                     onClose();
                     toast.info("Generierung abgebrochen");

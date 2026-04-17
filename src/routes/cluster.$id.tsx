@@ -902,13 +902,60 @@ interface ClusterPageCardProps {
 function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, onGenerate, onSetLive, onSubClusterCreated, onLinksUpdated }: ClusterPageCardProps) {
   const [subModalOpen, setSubModalOpen] = useState(false);
   const [linksModalOpen, setLinksModalOpen] = useState(false);
+  const [isStuck, setIsStuck] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const score = calculateScore(page);
   const status = page.status || "planned";
   const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.planned;
   const isGenerated = status === "generated" || status === "published" || status === "live";
-  const canGenerate = !isGenerated && status !== "generating" && !isGenerating;
   const showSkeleton = isFetchingScores && !page.score_volume;
   const hasSubCluster = !!page.sub_cluster_id;
+
+  // Detect stuck generation jobs (running > 5 min)
+  useEffect(() => {
+    if (!page.generation_jobs_id || isGenerated) {
+      setIsStuck(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("generation_jobs")
+        .select("status, created_at")
+        .eq("id", page.generation_jobs_id!)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const isRunning = data.status === "running" || data.status === "pending";
+      const ageMs = Date.now() - new Date(data.created_at).getTime();
+      setIsStuck(isRunning && ageMs > 5 * 60 * 1000);
+    })();
+    return () => { cancelled = true; };
+  }, [page.generation_jobs_id, isGenerated, isGenerating]);
+
+  const canGenerate = !isGenerated && status !== "generating" && !isGenerating && !isStuck;
+
+  const handleResetStuck = async () => {
+    if (!page.generation_jobs_id) return;
+    setResetting(true);
+    try {
+      await supabase
+        .from("generation_jobs")
+        .update({ status: "error", error_message: "Vom Nutzer abgebrochen" })
+        .eq("id", page.generation_jobs_id);
+      await supabase
+        .from("cluster_pages")
+        .update({ status: "approved", generation_jobs_id: null })
+        .eq("id", page.id);
+      try {
+        sessionStorage.removeItem("seo_os_generation_job");
+        sessionStorage.removeItem("currentGenerationJob");
+      } catch {}
+      setIsStuck(false);
+      onGenerate();
+    } finally {
+      setResetting(false);
+    }
+  };
 
   return (
     <>
@@ -983,7 +1030,19 @@ function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, 
                 <Zap className="h-3 w-3" /> Generieren
               </Button>
             )}
-            {isGenerating && (
+            {isStuck && !isGenerated && (
+              <Button
+                size="sm"
+                variant="destructive"
+                className="flex-1 text-[11px] h-7 gap-1"
+                onClick={handleResetStuck}
+                disabled={resetting}
+              >
+                {resetting ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                Abgebrochen — Erneut versuchen
+              </Button>
+            )}
+            {isGenerating && !isStuck && (
               <Button size="sm" className="flex-1 text-[11px] h-7 gap-1" disabled>
                 <Loader2 className="h-3 w-3 animate-spin" /> Generiere…
               </Button>

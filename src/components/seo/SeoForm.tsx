@@ -279,25 +279,82 @@ function checkNapValidity(form: SeoFormData): string[] {
   return errors;
 }
 
-const CORE_SECTIONS = [
-  { id: "01", label: "Hero-Sektion" },
-  { id: "02", label: "Problem-Spiegelung" },
-  { id: "04", label: "Symptome + Ursachen" },
-  { id: "05", label: "Selbsthilfe (HowTo)" },
-  { id: "07", label: "Unique Data Sektion" },
-  { id: "08", label: "Information Gain" },
-  { id: "09", label: "Ablauf vor Ort" },
-  { id: "10", label: "Preise + Risikoumkehr" },
-  { id: "14", label: "FAQ" },
-  { id: "15", label: "Autor + Kontakt" },
+const ALL_SECTIONS: { id: string; label: string; group: "seo" | "lp" }[] = [
+  // SEO Core
+  { id: "hero", label: "Hero-Sektion", group: "seo" },
+  { id: "problem", label: "Problem-Sektion", group: "seo" },
+  { id: "ursachen", label: "Ursachen-Sektion", group: "seo" },
+  { id: "loesung", label: "Lösung-Sektion", group: "seo" },
+  { id: "ablauf", label: "Ablauf-Sektion", group: "seo" },
+  { id: "preise", label: "Preise-Sektion", group: "seo" },
+  { id: "faq", label: "FAQ-Sektion", group: "seo" },
+  { id: "autor", label: "Autor-Box", group: "seo" },
+  { id: "service", label: "Service-Sektion", group: "seo" },
+  { id: "inhalt", label: "Inhalt-Sektion", group: "seo" },
+  { id: "symptome", label: "Symptome", group: "seo" },
+  { id: "selbsthilfe", label: "Selbsthilfe", group: "seo" },
+  { id: "unique_data", label: "Unique Data", group: "seo" },
+  { id: "information_gain", label: "Information Gain", group: "seo" },
+  { id: "fehlercode", label: "Fehlercode-Sektion", group: "seo" },
+  { id: "footer", label: "Footer", group: "seo" },
+  // Landingpage
+  { id: "lp_urgency_bar", label: "Urgency Bar (oben)", group: "lp" },
+  { id: "lp_sticky_nav", label: "Sticky Navigation", group: "lp" },
+  { id: "lp_social_proof_ticker", label: "Social Proof Ticker", group: "lp" },
+  { id: "lp_trust_badges", label: "Trust Badges", group: "lp" },
+  { id: "lp_testimonials_early", label: "Frühe Testimonials", group: "lp" },
+  { id: "lp_objection_handling", label: "Objection Handling", group: "lp" },
+  { id: "lp_how_it_works", label: "How It Works", group: "lp" },
+  { id: "lp_identity", label: "Für wen ist das?", group: "lp" },
+  { id: "lp_features", label: "Features & Benefits", group: "lp" },
+  { id: "lp_value_stack", label: "Value Stack", group: "lp" },
+  { id: "lp_bonus_stack", label: "Bonus Stack", group: "lp" },
+  { id: "lp_testimonials_more", label: "Weitere Testimonials", group: "lp" },
+  { id: "lp_guarantee", label: "Garantie Box", group: "lp" },
+  { id: "lp_lead_form", label: "Lead Formular", group: "lp" },
+  { id: "lp_social_proof_widget", label: "Social Proof Widget", group: "lp" },
+  { id: "lp_sticky_cta", label: "Sticky CTA Mobile", group: "lp" },
+  { id: "lp_countdown", label: "Countdown Timer", group: "lp" },
+  { id: "lp_case_study", label: "Case Study", group: "lp" },
+  { id: "lp_comparison_table", label: "Vergleichstabelle", group: "lp" },
+  { id: "lp_pricing_packages", label: "Preis-Pakete", group: "lp" },
+  { id: "lp_video_hero", label: "Video Hero (VSL)", group: "lp" },
+  { id: "lp_whatsapp_cta", label: "WhatsApp CTA", group: "lp" },
+  { id: "lp_authority", label: "Authority Section", group: "lp" },
+  { id: "lp_local_stats", label: "Lokale Statistiken", group: "lp" },
 ];
-const OPTIONAL_SECTIONS = [
-  { id: "03", label: "TOC (Inhaltsverzeichnis)" },
-  { id: "06", label: "Fehlercode-Liste" },
-  { id: "11", label: "Reparatur vs. Neukauf" },
-  { id: "12", label: "Qualität" },
-  { id: "13", label: "Marken" },
-];
+
+const DEFAULTS_BY_TYPE: Record<string, string[]> = {
+  pillar_page: ["hero", "ablauf", "service", "faq", "autor"],
+  service: ["hero", "problem", "ablauf", "preise", "faq", "autor"],
+  fehlercode: ["hero", "symptome", "ursachen", "selbsthilfe", "loesung", "faq", "autor"],
+  supporting_info: ["hero", "inhalt", "faq", "autor"],
+  supporting_commercial: ["hero", "problem", "loesung", "faq", "autor"],
+  transactional: ["hero", "service", "preise", "faq", "autor"],
+  deep_page: ["hero", "problem", "loesung", "faq", "autor"],
+  blog: ["hero", "inhalt", "faq", "autor"],
+  salesfunnel_leadgen: [
+    "lp_urgency_bar", "lp_sticky_nav", "hero", "lp_social_proof_ticker",
+    "lp_trust_badges", "problem", "lp_testimonials_early", "lp_objection_handling",
+    "lp_how_it_works", "lp_identity", "lp_features", "preise",
+    "lp_testimonials_more", "lp_guarantee", "faq", "lp_lead_form",
+    "lp_social_proof_widget", "lp_sticky_cta", "footer",
+  ],
+  salesfunnel_ecommerce: [
+    "lp_urgency_bar", "hero", "lp_trust_badges", "lp_value_stack", "lp_bonus_stack",
+    "lp_testimonials_early", "lp_objection_handling", "preise", "lp_guarantee",
+    "faq", "lp_lead_form", "lp_social_proof_widget", "lp_sticky_cta",
+  ],
+  landingpage_service: [
+    "lp_urgency_bar", "lp_sticky_nav", "hero", "lp_trust_badges", "problem",
+    "lp_how_it_works", "lp_testimonials_early", "preise", "lp_guarantee",
+    "faq", "lp_lead_form", "lp_social_proof_widget", "lp_sticky_cta",
+  ],
+  landingpage_local: [
+    "hero", "lp_trust_badges", "lp_local_stats", "service",
+    "lp_testimonials_early", "preise", "faq", "lp_lead_form", "lp_social_proof_widget",
+  ],
+};
 
 const REQUIRED_FIELDS: Record<string, (keyof SeoFormData)[]> = {
   A: ["keyword"],
@@ -327,7 +384,7 @@ const DEFAULT_FORM: SeoFormData = {
   imageStrategy: "NanoBanana KI", schemaBlocks: ["FAQPage", "HowTo"],
   breadcrumb: "", rating: "4.9", reviewCount: "", informationGain: "",
   discoverReady: "Ja-Bild vorhanden", comparativeCheck: "Noch ausstehend",
-  activeSections: CORE_SECTIONS.map((s) => s.id),
+  activeSections: DEFAULTS_BY_TYPE.pillar_page,
   // Landingpage defaults
   landingPageGoal: "call",
   mainHeadline: "",
@@ -568,7 +625,6 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
   }, []);
 
   const toggleSection = useCallback((sectionId: string) => {
-    if (CORE_SECTIONS.some((s) => s.id === sectionId)) return; // core can't be toggled
     setForm((prev) => {
       const sections = prev.activeSections.includes(sectionId)
         ? prev.activeSections.filter((s) => s !== sectionId)
@@ -576,6 +632,15 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
       return { ...prev, activeSections: sections };
     });
   }, []);
+
+  // Auto-apply section defaults when pageType changes
+  const lastPageTypeRef = useState<{ value: string }>(() => ({ value: "" }))[0];
+  useEffect(() => {
+    if (lastPageTypeRef.value === form.pageType) return;
+    lastPageTypeRef.value = form.pageType;
+    const defaults = DEFAULTS_BY_TYPE[form.pageType] || DEFAULTS_BY_TYPE.service;
+    setForm((prev) => ({ ...prev, activeSections: defaults }));
+  }, [form.pageType, lastPageTypeRef]);
 
   // ─── Step Renderers ──────────────────────────────────────────────────────
 
@@ -1107,36 +1172,55 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
     </div>
   );
 
-  const renderStepS = () => (
-    <div className="space-y-5">
+  const renderStepS = () => {
+    const isLp = isLandingPageType(form.pageType);
+    const seoSections = ALL_SECTIONS.filter((s) => s.group === "seo");
+    const lpSections = ALL_SECTIONS.filter((s) => s.group === "lp");
+
+    const renderGroup = (title: string, sections: typeof ALL_SECTIONS, hint?: string) => (
       <div>
-        <h4 className="text-sm font-semibold text-foreground mb-3">Kern-Sektionen (nicht deaktivierbar)</h4>
-        <div className="space-y-2">
-          {CORE_SECTIONS.map((s) => (
-            <label key={s.id} className="flex items-center gap-3 rounded-md border border-border bg-card p-3 opacity-90">
-              <Switch checked disabled />
-              <span className="text-sm font-medium">{s.id}. {s.label}</span>
-              <Badge variant="outline" className="ml-auto text-[10px]">Pflicht</Badge>
-            </label>
-          ))}
+        <h4 className="text-sm font-semibold text-foreground mb-1">{title}</h4>
+        {hint && <p className="text-[10px] text-muted-foreground mb-3">{hint}</p>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {sections.map((s) => {
+            const checked = form.activeSections.includes(s.id);
+            return (
+              <label
+                key={s.id}
+                className="flex items-center gap-3 rounded-md border border-border bg-card p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+              >
+                <Switch checked={checked} onCheckedChange={() => toggleSection(s.id)} />
+                <span className="text-sm font-medium flex-1">{s.label}</span>
+                <code className="text-[9px] text-muted-foreground font-mono">{s.id}</code>
+              </label>
+            );
+          })}
         </div>
       </div>
-      <div>
-        <h4 className="text-sm font-semibold text-foreground mb-3">Optionale Sektionen</h4>
-        <div className="space-y-2">
-          {OPTIONAL_SECTIONS.map((s) => (
-            <label key={s.id} className="flex items-center gap-3 rounded-md border border-border bg-card p-3 cursor-pointer hover:bg-accent/50 transition-colors">
-              <Switch
-                checked={form.activeSections.includes(s.id)}
-                onCheckedChange={() => toggleSection(s.id)}
-              />
-              <span className="text-sm font-medium">{s.id}. {s.label}</span>
-            </label>
-          ))}
+    );
+
+    return (
+      <div className="space-y-5">
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+          <p className="text-xs text-amber-800">
+            ✨ Sektionen wurden automatisch nach Seitentyp <strong>{form.pageType}</strong> vorausgewählt. Du kannst sie jederzeit anpassen.
+          </p>
+          <p className="text-[10px] text-amber-700 mt-1">
+            Aktiv: {form.activeSections.length} von {ALL_SECTIONS.length} Sektionen
+          </p>
         </div>
+
+        {isLp ? (
+          <>
+            {renderGroup("Landingpage-Sektionen", lpSections, "Conversion-optimierte Sales-Funnel Bausteine")}
+            {renderGroup("Basis-Sektionen", seoSections, "SEO-Inhalte für Authority & E-E-A-T")}
+          </>
+        ) : (
+          renderGroup("SEO-Sektionen", seoSections, "Inhalte für Suchmaschinen-Ranking & E-E-A-T")
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   const stepRenderers = [renderStepA, renderStepB, renderStepC, renderStepD, renderStepE, renderStepF, renderStepG, renderStepH, renderStepS];
 

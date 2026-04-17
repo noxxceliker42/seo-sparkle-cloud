@@ -254,9 +254,9 @@ export function GeneratePageModal({
         primaryColor: form.primaryColor,
         secondaryColor: form.secondaryColor,
         accentColor: form.accentColor,
-        targetAudience: cluster.target_audience || firm?.target_audience || "privatkunden",
-        themeContext: cluster.theme_context || firm?.theme_context || "",
-        differentiation: cluster.differentiation || firm?.differentiation || "",
+        targetAudience: form.targetAudience || cluster.target_audience || firm?.target_audience || "privatkunden",
+        themeContext: form.themeContext || cluster.theme_context || firm?.theme_context || "",
+        differentiation: form.differentiation || cluster.differentiation || firm?.differentiation || "",
         imageStrategy: form.imageStrategy,
 
         // Sections (as labels for n8n compatibility)

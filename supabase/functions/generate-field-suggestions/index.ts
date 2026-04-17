@@ -63,6 +63,33 @@ Erstelle NUR den Wert für "lsiTerms":
 10 LSI-Begriffe (Latent Semantic Indexing) aus der Branche, die thematisch verwandt sind.
 Fachbegriffe, Bauteile, Symptome, Konzepte. Kommasepariert in einer Zeile.
 Antwort als JSON: {"lsiTerms": "begriff1, begriff2, ..."}`,
+
+  mainHeadline: (ctx) => `${ctx}
+
+Erstelle 3 starke H1-Headline-Varianten für eine Landingpage zu diesem Keyword.
+Jede Variante max 12 Wörter. Konkret, mit Versprechen + Zielgruppe + USP.
+- Variante 1: Versprechen + Zielgruppe
+- Variante 2: Problem + Lösung
+- Variante 3: Ergebnis + USP
+Antwort als JSON: {"headlines": ["Headline 1", "Headline 2", "Headline 3"]}`,
+
+  painPoints: (ctx) => `${ctx}
+
+Erstelle 6 konkrete Schmerzpunkte (Pain Points) der Zielgruppe für dieses Keyword.
+Realistisch, emotional, spezifisch — keine generischen Floskeln.
+Jeder Schmerzpunkt 1-2 Sätze. Konkrete Situationen die der Nutzer kennt.
+Antwort als JSON: {"painPoints": ["Pain 1", "Pain 2", "Pain 3", "Pain 4", "Pain 5", "Pain 6"]}`,
+
+  personas: (ctx) => `${ctx}
+
+Erstelle 3 unterschiedliche Käufer-Personas für eine Landingpage zu diesem Keyword.
+Jede Persona: passendes Emoji, knackiger Titel (3-5 Wörter), Beschreibung (1-2 Sätze).
+Decke verschiedene Motivationen ab (z.B. Notfall, Preisbewusst, Qualitätsbewusst).
+Antwort als JSON: {"personas": [
+  {"emoji": "🔧", "title": "...", "description": "..."},
+  {"emoji": "⏰", "title": "...", "description": "..."},
+  {"emoji": "💰", "title": "...", "description": "..."}
+]}`,
 };
 
 Deno.serve(async (req) => {

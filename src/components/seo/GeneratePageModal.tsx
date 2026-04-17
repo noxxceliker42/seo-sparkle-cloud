@@ -353,6 +353,15 @@ export function GeneratePageModal({
   // Advanced settings
   const [kvaPrice, setKvaPrice] = useState("");
   const [priceRange, setPriceRange] = useState("");
+  // Schritt 3 — Image Strategy, Repair-vs-Buy, Price Cards
+  const [imageStrategy, setImageStrategy] = useState<"nanobanana" | "placeholder" | "none">("nanobanana");
+  const [repairVsBuy, setRepairVsBuy] = useState(false);
+  const [priceCard1Label, setPriceCard1Label] = useState("Diagnose");
+  const [priceCard1Price, setPriceCard1Price] = useState("");
+  const [priceCard2Label, setPriceCard2Label] = useState("Standard-Reparatur");
+  const [priceCard2Price, setPriceCard2Price] = useState("");
+  const [priceCard3Label, setPriceCard3Label] = useState("Komplett-Service");
+  const [priceCard3Price, setPriceCard3Price] = useState("");
   const [designPreset, setDesignPreset] = useState("trust");
   const [outputMode, setOutputMode] = useState("standalone");
   const [activeSections, setActiveSections] = useState<SectionKey[]>(() =>
@@ -565,6 +574,14 @@ export function GeneratePageModal({
       discoverReady,
       kvaPrice,
       priceRange,
+      // Schritt 3 — Image Strategy, Repair-vs-Buy, Price Cards
+      imageStrategy,
+      repairVsBuy,
+      priceCards: [
+        { label: priceCard1Label, price: priceCard1Price },
+        { label: priceCard2Label, price: priceCard2Price },
+        { label: priceCard3Label, price: priceCard3Price },
+      ].filter((c) => c.label.trim() && c.price.trim()),
       designPreset,
       designPhilosophy: activePhilosophy,
       designPhilosophyCustom: designCustomOverride || cluster.design_philosophy_custom || selectedFirmObj?.design_philosophy_custom || "",
@@ -984,6 +1001,68 @@ export function GeneratePageModal({
                     <Label className="text-xs">Preisspanne</Label>
                     <Input placeholder="z.B. 79€ – 299€" value={priceRange} onChange={(e) => setPriceRange(e.target.value)} disabled={generating} />
                   </div>
+                </div>
+              </div>
+
+              {/* Price Cards (3) */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Price Cards (3)</p>
+                <p className="text-[11px] text-muted-foreground">Strukturierte Preiskarten für die Preise-Sektion. Leere Karten werden ignoriert.</p>
+                {[
+                  { label: priceCard1Label, setLabel: setPriceCard1Label, price: priceCard1Price, setPrice: setPriceCard1Price, ph: "Diagnose" },
+                  { label: priceCard2Label, setLabel: setPriceCard2Label, price: priceCard2Price, setPrice: setPriceCard2Price, ph: "Standard-Reparatur" },
+                  { label: priceCard3Label, setLabel: setPriceCard3Label, price: priceCard3Price, setPrice: setPriceCard3Price, ph: "Komplett-Service" },
+                ].map((card, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_140px] gap-2">
+                    <Input
+                      placeholder={`Karte ${i + 1} Label (z.B. ${card.ph})`}
+                      value={card.label}
+                      onChange={(e) => card.setLabel(e.target.value)}
+                      disabled={generating}
+                    />
+                    <Input
+                      placeholder="Preis (z.B. 79€)"
+                      value={card.price}
+                      onChange={(e) => card.setPrice(e.target.value)}
+                      disabled={generating}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Image Strategy */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bilder-Strategie</p>
+                <Select value={imageStrategy} onValueChange={(v) => setImageStrategy(v as typeof imageStrategy)} disabled={generating}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nanobanana">NanoBanana 2 (KI-generiert)</SelectItem>
+                    <SelectItem value="placeholder">Platzhalter (später ersetzen)</SelectItem>
+                    <SelectItem value="none">Keine Bilder (Text-only)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  {imageStrategy === "nanobanana" && "Bild-Slots werden nach Generierung via NanoBanana 2 gefüllt."}
+                  {imageStrategy === "placeholder" && "Bild-Slots erhalten Platzhalter mit alt-Text — später manuell ersetzen."}
+                  {imageStrategy === "none" && "Keine Bild-Slots im Output. Reine Text-Seite."}
+                </p>
+              </div>
+
+              {/* Repair vs Buy */}
+              <div className="flex items-start gap-2 rounded-md border p-3">
+                <Checkbox
+                  id="repairVsBuy"
+                  checked={repairVsBuy}
+                  onCheckedChange={(v) => setRepairVsBuy(v === true)}
+                  disabled={generating}
+                />
+                <div className="grid gap-0.5">
+                  <Label htmlFor="repairVsBuy" className="text-sm cursor-pointer">Repair-vs-Buy Sektion</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Fügt eine Vergleichsbox „Reparieren oder neu kaufen?" mit Entscheidungs-Kriterien ein.
+                  </p>
                 </div>
               </div>
 

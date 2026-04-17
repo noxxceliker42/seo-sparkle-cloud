@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 import { buildMasterPrompt } from "@/lib/buildMasterPrompt";
-import { useGenerationJob, clearStuckJob } from "@/hooks/useGenerationJob";
+import { useGenerationJob, clearStuckJob, cancelCurrentJob } from "@/hooks/useGenerationJob";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -1289,18 +1289,15 @@ export function GeneratePageModal({
               <>
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    try {
-                      sessionStorage.removeItem("seo_os_generation_job");
-                      sessionStorage.removeItem("currentGenerationJob");
-                    } catch {}
+                  onClick={async () => {
+                    await cancelCurrentJob();
                     clearResult();
                     onClose();
                     toast.info("Generierung abgebrochen");
                   }}
-                  className="flex-1"
+                  className="flex-1 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
                 >
-                  Abbrechen
+                  ✕ Abbrechen
                 </Button>
                 <Button disabled className="flex-1">
                   <Loader2 className="h-4 w-4 animate-spin mr-2" /> Generiere…

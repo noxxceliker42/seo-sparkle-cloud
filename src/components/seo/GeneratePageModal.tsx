@@ -252,11 +252,11 @@ export function GeneratePageModal({
         designPhilosophy,
         designPhilosophyCustom,
         primaryColor: form.primaryColor,
-        secondaryColor: firm?.secondary_color || "#ffffff",
-        accentColor: firm?.accent_color || "#dc2626",
-        targetAudience: cluster.target_audience || firm?.target_audience || "privatkunden",
-        themeContext: cluster.theme_context || firm?.theme_context || "",
-        differentiation: cluster.differentiation || firm?.differentiation || "",
+        secondaryColor: form.secondaryColor,
+        accentColor: form.accentColor,
+        targetAudience: form.targetAudience || cluster.target_audience || firm?.target_audience || "privatkunden",
+        themeContext: form.themeContext || cluster.theme_context || firm?.theme_context || "",
+        differentiation: form.differentiation || cluster.differentiation || firm?.differentiation || "",
         imageStrategy: form.imageStrategy,
 
         // Sections (as labels for n8n compatibility)

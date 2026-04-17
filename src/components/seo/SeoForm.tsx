@@ -61,7 +61,14 @@ export interface SeoFormData {
   // F — Design & Bild
   outputMode: string;
   designPreset: string;
+  designPhilosophy: string;
+  designPhilosophyCustom: string;
   primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  targetAudience: string;
+  themeContext: string;
+  differentiation: string;
   toneOfVoice: string;
   imageStrategy: string;
   // G — Schema
@@ -185,7 +192,41 @@ const DESIGN_PRESETS = [
   { id: "craft", label: "Warm Craft", color: "#9a3412", desc: "Handwerklich & warm", gradient: "linear-gradient(135deg, #9a3412, #fb923c)" },
   { id: "tech", label: "Tech Precision", color: "#0c4a6e", desc: "Technisch & präzise", gradient: "linear-gradient(135deg, #0c4a6e, #0284c7)" },
 ];
-const TONE_OPTIONS = ["Sachlich-kompetent", "Freundlich-nahbar", "Direkt-verkaufend"];
+
+const DESIGN_PHILOSOPHIES = [
+  { value: "trust_classic", label: "Trust Classic", desc: "Professionell & vertrauenswürdig", primary: "#1d4ed8", secondary: "#ffffff", accent: "#dc2626" },
+  { value: "german_precision", label: "German Precision", desc: "Technisch, sachlich, präzise", primary: "#374151", secondary: "#f9fafb", accent: "#6b7280" },
+  { value: "handwerk_pro", label: "Handwerk Pro", desc: "Erdtöne, robust, bodenständig", primary: "#d97706", secondary: "#fffbeb", accent: "#92400e" },
+  { value: "luxury_dark", label: "Luxury Dark", desc: "Dunkel, Gold, exklusiv", primary: "#d4af37", secondary: "#111827", accent: "#d4af37" },
+  { value: "futuristic_tech", label: "Futuristic Tech", desc: "Neon, modern, digital", primary: "#00f5ff", secondary: "#0f0f1a", accent: "#7c3aed" },
+  { value: "glassmorphism", label: "Glassmorphism", desc: "Transparent, Blur, clean", primary: "#6366f1", secondary: "#f0f9ff", accent: "#f59e0b" },
+  { value: "berlin_urban", label: "Berlin Urban", desc: "Urban, jung, direkt", primary: "#e11d48", secondary: "#18181b", accent: "#f4f4f5" },
+  { value: "medical_clean", label: "Medical Clean", desc: "Weiß, Mint, klinisch", primary: "#059669", secondary: "#ffffff", accent: "#0891b2" },
+  { value: "automotive", label: "Automotive", desc: "Dunkel, Chrom, stark", primary: "#f59e0b", secondary: "#1e293b", accent: "#94a3b8" },
+  { value: "editorial_bold", label: "Editorial Bold", desc: "Große Typografie, S/W", primary: "#ef4444", secondary: "#ffffff", accent: "#000000" },
+  { value: "minimalist_swiss", label: "Minimalist Swiss", desc: "Grid, Weißraum, präzise", primary: "#3b82f6", secondary: "#fafafa", accent: "#171717" },
+  { value: "gradient_flow", label: "Gradient Flow", desc: "Farbverläufe, weich, modern", primary: "#8b5cf6", secondary: "#faf5ff", accent: "#ec4899" },
+  { value: "eco_green", label: "Eco Green", desc: "Grün, natürlich, nachhaltig", primary: "#16a34a", secondary: "#f0fdf4", accent: "#854d0e" },
+  { value: "warm_trustful", label: "Warm Trustful", desc: "Orange/Gelb, einladend", primary: "#ea580c", secondary: "#fff7ed", accent: "#d97706" },
+  { value: "brutalist_raw", label: "Brutalist Raw", desc: "Direkt, mutig, unkonventionell", primary: "#fbbf24", secondary: "#000000", accent: "#ffffff" },
+];
+
+const TARGET_AUDIENCES = [
+  { value: "privatkunden", label: "Privatkunden (Standard)" },
+  { value: "gewerblich", label: "Gewerblich / Vermieter" },
+  { value: "senioren", label: "Senioren / 60+" },
+  { value: "technik", label: "Technik-Affine / DIY" },
+  { value: "preisbewusst", label: "Preisbewusste Kunden" },
+  { value: "premium", label: "Premium-Kunden" },
+];
+
+const TONE_OPTIONS = [
+  "Sachlich-kompetent",
+  "Freundlich-nahbar",
+  "Premium-exklusiv",
+  "Technisch-präzise",
+  "Emotional-empathisch",
+];
 const IMAGE_STRATEGIES = ["NanoBanana KI", "Upload + Alt-Text", "Platzhalter"];
 const SCHEMA_OPTIONS = ["FAQPage", "HowTo", "LocalBusiness", "BreadcrumbList", "Service", "AggregateRating", "SpeakableSpec", "ImageObject"];
 
@@ -278,7 +319,11 @@ const DEFAULT_FORM: SeoFormData = {
   authorName: "", authorTitle: "", experienceYears: "", certificates: "",
   reviewer: "", caseStudy: "", kvaPrice: "", priceRange: "", priceCard1: "",
   priceCard2: "", priceCard3: "", repairVsBuy: "", outputMode: "standalone",
-  designPreset: "trust", primaryColor: "#1d4ed8", toneOfVoice: "Sachlich-kompetent",
+  designPreset: "trust",
+  designPhilosophy: "trust_classic", designPhilosophyCustom: "",
+  primaryColor: "#1d4ed8", secondaryColor: "#ffffff", accentColor: "#dc2626",
+  targetAudience: "privatkunden", themeContext: "", differentiation: "",
+  toneOfVoice: "Sachlich-kompetent",
   imageStrategy: "NanoBanana KI", schemaBlocks: ["FAQPage", "HowTo"],
   breadcrumb: "", rating: "4.9", reviewCount: "", informationGain: "",
   discoverReady: "Ja-Bild vorhanden", comparativeCheck: "Noch ausstehend",
@@ -429,6 +474,13 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
       rating: firm.rating?.toString() || prev.rating,
       reviewCount: firm.review_count?.toString() || "",
       primaryColor: firm.primary_color || prev.primaryColor,
+      secondaryColor: firm.secondary_color || prev.secondaryColor,
+      accentColor: firm.accent_color || prev.accentColor,
+      designPhilosophy: firm.design_philosophy || prev.designPhilosophy,
+      designPhilosophyCustom: firm.design_philosophy_custom || prev.designPhilosophyCustom,
+      targetAudience: firm.target_audience || prev.targetAudience,
+      themeContext: firm.theme_context || prev.themeContext,
+      differentiation: firm.differentiation || prev.differentiation,
       branche: firm.branche || prev.branche,
       sprache: firm.sprache || prev.sprache,
     }));
@@ -816,44 +868,159 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
               onClick={() => update("outputMode", mode.value)}
               className={`cursor-pointer rounded-lg border-2 p-3 text-center transition-colors ${
                 form.outputMode === mode.value
-                  ? "border-[#7c3aed] bg-[#f5f3ff]"
-                  : "border-border bg-background hover:border-[#7c3aed]/40"
+                  ? "border-primary bg-primary/5"
+                  : "border-border bg-background hover:border-primary/40"
               }`}
             >
-              <div className={`font-bold text-[13px] ${form.outputMode === mode.value ? "text-[#7c3aed]" : "text-foreground"}`}>{mode.label}</div>
-              <div className={`text-[11px] font-semibold mt-0.5 ${form.outputMode === mode.value ? "text-[#7c3aed]" : "text-muted-foreground"}`}>{mode.desc}</div>
+              <div className={`font-bold text-[13px] ${form.outputMode === mode.value ? "text-primary" : "text-foreground"}`}>{mode.label}</div>
+              <div className={`text-[11px] font-semibold mt-0.5 ${form.outputMode === mode.value ? "text-primary" : "text-muted-foreground"}`}>{mode.desc}</div>
               <div className="text-[9px] text-muted-foreground mt-1">{mode.detail}</div>
             </div>
           ))}
         </div>
       </FieldWrapper>
-      <FieldWrapper label="Design-Paket">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {DESIGN_PRESETS.map((dp) => (
-            <button
-              key={dp.id}
-              type="button"
-              onClick={() => { update("designPreset", dp.id); update("primaryColor", dp.color); }}
-              className={`relative rounded-xl overflow-hidden text-left transition-all ${
-                form.designPreset === dp.id
-                  ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-                  : "ring-1 ring-border hover:ring-primary/50"
-              }`}
-            >
-              <div className="h-16 w-full" style={{ background: dp.gradient }} />
-              <div className="p-3 bg-card">
-                <p className="text-sm font-bold text-foreground">{dp.label}</p>
-                <p className="text-[11px] text-muted-foreground">{dp.desc}</p>
-              </div>
-              {form.designPreset === dp.id && (
-                <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
-                  <span className="text-primary-foreground text-[10px] font-bold">✓</span>
+
+      {/* Design-Philosophie — 15 Karten */}
+      <FieldWrapper label="Design-Philosophie">
+        <p className="text-[10px] text-muted-foreground mb-2">
+          Wähle eine Philosophie — Farben werden automatisch übernommen (anpassbar unten).
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {DESIGN_PHILOSOPHIES.map((p) => {
+            const selected = form.designPhilosophy === p.value;
+            return (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => {
+                  update("designPhilosophy", p.value);
+                  update("primaryColor", p.primary);
+                  update("secondaryColor", p.secondary);
+                  update("accentColor", p.accent);
+                }}
+                className={`relative rounded-lg overflow-hidden text-left transition-all ${
+                  selected
+                    ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                    : "ring-1 ring-border hover:ring-primary/40"
+                }`}
+              >
+                <div className="h-12 w-full flex">
+                  <div className="flex-1" style={{ backgroundColor: p.primary }} />
+                  <div className="flex-1" style={{ backgroundColor: p.secondary }} />
+                  <div className="w-1/4" style={{ backgroundColor: p.accent }} />
                 </div>
-              )}
-            </button>
+                <div className="p-2 bg-card">
+                  <p className="text-[11px] font-bold text-foreground leading-tight">{p.label}</p>
+                  <p className="text-[9px] text-muted-foreground leading-tight mt-0.5">{p.desc}</p>
+                </div>
+                {selected && (
+                  <div className="absolute top-1 right-1 h-4 w-4 rounded-full bg-primary flex items-center justify-center">
+                    <span className="text-primary-foreground text-[9px] font-bold">✓</span>
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </FieldWrapper>
+
+      {/* Custom Design Freitext */}
+      <FieldWrapper label="Eigene Design-Beschreibung (optional)">
+        <Textarea
+          value={form.designPhilosophyCustom}
+          onChange={(e) => update("designPhilosophyCustom", e.target.value)}
+          rows={3}
+          placeholder="Beschreibe deinen Stil frei, z.B.: Luxuriöser futuristischer Tech-Stil mit dunklen Tönen und goldenen Akzenten..."
+        />
+        <p className="text-[10px] text-muted-foreground mt-1">
+          Eigene Beschreibung hat Vorrang über die Palette-Auswahl.
+        </p>
+      </FieldWrapper>
+
+      {/* Farb-Picker */}
+      <FieldWrapper label="Markenfarben">
+        <p className="text-[10px] text-muted-foreground mb-2">
+          Werden mit Palette vorausgefüllt — hier manuell überschreibbar.
+        </p>
+        <div className="grid grid-cols-3 gap-3">
+          {([
+            ["primaryColor", "Primär"],
+            ["secondaryColor", "Sekundär"],
+            ["accentColor", "Akzent"],
+          ] as const).map(([key, label]) => (
+            <div key={key} className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground">{label}</Label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="color"
+                  value={form[key]}
+                  onChange={(e) => update(key, e.target.value)}
+                  className="h-9 w-10 rounded border border-border cursor-pointer p-0 bg-transparent"
+                />
+                <Input
+                  value={form[key]}
+                  onChange={(e) => update(key, e.target.value)}
+                  className="h-9 text-xs font-mono"
+                  maxLength={7}
+                />
+              </div>
+            </div>
           ))}
         </div>
       </FieldWrapper>
+
+      {/* Zielgruppe & Kontext */}
+      <div className="border-t border-border pt-4">
+        <h4 className="text-sm font-semibold text-foreground mb-3">Zielgruppe & Kontext</h4>
+        <div className="space-y-4">
+          <FieldWrapper label="Primäre Zielgruppe">
+            <select
+              value={form.targetAudience}
+              onChange={(e) => update("targetAudience", e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              {TARGET_AUDIENCES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </FieldWrapper>
+
+          <FieldWrapper
+            label="Themen-Kontext"
+            action={
+              <AiButton
+                loading={suggestingField === "themeContext"}
+                onClick={() => fetchSuggestions("themeContext", applyString("themeContext"))}
+              />
+            }
+          >
+            <Textarea
+              value={form.themeContext}
+              onChange={(e) => update("themeContext", e.target.value)}
+              rows={2}
+              placeholder="Spezifische Modellnummern, Fehlercodes, technische Besonderheiten..."
+            />
+          </FieldWrapper>
+
+          <FieldWrapper
+            label="Differenzierung zum Wettbewerb"
+            action={
+              <AiButton
+                loading={suggestingField === "differentiation"}
+                onClick={() => fetchSuggestions("differentiation", applyString("differentiation"))}
+              />
+            }
+          >
+            <Textarea
+              value={form.differentiation}
+              onChange={(e) => update("differentiation", e.target.value)}
+              rows={2}
+              placeholder="Was bietet ihr konkret was Wettbewerber nicht haben?"
+            />
+          </FieldWrapper>
+        </div>
+      </div>
+
       <FieldWrapper label="Tone of Voice">
         <ButtonGroup options={TONE_OPTIONS} value={form.toneOfVoice} onChange={(v) => update("toneOfVoice", v)} />
       </FieldWrapper>
@@ -862,6 +1029,7 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
       </FieldWrapper>
     </div>
   );
+
 
   const renderStepG = () => (
     <div className="space-y-5">

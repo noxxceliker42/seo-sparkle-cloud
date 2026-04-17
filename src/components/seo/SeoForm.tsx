@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, ArrowRight, Sparkles, Loader2 } from "lucide-react";
 import { LandingPageAccordion } from "./LandingPageAccordion";
+import { FirmSelector, type Firm } from "./FirmSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -105,10 +106,11 @@ interface AutoFilledFields {
 }
 
 export interface SeoFormProps {
-  initialData: Partial<SeoFormData>;
+  initialData: Partial<SeoFormData> & { firmId?: string | null };
   autoFilledFields: AutoFilledFields;
   onSubmit: (data: SeoFormData) => void;
   onBack: () => void;
+  onFirmChange?: (firm: Firm | null) => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────
@@ -384,18 +386,56 @@ function ButtonGroup({ options, value, onChange, className }: {
 
 // ─── Component ────────────────────────────────────────────────────────────
 
-export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: SeoFormProps) {
+export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFirmChange }: SeoFormProps) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<SeoFormData>(() => ({ ...DEFAULT_FORM, ...initialData }));
+  const [selectedFirmId, setSelectedFirmId] = useState<string | null>(
+    (initialData as { firmId?: string | null })?.firmId || null,
+  );
 
-  // Sync initialData on mount
+  // Sync initialData on mount / when it changes (e.g. cluster firm)
   useEffect(() => {
     setForm((prev) => ({ ...prev, ...initialData }));
+    const fid = (initialData as { firmId?: string | null })?.firmId;
+    if (fid) setSelectedFirmId(fid);
   }, [initialData]);
 
   const update = useCallback(<K extends keyof SeoFormData>(key: K, value: SeoFormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  const handleFirmSelect = useCallback((firm: Firm | null) => {
+    if (!firm) {
+      setSelectedFirmId(null);
+      onFirmChange?.(null);
+      return;
+    }
+    setSelectedFirmId(firm.id);
+    setForm((prev) => ({
+      ...prev,
+      firmName: firm.name || "",
+      street: firm.street || "",
+      zip: firm.zip || "",
+      city: firm.city || "",
+      phone: firm.phone || "",
+      email: firm.email || "",
+      website: firm.website || "",
+      serviceArea: firm.service_area || "",
+      oeffnungszeiten: firm.oeffnungszeiten || "",
+      authorName: firm.author || "",
+      authorTitle: firm.author_title || "",
+      experienceYears: firm.author_experience?.toString() || "",
+      certificates: firm.author_certs || "",
+      rating: firm.rating?.toString() || prev.rating,
+      reviewCount: firm.review_count?.toString() || "",
+      primaryColor: firm.primary_color || prev.primaryColor,
+      branche: firm.branche || prev.branche,
+      sprache: firm.sprache || prev.sprache,
+    }));
+    onFirmChange?.(firm);
+    toast.success(`Firmendaten von "${firm.name}" übernommen`);
+  }, [onFirmChange]);
+
 
   // ─── KI-Vorschläge ────────────────────────────────────────────────────────
   const [suggestingField, setSuggestingField] = useState<string | null>(null);
@@ -640,6 +680,15 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
 
   const renderStepC = () => (
     <div className="space-y-5">
+      <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+        <Label className="text-xs font-medium text-muted-foreground">Firma auswählen</Label>
+        <FirmSelector selectedFirmId={selectedFirmId} onFirmChange={handleFirmSelect} />
+        {selectedFirmId && form.firmName && (
+          <p className="text-[11px] text-green-700">
+            ✓ Felder aus "{form.firmName}" übernommen — du kannst sie unten anpassen.
+          </p>
+        )}
+      </div>
       <FieldWrapper label="Firma" required autoFilled={isAuto("firmName")}>
         <Input value={form.firmName} onChange={(e) => update("firmName", e.target.value)} className={`${inputClass("firmName")} ${!form.firmName.trim() ? "border-red-500" : ""}`} />
       </FieldWrapper>

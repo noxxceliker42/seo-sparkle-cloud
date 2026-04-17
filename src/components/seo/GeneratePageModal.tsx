@@ -139,6 +139,7 @@ export function GeneratePageModal({
       siblingPages: siblingPagesString,
       deepPages: deepPagesText,
       // Firm / NAP
+      firmId: firm?.id || null,
       firmName: firm?.name || "",
       street: firm?.street || "",
       zip: firm?.zip || "",

@@ -71,6 +71,30 @@ export interface SeoFormData {
   comparativeCheck: string;
   // S — Sektionen
   activeSections: string[];
+  // L — Landingpage / Sales-Funnel (optional, nur bei isLandingPageType)
+  landingPageGoal?: string;
+  mainHeadline?: string;
+  primaryCtaText?: string;
+  secondaryCtaText?: string;
+  videoUrl?: string;
+  countdownActive?: boolean;
+  countdownEndDate?: string;
+  countdownText?: string;
+  urgencyBarActive?: boolean;
+  urgencyBarText?: string;
+  guaranteeTitle?: string;
+  guaranteeText?: string;
+  socialProofCustomers?: string;
+  socialProofRating?: string;
+  socialProofReviews?: string;
+  socialProofYears?: string;
+  socialProofWidgetActive?: boolean;
+  painPoints?: string[];
+  personas?: { emoji: string; title: string; description: string }[];
+  bonusStack?: { title: string; value: string }[];
+  leadMagnetTitle?: string;
+  leadMagnetDescription?: string;
+  formType?: string;
 }
 
 interface AutoFilledFields {
@@ -108,7 +132,22 @@ const PAGE_TYPE_OPTIONS = [
   { value: "transactional", label: "Transactional — Ortsteil/lokale Landingpage" },
   { value: "deep_page", label: "Deep Page — Spezifisches Thema/Modell" },
   { value: "blog", label: "Blog / Ratgeber-Artikel" },
+  { value: "salesfunnel_leadgen", label: "🎯 Sales Funnel — Lead Generation" },
+  { value: "salesfunnel_ecommerce", label: "🛒 Sales Funnel — E-Commerce/Direktkauf" },
+  { value: "landingpage_service", label: "📞 Landingpage — Service/Lokal" },
+  { value: "landingpage_local", label: "📍 Landingpage — Ortsteil/Stadt" },
 ];
+
+export const LANDINGPAGE_TYPES = [
+  "salesfunnel_leadgen",
+  "salesfunnel_ecommerce",
+  "landingpage_service",
+  "landingpage_local",
+] as const;
+
+export function isLandingPageType(pageType: string): boolean {
+  return (LANDINGPAGE_TYPES as readonly string[]).includes(pageType);
+}
 const PILLAR_TIERS = [
   { value: "1", label: "Tier 1", desc: "Haupt-Pillar", sub: "Brand oder Generic Hauptseite" },
   { value: "2", label: "Tier 2", desc: "Device-Pillar", sub: "Gerätetyp oder Unterkategorie" },
@@ -239,6 +278,38 @@ const DEFAULT_FORM: SeoFormData = {
   breadcrumb: "", rating: "4.9", reviewCount: "", informationGain: "",
   discoverReady: "Ja-Bild vorhanden", comparativeCheck: "Noch ausstehend",
   activeSections: CORE_SECTIONS.map((s) => s.id),
+  // Landingpage defaults
+  landingPageGoal: "call",
+  mainHeadline: "",
+  primaryCtaText: "",
+  secondaryCtaText: "",
+  videoUrl: "",
+  countdownActive: false,
+  countdownEndDate: "",
+  countdownText: "Angebot endet in:",
+  urgencyBarActive: false,
+  urgencyBarText: "",
+  guaranteeTitle: "",
+  guaranteeText: "",
+  socialProofCustomers: "",
+  socialProofRating: "",
+  socialProofReviews: "",
+  socialProofYears: "",
+  socialProofWidgetActive: true,
+  painPoints: ["", "", "", "", "", ""],
+  personas: [
+    { emoji: "", title: "", description: "" },
+    { emoji: "", title: "", description: "" },
+    { emoji: "", title: "", description: "" },
+  ],
+  bonusStack: [
+    { title: "", value: "" },
+    { title: "", value: "" },
+    { title: "", value: "" },
+  ],
+  leadMagnetTitle: "",
+  leadMagnetDescription: "",
+  formType: "multistep",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────

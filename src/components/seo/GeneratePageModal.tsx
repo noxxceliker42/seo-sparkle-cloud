@@ -596,6 +596,30 @@ export function GeneratePageModal({
                   <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("informationGain")} disabled={!!aiFieldLoading.informationGain || generating}>
                     {aiFieldLoading.informationGain ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
                   </Button>
+                )}
+              </div>
+              {aiFieldLoading.informationGain && !informationGain ? (
+                <Skeleton className="h-20 w-full rounded-md" />
+              ) : (
+                <Textarea ref={infoGainRef} id="gpm-infogain" placeholder="Exklusive Einblicke, Informationen die Wettbewerber nicht haben..." value={informationGain} onChange={(e) => setInformationGain(e.target.value)} disabled={generating} rows={3} />
+              )}
+            </div>
+
+            {/* USP Fokus */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="gpm-usp">USP-Fokus (optional)</Label>
+                {aiLoaded && (
+                  <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("uspFokus")} disabled={!!aiFieldLoading.uspFokus || generating}>
+                    {aiFieldLoading.uspFokus ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
+                  </Button>
+                )}
+              </div>
+              {aiFieldLoading.uspFokus && !uspFokus ? (
+                <Skeleton className="h-9 w-full rounded-md" />
+              ) : (
+                <Input id="gpm-usp" placeholder="z.B. 24h Notdienst, Original-Ersatzteile, 15 Jahre Erfahrung" value={uspFokus} onChange={(e) => setUspFokus(e.target.value)} disabled={generating} />
+              )}
             </div>
 
             {/* Intent + Tone of Voice (Schritt 1) */}
@@ -625,29 +649,6 @@ export function GeneratePageModal({
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-              {aiFieldLoading.informationGain && !informationGain ? (
-                <Skeleton className="h-20 w-full rounded-md" />
-              ) : (
-                <Textarea ref={infoGainRef} id="gpm-infogain" placeholder="Exklusive Einblicke, Informationen die Wettbewerber nicht haben..." value={informationGain} onChange={(e) => setInformationGain(e.target.value)} disabled={generating} rows={3} />
-              )}
-            </div>
-
-            {/* USP Fokus */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="gpm-usp">USP-Fokus (optional)</Label>
-                {aiLoaded && (
-                  <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("uspFokus")} disabled={!!aiFieldLoading.uspFokus || generating}>
-                    {aiFieldLoading.uspFokus ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Neu
-                  </Button>
-                )}
-              </div>
-              {aiFieldLoading.uspFokus && !uspFokus ? (
-                <Skeleton className="h-9 w-full rounded-md" />
-              ) : (
-                <Input id="gpm-usp" placeholder="z.B. 24h Notdienst, Original-Ersatzteile, 15 Jahre Erfahrung" value={uspFokus} onChange={(e) => setUspFokus(e.target.value)} disabled={generating} />
-              )}
             </div>
 
             {aiLoaded && (

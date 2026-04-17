@@ -796,6 +796,162 @@ export function GeneratePageModal({
             </CollapsibleContent>
           </Collapsible>
 
+          {/* ── SEKTION 3.5: SEO-Felder (Accordion mit Tabs) ── */}
+          <Collapsible open={seoOpen} onOpenChange={setSeoOpen}>
+            <CollapsibleTrigger className="flex items-center gap-2 w-full text-left text-sm font-semibold py-2 hover:text-primary transition-colors">
+              <ChevronRight className={`h-4 w-4 transition-transform ${seoOpen ? "rotate-90" : ""}`} />
+              SEO-Felder
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 pt-2 pl-6">
+              {/* Tab Headers */}
+              <div className="flex flex-wrap gap-1 border-b">
+                {([
+                  { id: "keywords", label: "Keywords" },
+                  { id: "cluster", label: "Cluster-Kontext" },
+                  { id: "eeat", label: "E-E-A-T" },
+                  { id: "schema", label: "Schema" },
+                  { id: "y2026", label: "2026" },
+                ] as const).map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setSeoTab(t.id)}
+                    className={cn(
+                      "px-2.5 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors",
+                      seoTab === t.id
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                    disabled={generating}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab A — Keywords */}
+              {seoTab === "keywords" && (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Sekundär-Keywords</Label>
+                      <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("secondaryKeywords")} disabled={!!aiFieldLoading.secondaryKeywords || generating}>
+                        {aiFieldLoading.secondaryKeywords ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Vorschläge
+                      </Button>
+                    </div>
+                    <Textarea placeholder="Kommasepariert: Beko Reparatur, Beko Service Berlin, Beko Kundendienst" value={secondaryKeywords} onChange={(e) => setSecondaryKeywords(e.target.value)} disabled={generating} rows={2} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">LSI / Verwandte Begriffe</Label>
+                      <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("lsiTerms")} disabled={!!aiFieldLoading.lsiTerms || generating}>
+                        {aiFieldLoading.lsiTerms ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ Vorschläge
+                      </Button>
+                    </div>
+                    <Textarea placeholder="Heizelement, Laugenpumpe, Fehlercode E3, Einlaufventil..." value={lsiTerms} onChange={(e) => setLsiTerms(e.target.value)} disabled={generating} rows={2} />
+                  </div>
+                </div>
+              )}
+
+              {/* Tab B — Cluster-Kontext */}
+              {seoTab === "cluster" && (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">People Also Ask — Fragen</Label>
+                      <Button type="button" variant="ghost" size="sm" className="h-5 text-[10px] gap-1 px-1.5" onClick={() => fetchSingleField("paaQuestions")} disabled={!!aiFieldLoading.paaQuestions || generating}>
+                        {aiFieldLoading.paaQuestions ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} ↻ PAA generieren
+                      </Button>
+                    </div>
+                    <Textarea placeholder={"Was kostet Beko Reparatur?\nWie lange dauert Beko Reparatur?\nKommt Beko Techniker nach Hause?"} value={paaQuestions} onChange={(e) => setPaaQuestions(e.target.value)} disabled={generating} rows={3} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Content-Gap (was Wettbewerber nicht haben)</Label>
+                    <Textarea placeholder="Wir haben als einzige eine vollständige Fehlercode-Datenbank für alle Beko-Modelle seit 2015..." value={contentGap} onChange={(e) => setContentGap(e.target.value)} disabled={generating} rows={2} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Unterseiten die verlinkt werden sollen</Label>
+                    <Textarea placeholder="Beko Waschmaschine Fehlercode E3, Beko Trockner Reparatur Berlin..." value={deepPages} onChange={(e) => setDeepPages(e.target.value)} disabled={generating} rows={2} />
+                    <p className="text-[10px] text-muted-foreground">Auto-befüllt aus Cluster (deep_page-Seiten)</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab C — E-E-A-T */}
+              {seoTab === "eeat" && (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Fachlich geprüft von</Label>
+                    <Input placeholder="z.B. TÜV geprüft, IHK zertifiziert" value={reviewer} onChange={(e) => setReviewer(e.target.value)} disabled={generating} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Referenz / Fallbeispiel</Label>
+                    <Textarea placeholder="Beko WMB714 — Laugenpumpe defekt, repariert in 90 Min, Kosten 89€" value={caseStudy} onChange={(e) => setCaseStudy(e.target.value)} disabled={generating} rows={2} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Bewertung</Label>
+                      <Input type="number" step="0.1" min="0" max="5" placeholder="z.B. 4.8" value={rating} onChange={(e) => setRating(e.target.value)} disabled={generating} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Anzahl Bewertungen</Label>
+                      <Input type="number" min="0" placeholder="z.B. 247" value={reviewCount} onChange={(e) => setReviewCount(e.target.value)} disabled={generating} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab D — Schema */}
+              {seoTab === "schema" && (
+                <div className="space-y-3">
+                  <Label className="text-xs">Schema-Typen aktivieren</Label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {SCHEMA_OPTIONS.map((s) => (
+                      <label key={s} className="flex items-center gap-2 text-xs cursor-pointer">
+                        <Checkbox
+                          checked={schemaBlocks.includes(s)}
+                          onCheckedChange={(checked) => {
+                            setSchemaBlocks((prev) => checked ? [...prev, s] : prev.filter((x) => x !== s));
+                          }}
+                          disabled={generating}
+                        />
+                        {s}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Vorausgefüllt nach pageType: <span className="font-mono">{clusterPage.page_type}</span></p>
+                </div>
+              )}
+
+              {/* Tab E — 2026 Features */}
+              {seoTab === "y2026" && (
+                <div className="space-y-2">
+                  <label className="flex items-start gap-2 text-xs cursor-pointer">
+                    <Checkbox checked={informationGainFlag} onCheckedChange={(v) => setInformationGainFlag(!!v)} disabled={generating} />
+                    <div>
+                      <div className="font-medium">AI Overview Optimierung</div>
+                      <div className="text-[10px] text-muted-foreground">2-Satz-Antworten für KI-Snippets</div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 text-xs cursor-pointer">
+                    <Checkbox checked={comparativeCheck} onCheckedChange={(v) => setComparativeCheck(!!v)} disabled={generating} />
+                    <div>
+                      <div className="font-medium">Comparative Check</div>
+                      <div className="text-[10px] text-muted-foreground">Vergleiche mit Wettbewerbern einbauen</div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 text-xs cursor-pointer">
+                    <Checkbox checked={discoverReady} onCheckedChange={(v) => setDiscoverReady(!!v)} disabled={generating} />
+                    <div>
+                      <div className="font-medium">Discover Ready</div>
+                      <div className="text-[10px] text-muted-foreground">Visuelle Elemente für Google Discover</div>
+                    </div>
+                  </label>
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+
           {/* ── SEKTION 4: Erweiterte Einstellungen (Accordion) ── */}
           <Collapsible open={advOpen} onOpenChange={setAdvOpen}>
             <CollapsibleTrigger className="flex items-center gap-2 w-full text-left text-sm font-semibold py-2 hover:text-primary transition-colors">

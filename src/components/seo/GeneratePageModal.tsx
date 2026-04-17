@@ -574,6 +574,14 @@ export function GeneratePageModal({
       discoverReady,
       kvaPrice,
       priceRange,
+      // Schritt 3 — Image Strategy, Repair-vs-Buy, Price Cards
+      imageStrategy,
+      repairVsBuy,
+      priceCards: [
+        { label: priceCard1Label, price: priceCard1Price },
+        { label: priceCard2Label, price: priceCard2Price },
+        { label: priceCard3Label, price: priceCard3Price },
+      ].filter((c) => c.label.trim() && c.price.trim()),
       designPreset,
       designPhilosophy: activePhilosophy,
       designPhilosophyCustom: designCustomOverride || cluster.design_philosophy_custom || selectedFirmObj?.design_philosophy_custom || "",

@@ -211,6 +211,15 @@ const DESIGN_PHILOSOPHIES = [
   { value: "brutalist_raw", label: "Brutalist Raw", desc: "Direkt, mutig, unkonventionell", primary: "#fbbf24", secondary: "#000000", accent: "#ffffff" },
 ];
 
+const LEGACY_DESIGN_PACKS = [
+  { value: "trust", label: "Trust & Service", desc: "Professionell & vertrauenswürdig", primary: "#1d4ed8", secondary: "#ffffff", accent: "#dc2626" },
+  { value: "midnight_executive", label: "Midnight Executive", desc: "Premium & dunkel", primary: "#3b82f6", secondary: "#0f172a", accent: "#6366f1" },
+  { value: "editorial", label: "Clean Editorial", desc: "Minimalistisch & textstark", primary: "#1c1917", secondary: "#fafaf9", accent: "#dc2626" },
+  { value: "eco", label: "Eco Service", desc: "Nachhaltig & organisch", primary: "#065f46", secondary: "#ecfdf5", accent: "#16a34a" },
+  { value: "craft", label: "Warm Craft", desc: "Handwerklich & warm", primary: "#9a3412", secondary: "#fff7ed", accent: "#ea580c" },
+  { value: "tech", label: "Tech Precision", desc: "Technisch & präzise", primary: "#0c4a6e", secondary: "#f0f9ff", accent: "#0ea5e9" },
+];
+
 const TARGET_AUDIENCES = [
   { value: "privatkunden", label: "Privatkunden (Standard)" },
   { value: "gewerblich", label: "Gewerblich / Vermieter" },

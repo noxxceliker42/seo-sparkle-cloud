@@ -498,6 +498,8 @@ export function GeneratePageModal({
       uniqueData,
       infoGain: informationGain,
       uspFokus,
+      intent,
+      toneOfVoice,
       kvaPrice,
       priceRange,
       designPreset,

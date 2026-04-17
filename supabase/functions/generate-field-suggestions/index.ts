@@ -64,6 +64,13 @@ Erstelle NUR den Wert für "lsiTerms":
 Fachbegriffe, Bauteile, Symptome, Konzepte. Kommasepariert in einer Zeile.
 Antwort als JSON: {"lsiTerms": "begriff1, begriff2, ..."}`,
 
+  contentGap: (ctx) => `${ctx}
+
+Erstelle NUR den Wert für "contentGap":
+Was haben Top-3 Wettbewerber für dieses Keyword NICHT, was diese Seite bieten könnte?
+Konkrete Lücken in Tiefe, Aktualität, Format oder Datenqualität. 1-2 Sätze.
+Antwort als JSON: {"contentGap": "..."}`,
+
   mainHeadline: (ctx) => `${ctx}
 
 Erstelle 3 starke H1-Headline-Varianten für eine Landingpage zu diesem Keyword.

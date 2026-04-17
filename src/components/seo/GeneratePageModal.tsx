@@ -126,6 +126,31 @@ const ALL_SECTIONS = [
   { key: "14_faq", label: "FAQ-Sektion" },
   { key: "15_autor", label: "Autor-Box" },
   { key: "16_blog", label: "Blog-Sektion" },
+  // ── Landingpage / Sales-Funnel Sektionen ──────────────────
+  { key: "lp_urgency_bar", label: "Urgency Bar" },
+  { key: "lp_sticky_nav", label: "Sticky Nav" },
+  { key: "lp_social_proof_ticker", label: "Social Proof Ticker" },
+  { key: "lp_trust_badges", label: "Trust Badges" },
+  { key: "lp_testimonials_early", label: "Testimonials (früh)" },
+  { key: "lp_objection_handling", label: "Einwandbehandlung" },
+  { key: "lp_how_it_works", label: "So funktioniert es" },
+  { key: "lp_identity", label: "Identität / Über uns" },
+  { key: "lp_features", label: "Features" },
+  { key: "lp_pricing", label: "Pricing" },
+  { key: "lp_testimonials_more", label: "Weitere Testimonials" },
+  { key: "lp_guarantee", label: "Garantie" },
+  { key: "lp_lead_form", label: "Lead-Formular" },
+  { key: "lp_social_proof_widget", label: "Live Social Proof Widget" },
+  { key: "lp_sticky_cta", label: "Sticky CTA" },
+  { key: "lp_footer", label: "Footer" },
+  { key: "lp_product_showcase", label: "Produkt-Showcase" },
+  { key: "lp_value_stack", label: "Value Stack" },
+  { key: "lp_bonus_stack", label: "Bonus Stack" },
+  { key: "lp_cta_final", label: "Finaler CTA" },
+  { key: "lp_contact", label: "Kontakt-Block" },
+  { key: "lp_local_stats", label: "Lokale Statistiken" },
+  { key: "lp_services", label: "Service-Übersicht" },
+  { key: "lp_service_area", label: "Einsatzgebiet" },
 ] as const;
 
 type SectionKey = (typeof ALL_SECTIONS)[number]["key"];
@@ -133,11 +158,38 @@ type SectionKey = (typeof ALL_SECTIONS)[number]["key"];
 const DEFAULTS_BY_TYPE: Record<string, SectionKey[]> = {
   service: ["01_hero", "02_problem", "09_ablauf", "10_preise", "14_faq", "15_autor"],
   fehlercode: ["01_hero", "03_ursachen", "06_loesung", "14_faq", "15_autor"],
-  pillar_page: ALL_SECTIONS.map((s) => s.key),
-  pillar: ALL_SECTIONS.map((s) => s.key),
+  pillar_page: ALL_SECTIONS.map((s) => s.key).filter((k) => !k.startsWith("lp_")) as SectionKey[],
+  pillar: ALL_SECTIONS.map((s) => s.key).filter((k) => !k.startsWith("lp_")) as SectionKey[],
   transactional: ["01_hero", "11_service", "10_preise", "14_faq", "15_autor"],
   transactional_local: ["01_hero", "11_service", "10_preise", "14_faq", "15_autor"],
   blog: ["01_hero", "12_inhalt", "14_faq", "15_autor"],
+  supporting_info: ["01_hero", "02_problem", "08_infogain", "12_inhalt", "14_faq", "15_autor"],
+  supporting_commercial: ["01_hero", "02_problem", "07_unique", "10_preise", "11_service", "14_faq", "15_autor"],
+  deep_page: ["01_hero", "02_problem", "03_ursachen", "06_loesung", "07_unique", "14_faq", "15_autor"],
+  // ── Sales Funnels & Landingpages ─────────────────────────
+  salesfunnel_leadgen: [
+    "lp_urgency_bar", "lp_sticky_nav", "01_hero", "lp_social_proof_ticker",
+    "lp_trust_badges", "02_problem", "lp_testimonials_early", "lp_objection_handling",
+    "lp_how_it_works", "lp_identity", "lp_features", "lp_pricing",
+    "lp_testimonials_more", "lp_guarantee", "14_faq", "lp_lead_form",
+    "lp_social_proof_widget", "lp_sticky_cta", "lp_footer",
+  ],
+  salesfunnel_ecommerce: [
+    "lp_urgency_bar", "01_hero", "lp_trust_badges", "lp_product_showcase",
+    "lp_value_stack", "lp_bonus_stack", "lp_testimonials_early",
+    "lp_objection_handling", "lp_pricing", "lp_guarantee", "14_faq",
+    "lp_cta_final", "lp_social_proof_widget", "lp_sticky_cta",
+  ],
+  landingpage_service: [
+    "lp_urgency_bar", "lp_sticky_nav", "01_hero", "lp_trust_badges",
+    "02_problem", "lp_how_it_works", "lp_testimonials_early", "lp_pricing",
+    "lp_guarantee", "14_faq", "lp_contact", "lp_social_proof_widget", "lp_sticky_cta",
+  ],
+  landingpage_local: [
+    "01_hero", "lp_trust_badges", "lp_local_stats", "lp_services",
+    "lp_service_area", "lp_testimonials_early", "lp_pricing", "14_faq",
+    "lp_contact", "lp_social_proof_widget",
+  ],
 };
 
 const FALLBACK_SECTIONS: SectionKey[] = ["01_hero", "02_problem", "06_loesung", "14_faq", "15_autor"];

@@ -397,6 +397,51 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack }: Seo
     setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  // ─── KI-Vorschläge ────────────────────────────────────────────────────────
+  const [suggestingField, setSuggestingField] = useState<string | null>(null);
+
+  const fetchSuggestions = useCallback(
+    async (field: string, apply: (data: Record<string, unknown>) => void) => {
+      setSuggestingField(field);
+      try {
+        const { data, error } = await supabase.functions.invoke("generate-field-suggestions", {
+          body: {
+            keyword: form.keyword || "",
+            pageType: form.pageType || "service",
+            firm: form.firmName || "",
+            branche: form.branche || "hausgeraete",
+            targetAudience: "privatkunden",
+            field,
+          },
+        });
+        if (error) throw error;
+        if (data && typeof data === "object") {
+          apply(data as Record<string, unknown>);
+          toast.success("KI-Vorschlag übernommen", {
+            description: "Bitte prüfen und ggf. anpassen.",
+          });
+        }
+      } catch (err) {
+        console.error("AI Suggestion Error:", err);
+        toast.error("KI-Vorschlag fehlgeschlagen", {
+          description: "Bitte manuell ausfüllen.",
+        });
+      } finally {
+        setSuggestingField(null);
+      }
+    },
+    [form.keyword, form.pageType, form.firmName, form.branche],
+  );
+
+  const applyString = useCallback(
+    <K extends keyof SeoFormData>(key: K) =>
+      (data: Record<string, unknown>) => {
+        const v = data[key as string];
+        if (typeof v === "string") update(key, v as SeoFormData[K]);
+      },
+    [update],
+  );
+
   const isAuto = useCallback((key: string) => !!autoFilledFields[key], [autoFilledFields]);
 
   const inputClass = useCallback((key: string) =>

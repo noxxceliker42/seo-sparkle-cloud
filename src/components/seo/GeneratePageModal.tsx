@@ -353,6 +353,15 @@ export function GeneratePageModal({
   // Advanced settings
   const [kvaPrice, setKvaPrice] = useState("");
   const [priceRange, setPriceRange] = useState("");
+  // Schritt 3 — Image Strategy, Repair-vs-Buy, Price Cards
+  const [imageStrategy, setImageStrategy] = useState<"nanobanana" | "placeholder" | "none">("nanobanana");
+  const [repairVsBuy, setRepairVsBuy] = useState(false);
+  const [priceCard1Label, setPriceCard1Label] = useState("Diagnose");
+  const [priceCard1Price, setPriceCard1Price] = useState("");
+  const [priceCard2Label, setPriceCard2Label] = useState("Standard-Reparatur");
+  const [priceCard2Price, setPriceCard2Price] = useState("");
+  const [priceCard3Label, setPriceCard3Label] = useState("Komplett-Service");
+  const [priceCard3Price, setPriceCard3Price] = useState("");
   const [designPreset, setDesignPreset] = useState("trust");
   const [outputMode, setOutputMode] = useState("standalone");
   const [activeSections, setActiveSections] = useState<SectionKey[]>(() =>

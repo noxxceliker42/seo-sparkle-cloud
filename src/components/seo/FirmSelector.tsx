@@ -15,7 +15,7 @@ import { Plus, Building2, Loader2, Info } from "lucide-react";
 import { DesignTab } from "./DesignTab";
 import { toast } from "sonner";
 
-interface Firm {
+export interface Firm {
   id: string;
   name: string;
   city: string | null;
@@ -25,6 +25,23 @@ interface Firm {
   email: string | null;
   website: string | null;
   service_area: string | null;
+  oeffnungszeiten?: string | null;
+  branche?: string | null;
+  sprache?: string | null;
+  author?: string | null;
+  author_title?: string | null;
+  author_experience?: number | null;
+  author_certs?: string | null;
+  rating?: number | null;
+  review_count?: number | null;
+  design_philosophy?: string | null;
+  design_philosophy_custom?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  accent_color?: string | null;
+  target_audience?: string | null;
+  theme_context?: string | null;
+  differentiation?: string | null;
 }
 
 interface FirmSelectorProps {

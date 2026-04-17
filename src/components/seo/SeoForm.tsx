@@ -279,25 +279,82 @@ function checkNapValidity(form: SeoFormData): string[] {
   return errors;
 }
 
-const CORE_SECTIONS = [
-  { id: "01", label: "Hero-Sektion" },
-  { id: "02", label: "Problem-Spiegelung" },
-  { id: "04", label: "Symptome + Ursachen" },
-  { id: "05", label: "Selbsthilfe (HowTo)" },
-  { id: "07", label: "Unique Data Sektion" },
-  { id: "08", label: "Information Gain" },
-  { id: "09", label: "Ablauf vor Ort" },
-  { id: "10", label: "Preise + Risikoumkehr" },
-  { id: "14", label: "FAQ" },
-  { id: "15", label: "Autor + Kontakt" },
+const ALL_SECTIONS: { id: string; label: string; group: "seo" | "lp" }[] = [
+  // SEO Core
+  { id: "hero", label: "Hero-Sektion", group: "seo" },
+  { id: "problem", label: "Problem-Sektion", group: "seo" },
+  { id: "ursachen", label: "Ursachen-Sektion", group: "seo" },
+  { id: "loesung", label: "Lösung-Sektion", group: "seo" },
+  { id: "ablauf", label: "Ablauf-Sektion", group: "seo" },
+  { id: "preise", label: "Preise-Sektion", group: "seo" },
+  { id: "faq", label: "FAQ-Sektion", group: "seo" },
+  { id: "autor", label: "Autor-Box", group: "seo" },
+  { id: "service", label: "Service-Sektion", group: "seo" },
+  { id: "inhalt", label: "Inhalt-Sektion", group: "seo" },
+  { id: "symptome", label: "Symptome", group: "seo" },
+  { id: "selbsthilfe", label: "Selbsthilfe", group: "seo" },
+  { id: "unique_data", label: "Unique Data", group: "seo" },
+  { id: "information_gain", label: "Information Gain", group: "seo" },
+  { id: "fehlercode", label: "Fehlercode-Sektion", group: "seo" },
+  { id: "footer", label: "Footer", group: "seo" },
+  // Landingpage
+  { id: "lp_urgency_bar", label: "Urgency Bar (oben)", group: "lp" },
+  { id: "lp_sticky_nav", label: "Sticky Navigation", group: "lp" },
+  { id: "lp_social_proof_ticker", label: "Social Proof Ticker", group: "lp" },
+  { id: "lp_trust_badges", label: "Trust Badges", group: "lp" },
+  { id: "lp_testimonials_early", label: "Frühe Testimonials", group: "lp" },
+  { id: "lp_objection_handling", label: "Objection Handling", group: "lp" },
+  { id: "lp_how_it_works", label: "How It Works", group: "lp" },
+  { id: "lp_identity", label: "Für wen ist das?", group: "lp" },
+  { id: "lp_features", label: "Features & Benefits", group: "lp" },
+  { id: "lp_value_stack", label: "Value Stack", group: "lp" },
+  { id: "lp_bonus_stack", label: "Bonus Stack", group: "lp" },
+  { id: "lp_testimonials_more", label: "Weitere Testimonials", group: "lp" },
+  { id: "lp_guarantee", label: "Garantie Box", group: "lp" },
+  { id: "lp_lead_form", label: "Lead Formular", group: "lp" },
+  { id: "lp_social_proof_widget", label: "Social Proof Widget", group: "lp" },
+  { id: "lp_sticky_cta", label: "Sticky CTA Mobile", group: "lp" },
+  { id: "lp_countdown", label: "Countdown Timer", group: "lp" },
+  { id: "lp_case_study", label: "Case Study", group: "lp" },
+  { id: "lp_comparison_table", label: "Vergleichstabelle", group: "lp" },
+  { id: "lp_pricing_packages", label: "Preis-Pakete", group: "lp" },
+  { id: "lp_video_hero", label: "Video Hero (VSL)", group: "lp" },
+  { id: "lp_whatsapp_cta", label: "WhatsApp CTA", group: "lp" },
+  { id: "lp_authority", label: "Authority Section", group: "lp" },
+  { id: "lp_local_stats", label: "Lokale Statistiken", group: "lp" },
 ];
-const OPTIONAL_SECTIONS = [
-  { id: "03", label: "TOC (Inhaltsverzeichnis)" },
-  { id: "06", label: "Fehlercode-Liste" },
-  { id: "11", label: "Reparatur vs. Neukauf" },
-  { id: "12", label: "Qualität" },
-  { id: "13", label: "Marken" },
-];
+
+const DEFAULTS_BY_TYPE: Record<string, string[]> = {
+  pillar_page: ["hero", "ablauf", "service", "faq", "autor"],
+  service: ["hero", "problem", "ablauf", "preise", "faq", "autor"],
+  fehlercode: ["hero", "symptome", "ursachen", "selbsthilfe", "loesung", "faq", "autor"],
+  supporting_info: ["hero", "inhalt", "faq", "autor"],
+  supporting_commercial: ["hero", "problem", "loesung", "faq", "autor"],
+  transactional: ["hero", "service", "preise", "faq", "autor"],
+  deep_page: ["hero", "problem", "loesung", "faq", "autor"],
+  blog: ["hero", "inhalt", "faq", "autor"],
+  salesfunnel_leadgen: [
+    "lp_urgency_bar", "lp_sticky_nav", "hero", "lp_social_proof_ticker",
+    "lp_trust_badges", "problem", "lp_testimonials_early", "lp_objection_handling",
+    "lp_how_it_works", "lp_identity", "lp_features", "preise",
+    "lp_testimonials_more", "lp_guarantee", "faq", "lp_lead_form",
+    "lp_social_proof_widget", "lp_sticky_cta", "footer",
+  ],
+  salesfunnel_ecommerce: [
+    "lp_urgency_bar", "hero", "lp_trust_badges", "lp_value_stack", "lp_bonus_stack",
+    "lp_testimonials_early", "lp_objection_handling", "preise", "lp_guarantee",
+    "faq", "lp_lead_form", "lp_social_proof_widget", "lp_sticky_cta",
+  ],
+  landingpage_service: [
+    "lp_urgency_bar", "lp_sticky_nav", "hero", "lp_trust_badges", "problem",
+    "lp_how_it_works", "lp_testimonials_early", "preise", "lp_guarantee",
+    "faq", "lp_lead_form", "lp_social_proof_widget", "lp_sticky_cta",
+  ],
+  landingpage_local: [
+    "hero", "lp_trust_badges", "lp_local_stats", "service",
+    "lp_testimonials_early", "preise", "faq", "lp_lead_form", "lp_social_proof_widget",
+  ],
+};
 
 const REQUIRED_FIELDS: Record<string, (keyof SeoFormData)[]> = {
   A: ["keyword"],
@@ -327,7 +384,7 @@ const DEFAULT_FORM: SeoFormData = {
   imageStrategy: "NanoBanana KI", schemaBlocks: ["FAQPage", "HowTo"],
   breadcrumb: "", rating: "4.9", reviewCount: "", informationGain: "",
   discoverReady: "Ja-Bild vorhanden", comparativeCheck: "Noch ausstehend",
-  activeSections: CORE_SECTIONS.map((s) => s.id),
+  activeSections: DEFAULTS_BY_TYPE.pillar_page,
   // Landingpage defaults
   landingPageGoal: "call",
   mainHeadline: "",

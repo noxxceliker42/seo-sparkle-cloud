@@ -42,6 +42,27 @@ Erstelle NUR den Wert für "differentiation":
 3 konkrete Wettbewerbsvorteile die ein lokaler Reparaturservice für dieses Keyword haben sollte. 
 Realistisch und umsetzbar. 3 Stichpunkte, je 1 Zeile.
 Antwort als JSON: {"differentiation": "..."}`,
+
+  paaQuestions: (ctx) => `${ctx}
+
+Erstelle NUR den Wert für "paaQuestions":
+5 typische Google "People Also Ask"-Fragen für dieses Keyword.
+Realistische Nutzerfragen, die echt bei Google auftauchen. Eine Frage pro Zeile.
+Antwort als JSON: {"paaQuestions": "Frage 1?\\nFrage 2?\\nFrage 3?\\nFrage 4?\\nFrage 5?"}`,
+
+  secondaryKeywords: (ctx) => `${ctx}
+
+Erstelle NUR den Wert für "secondaryKeywords":
+8 Sekundär-Keywords (Keyword-Varianten + Long-Tail) für dieses Hauptkeyword.
+Kommasepariert in einer Zeile. Realistische Suchanfragen.
+Antwort als JSON: {"secondaryKeywords": "kw1, kw2, kw3, ..."}`,
+
+  lsiTerms: (ctx) => `${ctx}
+
+Erstelle NUR den Wert für "lsiTerms":
+10 LSI-Begriffe (Latent Semantic Indexing) aus der Branche, die thematisch verwandt sind.
+Fachbegriffe, Bauteile, Symptome, Konzepte. Kommasepariert in einer Zeile.
+Antwort als JSON: {"lsiTerms": "begriff1, begriff2, ..."}`,
 };
 
 Deno.serve(async (req) => {

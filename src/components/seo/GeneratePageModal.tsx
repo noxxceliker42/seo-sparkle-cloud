@@ -238,6 +238,39 @@ export function GeneratePageModal({
   const [intent, setIntent] = useState<string>(() => intentFromPageType(clusterPage.page_type));
   const [toneOfVoice, setToneOfVoice] = useState<string>("sachlich");
 
+  // SEO-Felder Accordion (Schritt 2)
+  const [seoOpen, setSeoOpen] = useState(false);
+  const [seoTab, setSeoTab] = useState<"keywords" | "cluster" | "eeat" | "schema" | "y2026">("keywords");
+  // 2A — Keywords
+  const [secondaryKeywords, setSecondaryKeywords] = useState("");
+  const [lsiTerms, setLsiTerms] = useState("");
+  // 2B — Cluster-Kontext
+  const [paaQuestions, setPaaQuestions] = useState("");
+  const [contentGap, setContentGap] = useState("");
+  const [deepPages, setDeepPages] = useState("");
+  // 2C — E-E-A-T
+  const [reviewer, setReviewer] = useState("");
+  const [caseStudy, setCaseStudy] = useState("");
+  // 2D — Schema
+  const SCHEMA_DEFAULTS_BY_TYPE: Record<string, string[]> = {
+    service: ["LocalBusiness", "Service", "FAQPage"],
+    fehlercode: ["FAQPage", "HowTo"],
+    pillar_page: ["WebPage", "FAQPage", "BreadcrumbList"],
+    pillar: ["WebPage", "FAQPage", "BreadcrumbList"],
+    transactional: ["LocalBusiness", "FAQPage"],
+    transactional_local: ["LocalBusiness", "FAQPage"],
+  };
+  const SCHEMA_OPTIONS = ["LocalBusiness", "Service", "FAQPage", "HowTo", "WebPage", "BreadcrumbList"];
+  const [schemaBlocks, setSchemaBlocks] = useState<string[]>(
+    () => SCHEMA_DEFAULTS_BY_TYPE[clusterPage.page_type] || ["FAQPage"]
+  );
+  const [rating, setRating] = useState<string>("");
+  const [reviewCount, setReviewCount] = useState<string>("");
+  // 2E — 2026 Features
+  const [informationGainFlag, setInformationGainFlag] = useState(true);
+  const [comparativeCheck, setComparativeCheck] = useState(true);
+  const [discoverReady, setDiscoverReady] = useState(false);
+
   // AI suggestions — per-field loading state
   const [aiFieldLoading, setAiFieldLoading] = useState<Record<string, boolean>>({});
   const [aiLoaded, setAiLoaded] = useState(false);

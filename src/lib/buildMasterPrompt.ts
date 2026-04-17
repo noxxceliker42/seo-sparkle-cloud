@@ -289,7 +289,7 @@ ${discoverReady ? `GOOGLE DISCOVER OPTIMIERUNG:
 - EEAT-Optimierer (Autorbox, Fachprüfung, Erfahrungsbelege, Aktualisierungsdaten)
 
 KERNPRINZIP: Schreibe niemals generisch. Jede Seite ist konkret, fachlich präzise, konversionsorientiert und visuell hochwertig. KI-Floskeln sind absolut verboten.
-
+${toneBlock}
 ══════════════════════════════════════
 SEITEN-KONTEXT
 ══════════════════════════════════════

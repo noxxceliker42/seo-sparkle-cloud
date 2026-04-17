@@ -216,6 +216,28 @@ export function GeneratePageModal({
   const [informationGain, setInformationGain] = useState("");
   const [uspFokus, setUspFokus] = useState("");
 
+  // Intent + Tone of Voice (Schritt 1)
+  const intentFromPageType = (pt: string): string => {
+    switch (pt) {
+      case "service":
+      case "transactional":
+      case "transactional_local":
+        return "transactional";
+      case "supporting_commercial":
+        return "commercial";
+      case "pillar_page":
+      case "pillar":
+      case "fehlercode":
+      case "blog":
+      case "supporting_info":
+      case "deep_page":
+      default:
+        return "informational";
+    }
+  };
+  const [intent, setIntent] = useState<string>(() => intentFromPageType(clusterPage.page_type));
+  const [toneOfVoice, setToneOfVoice] = useState<string>("sachlich");
+
   // AI suggestions — per-field loading state
   const [aiFieldLoading, setAiFieldLoading] = useState<Record<string, boolean>>({});
   const [aiLoaded, setAiLoaded] = useState(false);

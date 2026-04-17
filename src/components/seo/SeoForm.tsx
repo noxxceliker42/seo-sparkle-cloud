@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
+import { LandingPageAccordion } from "./LandingPageAccordion";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 

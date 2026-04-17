@@ -24,10 +24,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Loader2, Zap, Network, Eye, Rocket, AlertCircle, RotateCcw, LinkIcon, Check } from "lucide-react";
+import { ArrowLeft, Loader2, Zap, Network, Eye, Rocket, AlertCircle, RotateCcw, LinkIcon, Check, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { calculateScore, scoreColor, scoreTextColor } from "@/lib/clusterScore";
 import { GeneratePageModal, type FirmData } from "@/components/seo/GeneratePageModal";
+import { cancelCurrentJob } from "@/hooks/useGenerationJob";
 import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/cluster/$id")({
@@ -938,6 +939,7 @@ function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, 
     if (!page.generation_jobs_id) return;
     setResetting(true);
     try {
+      await cancelCurrentJob("Vom Nutzer abgebrochen");
       await supabase
         .from("generation_jobs")
         .update({ status: "error", error_message: "Vom Nutzer abgebrochen" })
@@ -946,12 +948,25 @@ function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, 
         .from("cluster_pages")
         .update({ status: "approved", generation_jobs_id: null })
         .eq("id", page.id);
-      try {
-        sessionStorage.removeItem("seo_os_generation_job");
-        sessionStorage.removeItem("currentGenerationJob");
-      } catch {}
       setIsStuck(false);
       onGenerate();
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const handleCancelRunning = async () => {
+    setResetting(true);
+    try {
+      await cancelCurrentJob("Vom Nutzer abgebrochen");
+      if (page.generation_jobs_id) {
+        await supabase
+          .from("cluster_pages")
+          .update({ status: "approved", generation_jobs_id: null })
+          .eq("id", page.id);
+      }
+      const { toast } = await import("sonner");
+      toast.info("Generierung abgebrochen");
     } finally {
       setResetting(false);
     }
@@ -1043,9 +1058,21 @@ function ClusterPageCard({ page, cluster, firm, isGenerating, isFetchingScores, 
               </Button>
             )}
             {isGenerating && !isStuck && (
-              <Button size="sm" className="flex-1 text-[11px] h-7 gap-1" disabled>
-                <Loader2 className="h-3 w-3 animate-spin" /> Generiere…
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 text-[11px] h-7 gap-1 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                  onClick={handleCancelRunning}
+                  disabled={resetting}
+                >
+                  {resetting ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+                  Abbrechen
+                </Button>
+                <div className="flex-1 flex items-center justify-center gap-1 text-[11px] text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Generiert…
+                </div>
+              </>
             )}
             {isGenerated && page.seo_page_id && (
               <>

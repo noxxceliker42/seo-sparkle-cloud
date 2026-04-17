@@ -278,6 +278,38 @@ const DEFAULT_FORM: SeoFormData = {
   breadcrumb: "", rating: "4.9", reviewCount: "", informationGain: "",
   discoverReady: "Ja-Bild vorhanden", comparativeCheck: "Noch ausstehend",
   activeSections: CORE_SECTIONS.map((s) => s.id),
+  // Landingpage defaults
+  landingPageGoal: "call",
+  mainHeadline: "",
+  primaryCtaText: "",
+  secondaryCtaText: "",
+  videoUrl: "",
+  countdownActive: false,
+  countdownEndDate: "",
+  countdownText: "Angebot endet in:",
+  urgencyBarActive: false,
+  urgencyBarText: "",
+  guaranteeTitle: "",
+  guaranteeText: "",
+  socialProofCustomers: "",
+  socialProofRating: "",
+  socialProofReviews: "",
+  socialProofYears: "",
+  socialProofWidgetActive: true,
+  painPoints: ["", "", "", "", "", ""],
+  personas: [
+    { emoji: "", title: "", description: "" },
+    { emoji: "", title: "", description: "" },
+    { emoji: "", title: "", description: "" },
+  ],
+  bonusStack: [
+    { title: "", value: "" },
+    { title: "", value: "" },
+    { title: "", value: "" },
+  ],
+  leadMagnetTitle: "",
+  leadMagnetDescription: "",
+  formType: "multistep",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────

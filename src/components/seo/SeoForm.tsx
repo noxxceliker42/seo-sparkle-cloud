@@ -804,8 +804,30 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
     </div>
   );
 
+  const generateAllStepC = useCallback(async () => {
+    await fetchSuggestions("uniqueData", applyString("uniqueData"));
+    await fetchSuggestions("informationGain", applyString("informationGain"));
+    await fetchSuggestions("uspFokus", applyString("uspFokus"));
+  }, [fetchSuggestions, applyString]);
+
   const renderStepC = () => (
     <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-foreground">Firma & Unique Data</h3>
+        <button
+          type="button"
+          onClick={generateAllStepC}
+          disabled={suggestingField !== null}
+          className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed px-2 py-1 rounded-md hover:bg-primary/5"
+        >
+          {suggestingField !== null ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Sparkles className="h-3 w-3" />
+          )}
+          Alle generieren
+        </button>
+      </div>
       <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
         <Label className="text-xs font-medium text-muted-foreground">Firma auswählen</Label>
         <FirmSelector selectedFirmId={selectedFirmId} onFirmChange={handleFirmSelect} />

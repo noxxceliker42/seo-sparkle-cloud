@@ -172,6 +172,8 @@ export function GeneratePageModal({
       designPreset: "trust",
       primaryColor:
         cluster.primary_color || firm?.primary_color || "#1d4ed8",
+      sectionData:
+        ((cluster as unknown as { section_data?: Record<string, string> }).section_data) || {},
     };
   }, [clusterPage, cluster, firm, siblingPagesString, deepPagesText]);
 
@@ -284,6 +286,7 @@ export function GeneratePageModal({
 
         // Sections (as labels for n8n compatibility)
         activeSections: form.activeSections,
+        sectionData: form.sectionData || {},
 
         // Cluster linking
         siblingPages: siblingPagesString,

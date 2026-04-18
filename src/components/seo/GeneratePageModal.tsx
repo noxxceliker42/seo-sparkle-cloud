@@ -372,6 +372,20 @@ export function GeneratePageModal({
               </div>
             )}
           </div>
+        ) : phase === "qa" && pendingForm ? (
+          <div className="pt-2">
+            {error && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 mb-4 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-800">{error}</p>
+              </div>
+            )}
+            <QaGate
+              formData={pendingForm}
+              onBack={() => setPhase("form")}
+              onGenerate={(data) => runGeneration(data)}
+            />
+          </div>
         ) : (
           <div className="pt-2">
             {error && (
@@ -381,7 +395,7 @@ export function GeneratePageModal({
               </div>
             )}
             <SeoForm
-              initialData={initialData}
+              initialData={pendingForm ?? initialData}
               autoFilledFields={{
                 keyword: true,
                 pageType: true,
@@ -390,7 +404,7 @@ export function GeneratePageModal({
                 phone: !!firm?.phone,
                 authorName: !!firm?.author,
               }}
-              onSubmit={handleSubmit}
+              onSubmit={handleFormSubmit}
               onBack={onClose}
             />
           </div>

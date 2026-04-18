@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertCircle } from "lucide-react";
 import { SeoForm, type SeoFormData } from "./SeoForm";
-import { QaGate } from "./QaGate";
+import { QaGateInteractive } from "./QaGateInteractive";
 
 type ClusterPageRow = Tables<"cluster_pages">;
 type ClusterRow = Tables<"clusters">;
@@ -384,10 +384,17 @@ export function GeneratePageModal({
                 <p className="text-xs text-red-800">{error}</p>
               </div>
             )}
-            <QaGate
+            <QaGateInteractive
               formData={pendingForm}
               onBack={() => setPhase("form")}
-              onGenerate={(data) => runGeneration(data)}
+              onFieldUpdate={(field, value) => {
+                setPendingForm((prev) =>
+                  prev ? ({ ...prev, [field]: value } as SeoFormData) : prev,
+                );
+              }}
+              onPass={() => {
+                if (pendingForm) runGeneration(pendingForm);
+              }}
             />
           </div>
         ) : (

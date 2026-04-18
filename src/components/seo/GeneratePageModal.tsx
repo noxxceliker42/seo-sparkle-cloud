@@ -183,7 +183,13 @@ export function GeneratePageModal({
     }
   }, [result, generating, submitting, jobId, onSuccess]);
 
-  const handleSubmit = useCallback(
+  const handleFormSubmit = useCallback((form: SeoFormData) => {
+    clearError();
+    setPendingForm(form);
+    setPhase("qa");
+  }, [clearError]);
+
+  const runGeneration = useCallback(
     async (form: SeoFormData) => {
       clearError();
       setSubmitting(true);

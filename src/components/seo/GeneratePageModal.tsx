@@ -177,11 +177,17 @@ export function GeneratePageModal({
       clearError();
       setSubmitting(true);
 
-      // Resolve design philosophy (cluster wins, then firm)
+      // Resolve design fields — Form input wins, then cluster, then firm
       const designPhilosophy =
-        cluster.design_philosophy || firm?.design_philosophy || "trust_classic";
+        form.designPhilosophy || cluster.design_philosophy || firm?.design_philosophy || "trust_classic";
       const designPhilosophyCustom =
-        cluster.design_philosophy_custom || firm?.design_philosophy_custom || "";
+        form.designPhilosophyCustom || cluster.design_philosophy_custom || firm?.design_philosophy_custom || "";
+      const primaryColor =
+        form.primaryColor || cluster.primary_color || firm?.primary_color || "#1d4ed8";
+      const secondaryColor =
+        form.secondaryColor || cluster.secondary_color || firm?.secondary_color || "#ffffff";
+      const accentColor =
+        form.accentColor || cluster.accent_color || firm?.accent_color || "#dc2626";
 
       // Build complete formData payload — merge SeoFormData with cluster/job-specific fields
       const formData: Record<string, unknown> = {
@@ -251,9 +257,9 @@ export function GeneratePageModal({
         designPreset: form.designPreset,
         designPhilosophy,
         designPhilosophyCustom,
-        primaryColor: form.primaryColor,
-        secondaryColor: form.secondaryColor,
-        accentColor: form.accentColor,
+        primaryColor,
+        secondaryColor,
+        accentColor,
         targetAudience: form.targetAudience || cluster.target_audience || firm?.target_audience || "privatkunden",
         themeContext: form.themeContext || cluster.theme_context || firm?.theme_context || "",
         differentiation: form.differentiation || cluster.differentiation || firm?.differentiation || "",

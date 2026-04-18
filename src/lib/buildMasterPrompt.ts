@@ -375,6 +375,17 @@ CSS-VARIABLEN:
 :root {
   ${ds.cssVars}
 }
+${data.designPhilosophyCustom ? `
+══════════════════════════════════════
+EIGENE DESIGN-BESCHREIBUNG (HAT VORRANG)
+══════════════════════════════════════
+"${data.designPhilosophyCustom}"
+
+→ Diese Beschreibung definiert den gesamten visuellen Stil der Seite.
+→ Alle CSS-Entscheidungen (Farben, Typografie, Layout, Spacing, Shadows, Hover-Effekte)
+  müssen dieser Beschreibung entsprechen und das oben definierte Design-System überschreiben,
+  wo es Konflikte gibt.
+` : ""}
 
 CSS-MODUS: ${isContao
     ? "CONTAO-INLINE — ALLE Styles als style=\"\"-Attribut direkt am Element. KEIN <style>-Block. KEIN ::before/::after. KEIN @media. Nur flexbox (kein CSS Grid). Keine CSS-Variablen — alle Werte ausschreiben."

@@ -1317,15 +1317,47 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {sections.map((s) => {
             const checked = form.activeSections.includes(s.id);
+            const inputCfg = LP_SECTIONS_WITH_INPUT[s.id];
             return (
-              <label
+              <div
                 key={s.id}
-                className="flex items-center gap-3 rounded-md border border-border bg-card p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+                className="rounded-md border border-border bg-card p-3 space-y-2"
               >
-                <Switch checked={checked} onCheckedChange={() => toggleSection(s.id)} />
-                <span className="text-sm font-medium flex-1">{s.label}</span>
-                <code className="text-[9px] text-muted-foreground font-mono">{s.id}</code>
-              </label>
+                <div className="flex items-center gap-3">
+                  <Switch checked={checked} onCheckedChange={() => toggleSection(s.id)} />
+                  <span className="text-sm font-medium flex-1">{s.label}</span>
+                  <code className="text-[9px] text-muted-foreground font-mono">{s.id}</code>
+                </div>
+                {checked && inputCfg && (
+                  <div className="ml-11 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">
+                        Inhalt konkretisieren (optional):
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => fetchSectionSuggestion(s.id)}
+                        disabled={suggestingSection === s.id}
+                        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                      >
+                        {suggestingSection === s.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3 w-3" />
+                        )}
+                        KI-Vorschlag
+                      </button>
+                    </div>
+                    <textarea
+                      value={sectionData[s.id] || ""}
+                      onChange={(e) => updateSectionData(s.id, e.target.value)}
+                      placeholder={inputCfg.placeholder}
+                      rows={inputCfg.rows || 2}
+                      className="w-full text-xs p-2 rounded-md border border-input bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-xs"
+                    />
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

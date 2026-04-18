@@ -283,6 +283,7 @@ export function GeneratePageModal({
         themeContext: form.themeContext || cluster.theme_context || firm?.theme_context || "",
         differentiation: form.differentiation || cluster.differentiation || firm?.differentiation || "",
         imageStrategy: form.imageStrategy,
+        imagePlaceholders: form.imagePlaceholders || false,
 
         // Sections (as labels for n8n compatibility)
         activeSections: form.activeSections,

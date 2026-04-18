@@ -289,6 +289,19 @@ function checkNapValidity(form: SeoFormData): string[] {
   return errors;
 }
 
+const LP_SECTIONS_WITH_INPUT: Record<string, { placeholder: string; kiField: string; rows: number }> = {
+  lp_urgency_bar: { placeholder: '🔥 z.B. "Nur noch heute: Kostenlose Erstberatung verfügbar"', kiField: "urgencyBar", rows: 1 },
+  lp_trust_badges: { placeholder: 'z.B. "15 Jahre Erfahrung, 500+ Kunden, 4.9 Sterne, Garantie"', kiField: "trustBadges", rows: 1 },
+  lp_testimonials_early: { placeholder: 'z.B. "Klaus M. (Berlin-Mitte): Innerhalb von 2h alles repariert — top Service!"', kiField: "testimonials", rows: 2 },
+  lp_objection_handling: { placeholder: 'z.B. "Zu teuer? — Faire Festpreise. Nicht sicher? — 6 Monate Garantie."', kiField: "objections", rows: 2 },
+  lp_how_it_works: { placeholder: 'z.B. "1. Anruf → 2. Termin innerhalb 24h → 3. Problem gelöst"', kiField: "howItWorks", rows: 1 },
+  lp_guarantee: { placeholder: 'z.B. "Nicht zufrieden? Vollständige Rückerstattung ohne Fragen gestellt"', kiField: "guarantee", rows: 2 },
+  lp_value_stack: { placeholder: 'z.B. "Diagnose (49€) + Reparatur + 6 Monate Garantie (99€) = Gesamtwert 247€"', kiField: "valueStack", rows: 2 },
+  lp_authority: { placeholder: 'z.B. "Bekannt aus Berliner Morgenpost, Google Top-Bewertung 2024"', kiField: "authority", rows: 1 },
+  lp_case_study: { placeholder: 'z.B. "Müller GmbH: Waschmaschine defekt → in 90 Min repariert → 400€ Neukauf gespart"', kiField: "caseStudy", rows: 2 },
+  lp_comparison_table: { placeholder: 'z.B. "Preis, Reaktionszeit, Garantie, Originalteile — wir vs. Wettbewerb"', kiField: "comparisonTable", rows: 1 },
+};
+
 const ALL_SECTIONS: { id: string; label: string; group: "seo" | "lp" }[] = [
   // SEO Core
   { id: "hero", label: "Hero-Sektion", group: "seo" },
@@ -395,6 +408,7 @@ const DEFAULT_FORM: SeoFormData = {
   breadcrumb: "", rating: "4.9", reviewCount: "", informationGain: "",
   discoverReady: "Ja-Bild vorhanden", comparativeCheck: "Noch ausstehend",
   activeSections: DEFAULTS_BY_TYPE.pillar_page,
+  sectionData: {},
   // Landingpage defaults
   landingPageGoal: "call",
   mainHeadline: "",

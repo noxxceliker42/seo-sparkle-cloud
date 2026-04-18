@@ -82,6 +82,7 @@ export interface SeoFormData {
   comparativeCheck: string;
   // S — Sektionen
   activeSections: string[];
+  sectionData?: Record<string, string>;
   // L — Landingpage / Sales-Funnel (optional, nur bei isLandingPageType)
   landingPageGoal?: string;
   mainHeadline?: string;
@@ -288,6 +289,19 @@ function checkNapValidity(form: SeoFormData): string[] {
   return errors;
 }
 
+const LP_SECTIONS_WITH_INPUT: Record<string, { placeholder: string; kiField: string; rows: number }> = {
+  lp_urgency_bar: { placeholder: '🔥 z.B. "Nur noch heute: Kostenlose Erstberatung verfügbar"', kiField: "urgencyBar", rows: 1 },
+  lp_trust_badges: { placeholder: 'z.B. "15 Jahre Erfahrung, 500+ Kunden, 4.9 Sterne, Garantie"', kiField: "trustBadges", rows: 1 },
+  lp_testimonials_early: { placeholder: 'z.B. "Klaus M. (Berlin-Mitte): Innerhalb von 2h alles repariert — top Service!"', kiField: "testimonials", rows: 2 },
+  lp_objection_handling: { placeholder: 'z.B. "Zu teuer? — Faire Festpreise. Nicht sicher? — 6 Monate Garantie."', kiField: "objections", rows: 2 },
+  lp_how_it_works: { placeholder: 'z.B. "1. Anruf → 2. Termin innerhalb 24h → 3. Problem gelöst"', kiField: "howItWorks", rows: 1 },
+  lp_guarantee: { placeholder: 'z.B. "Nicht zufrieden? Vollständige Rückerstattung ohne Fragen gestellt"', kiField: "guarantee", rows: 2 },
+  lp_value_stack: { placeholder: 'z.B. "Diagnose (49€) + Reparatur + 6 Monate Garantie (99€) = Gesamtwert 247€"', kiField: "valueStack", rows: 2 },
+  lp_authority: { placeholder: 'z.B. "Bekannt aus Berliner Morgenpost, Google Top-Bewertung 2024"', kiField: "authority", rows: 1 },
+  lp_case_study: { placeholder: 'z.B. "Müller GmbH: Waschmaschine defekt → in 90 Min repariert → 400€ Neukauf gespart"', kiField: "caseStudy", rows: 2 },
+  lp_comparison_table: { placeholder: 'z.B. "Preis, Reaktionszeit, Garantie, Originalteile — wir vs. Wettbewerb"', kiField: "comparisonTable", rows: 1 },
+};
+
 const ALL_SECTIONS: { id: string; label: string; group: "seo" | "lp" }[] = [
   // SEO Core
   { id: "hero", label: "Hero-Sektion", group: "seo" },
@@ -394,6 +408,7 @@ const DEFAULT_FORM: SeoFormData = {
   breadcrumb: "", rating: "4.9", reviewCount: "", informationGain: "",
   discoverReady: "Ja-Bild vorhanden", comparativeCheck: "Noch ausstehend",
   activeSections: DEFAULTS_BY_TYPE.pillar_page,
+  sectionData: {},
   // Landingpage defaults
   landingPageGoal: "call",
   mainHeadline: "",
@@ -632,6 +647,49 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
       return { ...prev, schemaBlocks: blocks };
     });
   }, []);
+
+  // ─── Section Data (LP inline inputs) ─────────────────────────────────────
+  const [sectionData, setSectionData] = useState<Record<string, string>>(
+    (initialData as { sectionData?: Record<string, string> })?.sectionData || form.sectionData || {},
+  );
+  const [suggestingSection, setSuggestingSection] = useState<string | null>(null);
+
+  const updateSectionData = useCallback((id: string, value: string) => {
+    setSectionData((prev) => {
+      const next = { ...prev, [id]: value };
+      setForm((f) => ({ ...f, sectionData: next }));
+      return next;
+    });
+  }, []);
+
+  const fetchSectionSuggestion = useCallback(async (sectionId: string) => {
+    const config = LP_SECTIONS_WITH_INPUT[sectionId];
+    if (!config) return;
+    setSuggestingSection(sectionId);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-field-suggestions", {
+        body: {
+          keyword: form.keyword || "",
+          pageType: form.pageType || "service",
+          firm: form.firmName || "",
+          branche: form.branche || "hausgeraete",
+          targetAudience: form.targetAudience || "privatkunden",
+          field: config.kiField,
+        },
+      });
+      if (error) throw error;
+      const value = (data as Record<string, unknown> | null)?.[config.kiField];
+      if (typeof value === "string" && value.trim()) {
+        updateSectionData(sectionId, value);
+        toast.success("KI-Vorschlag übernommen");
+      }
+    } catch (e) {
+      console.error("Section suggestion error:", e);
+      toast.error("KI-Vorschlag fehlgeschlagen", { description: "Bitte manuell ausfüllen." });
+    } finally {
+      setSuggestingSection(null);
+    }
+  }, [form.keyword, form.pageType, form.firmName, form.branche, form.targetAudience, updateSectionData]);
 
   const toggleSection = useCallback((sectionId: string) => {
     setForm((prev) => {
@@ -1259,15 +1317,47 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {sections.map((s) => {
             const checked = form.activeSections.includes(s.id);
+            const inputCfg = LP_SECTIONS_WITH_INPUT[s.id];
             return (
-              <label
+              <div
                 key={s.id}
-                className="flex items-center gap-3 rounded-md border border-border bg-card p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+                className="rounded-md border border-border bg-card p-3 space-y-2"
               >
-                <Switch checked={checked} onCheckedChange={() => toggleSection(s.id)} />
-                <span className="text-sm font-medium flex-1">{s.label}</span>
-                <code className="text-[9px] text-muted-foreground font-mono">{s.id}</code>
-              </label>
+                <div className="flex items-center gap-3">
+                  <Switch checked={checked} onCheckedChange={() => toggleSection(s.id)} />
+                  <span className="text-sm font-medium flex-1">{s.label}</span>
+                  <code className="text-[9px] text-muted-foreground font-mono">{s.id}</code>
+                </div>
+                {checked && inputCfg && (
+                  <div className="ml-11 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">
+                        Inhalt konkretisieren (optional):
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => fetchSectionSuggestion(s.id)}
+                        disabled={suggestingSection === s.id}
+                        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                      >
+                        {suggestingSection === s.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3 w-3" />
+                        )}
+                        KI-Vorschlag
+                      </button>
+                    </div>
+                    <textarea
+                      value={sectionData[s.id] || ""}
+                      onChange={(e) => updateSectionData(s.id, e.target.value)}
+                      placeholder={inputCfg.placeholder}
+                      rows={inputCfg.rows || 2}
+                      className="w-full text-xs p-2 rounded-md border border-input bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-xs"
+                    />
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

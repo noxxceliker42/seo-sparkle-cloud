@@ -97,6 +97,65 @@ Antwort als JSON: {"personas": [
   {"emoji": "⏰", "title": "...", "description": "..."},
   {"emoji": "💰", "title": "...", "description": "..."}
 ]}`,
+
+  urgencyBar: (ctx) => `${ctx}
+
+Erstelle einen dringlichen Urgency-Bar Text (max 80 Zeichen) für dieses Keyword.
+Erzeugt echte Dringlichkeit, kein Marketing-Geschwafel.
+Antwort als JSON: {"urgencyBar": "..."}`,
+
+  trustBadges: (ctx) => `${ctx}
+
+Erstelle 4 Trust-Badges (kommasepariert) für die Firma.
+Beispiel: "15 Jahre Erfahrung, 500+ Kunden, 4.9 Sterne Google, 6 Monate Garantie".
+Antwort als JSON: {"trustBadges": "..."}`,
+
+  testimonials: (ctx) => `${ctx}
+
+Erstelle 2 realistische lokale Kundenstimmen für dieses Keyword.
+Format: "Name (Stadtteil): Text". Eine Stimme pro Zeile.
+Antwort als JSON: {"testimonials": "..."}`,
+
+  objections: (ctx) => `${ctx}
+
+Erstelle 3 typische Einwände mit kurzen Lösungen für dieses Keyword.
+Format: "Einwand — Lösung". Einer pro Zeile.
+Antwort als JSON: {"objections": "..."}`,
+
+  howItWorks: (ctx) => `${ctx}
+
+Erstelle 3 klare Prozessschritte für diesen Service.
+Format: "1. Schritt → 2. Schritt → 3. Schritt"
+Antwort als JSON: {"howItWorks": "..."}`,
+
+  guarantee: (ctx) => `${ctx}
+
+Erstelle einen starken, glaubwürdigen Garantie-Text (2 Sätze) für diesen Service.
+Antwort als JSON: {"guarantee": "..."}`,
+
+  valueStack: (ctx) => `${ctx}
+
+Erstelle einen Value Stack: Leistungen mit Einzelwerten in € + Gesamtwert.
+Beispiel: "Diagnose (49€) + Reparatur + 6 Monate Garantie (99€) = Gesamtwert 247€"
+Antwort als JSON: {"valueStack": "..."}`,
+
+  authority: (ctx) => `${ctx}
+
+Erstelle einen Authority-Text (Medien, Auszeichnungen, Partner) für diesen lokalen Service.
+1 Zeile, konkret und glaubwürdig.
+Antwort als JSON: {"authority": "..."}`,
+
+  caseStudy: (ctx) => `${ctx}
+
+Erstelle ein kurzes konkretes Fallbeispiel: Problem → Lösung → Ergebnis in 2 Sätzen.
+Mit Zahlen, Zeiten, Ersparnis.
+Antwort als JSON: {"caseStudy": "..."}`,
+
+  comparisonTable: (ctx) => `${ctx}
+
+Erstelle 4 Vergleichskriterien (kommasepariert) für diese Branche vs. Wettbewerb.
+Beispiel: "Preis, Reaktionszeit, Garantie, Originalteile"
+Antwort als JSON: {"comparisonTable": "..."}`,
 };
 
 Deno.serve(async (req) => {

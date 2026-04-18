@@ -648,6 +648,49 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
     });
   }, []);
 
+  // ─── Section Data (LP inline inputs) ─────────────────────────────────────
+  const [sectionData, setSectionData] = useState<Record<string, string>>(
+    (initialData as { sectionData?: Record<string, string> })?.sectionData || form.sectionData || {},
+  );
+  const [suggestingSection, setSuggestingSection] = useState<string | null>(null);
+
+  const updateSectionData = useCallback((id: string, value: string) => {
+    setSectionData((prev) => {
+      const next = { ...prev, [id]: value };
+      setForm((f) => ({ ...f, sectionData: next }));
+      return next;
+    });
+  }, []);
+
+  const fetchSectionSuggestion = useCallback(async (sectionId: string) => {
+    const config = LP_SECTIONS_WITH_INPUT[sectionId];
+    if (!config) return;
+    setSuggestingSection(sectionId);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-field-suggestions", {
+        body: {
+          keyword: form.keyword || "",
+          pageType: form.pageType || "service",
+          firm: form.firmName || "",
+          branche: form.branche || "hausgeraete",
+          targetAudience: form.targetAudience || "privatkunden",
+          field: config.kiField,
+        },
+      });
+      if (error) throw error;
+      const value = (data as Record<string, unknown> | null)?.[config.kiField];
+      if (typeof value === "string" && value.trim()) {
+        updateSectionData(sectionId, value);
+        toast.success("KI-Vorschlag übernommen");
+      }
+    } catch (e) {
+      console.error("Section suggestion error:", e);
+      toast.error("KI-Vorschlag fehlgeschlagen", { description: "Bitte manuell ausfüllen." });
+    } finally {
+      setSuggestingSection(null);
+    }
+  }, [form.keyword, form.pageType, form.firmName, form.branche, form.targetAudience, updateSectionData]);
+
   const toggleSection = useCallback((sectionId: string) => {
     setForm((prev) => {
       const sections = prev.activeSections.includes(sectionId)

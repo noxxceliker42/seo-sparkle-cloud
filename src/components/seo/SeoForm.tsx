@@ -82,6 +82,7 @@ export interface SeoFormData {
   comparativeCheck: string;
   // S — Sektionen
   activeSections: string[];
+  sectionData?: Record<string, string>;
   // L — Landingpage / Sales-Funnel (optional, nur bei isLandingPageType)
   landingPageGoal?: string;
   mainHeadline?: string;

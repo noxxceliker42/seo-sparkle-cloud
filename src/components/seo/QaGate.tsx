@@ -396,18 +396,36 @@ export function QaGate({ formData, onBack, onGenerate }: QaGateProps) {
       </Accordion>
 
       {/* Navigation */}
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex items-center justify-between pt-2 gap-2 flex-wrap">
         <Button variant="outline" onClick={onBack} className="min-h-[44px] gap-2">
-          <ArrowLeft className="h-4 w-4" /> Zurück zum Formular
+          <ArrowLeft className="h-4 w-4" /> Zurück und ergänzen
         </Button>
-        <Button
-          onClick={() => onGenerate(formData)}
-          disabled={score < 85}
-          className={`min-h-[44px] gap-2 ${score >= 85 ? "bg-green-600 hover:bg-green-700" : ""}`}
-        >
-          Seite generieren
-          <ArrowRight className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {score < 85 && (
+            <Button
+              variant="outline"
+              onClick={() => onGenerate(formData)}
+              className="min-h-[44px] gap-2 text-muted-foreground"
+              title="Generierung ohne 85%-Freigabe starten"
+            >
+              Trotzdem generieren
+            </Button>
+          )}
+          <Button
+            onClick={() => onGenerate(formData)}
+            disabled={score < 60}
+            className={`min-h-[44px] gap-2 ${
+              score >= 85
+                ? "bg-green-600 hover:bg-green-700"
+                : score >= 60
+                ? "bg-amber-600 hover:bg-amber-700"
+                : ""
+            }`}
+          >
+            Seite generieren
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertCircle } from "lucide-react";
 import { SeoForm, type SeoFormData } from "./SeoForm";
+import { QaGate } from "./QaGate";
 
 type ClusterPageRow = Tables<"cluster_pages">;
 type ClusterRow = Tables<"clusters">;
@@ -99,6 +100,16 @@ export function GeneratePageModal({
   // Deep pages from sibling cluster_pages
   const [deepPagesText, setDeepPagesText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [phase, setPhase] = useState<"form" | "qa">("form");
+  const [pendingForm, setPendingForm] = useState<SeoFormData | null>(null);
+
+  // Reset phase whenever modal reopens
+  useEffect(() => {
+    if (open) {
+      setPhase("form");
+      setPendingForm(null);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -172,7 +183,13 @@ export function GeneratePageModal({
     }
   }, [result, generating, submitting, jobId, onSuccess]);
 
-  const handleSubmit = useCallback(
+  const handleFormSubmit = useCallback((form: SeoFormData) => {
+    clearError();
+    setPendingForm(form);
+    setPhase("qa");
+  }, [clearError]);
+
+  const runGeneration = useCallback(
     async (form: SeoFormData) => {
       clearError();
       setSubmitting(true);
@@ -355,6 +372,20 @@ export function GeneratePageModal({
               </div>
             )}
           </div>
+        ) : phase === "qa" && pendingForm ? (
+          <div className="pt-2">
+            {error && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 mb-4 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-800">{error}</p>
+              </div>
+            )}
+            <QaGate
+              formData={pendingForm}
+              onBack={() => setPhase("form")}
+              onGenerate={(data) => runGeneration(data)}
+            />
+          </div>
         ) : (
           <div className="pt-2">
             {error && (
@@ -364,7 +395,7 @@ export function GeneratePageModal({
               </div>
             )}
             <SeoForm
-              initialData={initialData}
+              initialData={pendingForm ?? initialData}
               autoFilledFields={{
                 keyword: true,
                 pageType: true,
@@ -373,7 +404,7 @@ export function GeneratePageModal({
                 phone: !!firm?.phone,
                 authorName: !!firm?.author,
               }}
-              onSubmit={handleSubmit}
+              onSubmit={handleFormSubmit}
               onBack={onClose}
             />
           </div>

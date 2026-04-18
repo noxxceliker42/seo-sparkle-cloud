@@ -16,7 +16,7 @@ import { ModeToggle } from "@/components/seo/ModeToggle";
 import { FirmSelector } from "@/components/seo/FirmSelector";
 import { SeoForm, type SeoFormData } from "@/components/seo/SeoForm";
 import { OutputPanel, type GeneratedPage } from "@/components/seo/OutputPanel";
-import { QaGate } from "@/components/seo/QaGate";
+import { QaGateInteractive } from "@/components/seo/QaGateInteractive";
 import { useAnalysis } from "@/context/AnalysisContext";
 import { toast } from "sonner";
 import { buildMasterPrompt } from "@/lib/buildMasterPrompt";
@@ -671,11 +671,16 @@ function Index() {
           </>
         ) : showQaGate && qaFormData ? (
           <>
-            <QaGate
+            <QaGateInteractive
               formData={qaFormData}
               onBack={() => { setShowQaGate(false); setShowForm(true); }}
-              onGenerate={(data: SeoFormData) => {
-                const prompt = buildMasterPrompt(data);
+              onFieldUpdate={(field, value) => {
+                setQaFormData((prev) =>
+                  prev ? ({ ...prev, [field]: value } as SeoFormData) : prev,
+                );
+              }}
+              onPass={() => {
+                const prompt = buildMasterPrompt(qaFormData);
                 setReviewPrompt(prompt);
                 setIsPromptEdited(false);
                 setShowPromptReview(true);

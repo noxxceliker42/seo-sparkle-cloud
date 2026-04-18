@@ -71,6 +71,7 @@ export interface SeoFormData {
   differentiation: string;
   toneOfVoice: string;
   imageStrategy: string;
+  imagePlaceholders?: boolean;
   // G — Schema
   schemaBlocks: string[];
   breadcrumb: string;
@@ -404,7 +405,7 @@ const DEFAULT_FORM: SeoFormData = {
   primaryColor: "#1d4ed8", secondaryColor: "#ffffff", accentColor: "#dc2626",
   targetAudience: "privatkunden", themeContext: "", differentiation: "",
   toneOfVoice: "Sachlich-kompetent",
-  imageStrategy: "NanoBanana KI", schemaBlocks: ["FAQPage", "HowTo"],
+  imageStrategy: "NanoBanana KI", imagePlaceholders: false, schemaBlocks: ["FAQPage", "HowTo"],
   breadcrumb: "", rating: "4.9", reviewCount: "", informationGain: "",
   discoverReady: "Ja-Bild vorhanden", comparativeCheck: "Noch ausstehend",
   activeSections: DEFAULTS_BY_TYPE.pillar_page,
@@ -1225,6 +1226,33 @@ export function SeoForm({ initialData, autoFilledFields, onSubmit, onBack, onFir
       <FieldWrapper label="Bild-Strategie">
         <ButtonGroup options={IMAGE_STRATEGIES} value={form.imageStrategy} onChange={(v) => update("imageStrategy", v)} />
       </FieldWrapper>
+
+      <div className="space-y-2 pt-4 border-t border-border">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <label className="text-sm font-medium">Bild-Platzhalter einbauen</label>
+            <p className="text-xs text-muted-foreground">
+              {form.imagePlaceholders
+                ? "Strukturierte <img> Platzhalter werden eingebaut — im Dashboard für NanoBanana kopierbar"
+                : "Seite wird ohne Bilder generiert (empfohlen)"}
+            </p>
+          </div>
+          <Switch
+            checked={form.imagePlaceholders || false}
+            onCheckedChange={(val) => update("imagePlaceholders", val)}
+          />
+        </div>
+        {form.imagePlaceholders && (
+          <div className="text-xs bg-blue-50 text-blue-700 rounded-md p-3 border border-blue-200">
+            ℹ️ Claude generiert{" "}
+            <code className="mx-1 font-mono">
+              &lt;img data-nb-slot="..." data-nb-prompt="..."&gt;
+            </code>{" "}
+            Platzhalter. Im Dashboard unter "Bilder" Tab kannst du die Prompts kopieren und Bilder
+            manuell in NanoBanana generieren.
+          </div>
+        )}
+      </div>
     </div>
   );
 

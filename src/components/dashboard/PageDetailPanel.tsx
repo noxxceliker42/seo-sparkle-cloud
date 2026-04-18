@@ -276,6 +276,64 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
     return slots;
   }, [page.html_output]);
 
+  /* ── NanoBanana placeholder slots from HTML ── */
+  const nbImageSlots = useMemo(() => {
+    const html = page.html_output || "";
+    // Match each <img ... data-nb-slot="..."> tag, then extract attributes
+    const tagRegex = /<img\b[^>]*data-nb-slot=[^>]*>/gi;
+    const tags = html.match(tagRegex) || [];
+    const attr = (tag: string, name: string) => {
+      const r = new RegExp(`${name}="([^"]*)"`, "i");
+      const m = tag.match(r);
+      return m ? m[1] : "";
+    };
+    return tags.map((tag) => ({
+      slot: attr(tag, "data-nb-slot"),
+      prompt: attr(tag, "data-nb-prompt"),
+      width: attr(tag, "data-nb-width") || "—",
+      height: attr(tag, "data-nb-height") || "—",
+      ratio: attr(tag, "data-nb-ratio") || "",
+      alt: attr(tag, "alt"),
+      currentSrc: attr(tag, "src"),
+      isPlaceholder: attr(tag, "src") === "BILD_PLATZHALTER",
+    }));
+  }, [page.html_output]);
+
+  const [nbImageUrls, setNbImageUrls] = useState<Record<string, string>>({});
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("In Zwischenablage kopiert");
+    } catch {
+      toast.error("Kopieren fehlgeschlagen");
+    }
+  };
+
+  const handleInsertNbImage = async (slot: string) => {
+    const url = (nbImageUrls[slot] || "").trim();
+    if (!url) return;
+    const html = page.html_output || "";
+    // Replace src of the <img> with matching data-nb-slot
+    const tagRegex = new RegExp(
+      `(<img\\b[^>]*\\bdata-nb-slot="${slot.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}"[^>]*>)`,
+      "i"
+    );
+    const updated = html.replace(tagRegex, (tag) => {
+      if (/\bsrc="[^"]*"/i.test(tag)) {
+        return tag.replace(/\bsrc="[^"]*"/i, `src="${url}"`);
+      }
+      return tag.replace(/<img\b/i, `<img src="${url}"`);
+    });
+    if (updated === html) {
+      toast.error(`Slot "${slot}" nicht gefunden`);
+      return;
+    }
+    await updatePage({ html_output: updated });
+    setNbImageUrls((prev) => ({ ...prev, [slot]: "" }));
+    toast.success("Bild erfolgreich eingebaut ✓");
+  };
+
   /* ── Score ring SVG ── */
   const ScoreRing = ({ score }: { score: number }) => {
     const r = 36, c = 2 * Math.PI * r, offset = c - (score / 100) * c;
@@ -449,15 +507,82 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
 
       {/* ═══ TAB 5: Bilder ═══ */}
       <TabsContent value="images" className="space-y-4 mt-4">
-        {imageSlots.length === 0 ? (
+        {nbImageSlots.length === 0 && imageSlots.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            <p>Diese Seite hat keine Bild-Platzhalter.</p>
-            <p className="text-sm mt-1">Seite neu generieren um Bilder einzufügen.</p>
+            <p>Keine Bild-Platzhalter in dieser Seite.</p>
+            <p className="text-sm mt-1">
+              Aktiviere "Bild-Platzhalter einbauen" beim nächsten Generieren.
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
+            {nbImageSlots.map((s) => (
+              <div key={s.slot} className="border border-border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">
+                    {s.slot} — {s.width}×{s.height}
+                    {s.ratio && <span className="text-muted-foreground ml-1">({s.ratio})</span>}
+                  </span>
+                  <span
+                    className={`text-xs px-2 py-1 rounded ${
+                      s.isPlaceholder
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {s.isPlaceholder ? "Platzhalter" : "Eingebaut"}
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">NanoBanana Prompt:</label>
+                  <div className="flex gap-2">
+                    <code className="flex-1 text-xs bg-secondary p-2 rounded font-mono break-all">
+                      {s.prompt || <em className="text-muted-foreground">— kein Prompt —</em>}
+                    </code>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => copyToClipboard(s.prompt)}
+                      disabled={!s.prompt}
+                      className="whitespace-nowrap"
+                    >
+                      Kopieren
+                    </Button>
+                  </div>
+                </div>
+
+                {s.isPlaceholder && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">
+                      Bild-URL nach Generierung einfügen:
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="https://..."
+                        value={nbImageUrls[s.slot] || ""}
+                        onChange={(e) =>
+                          setNbImageUrls((prev) => ({ ...prev, [s.slot]: e.target.value }))
+                        }
+                        className="flex-1 text-xs h-9"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => handleInsertNbImage(s.slot)}
+                        disabled={!(nbImageUrls[s.slot] || "").trim()}
+                        className="bg-green-600 hover:bg-green-700 text-white whitespace-nowrap"
+                      >
+                        Einbauen
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
             {imageSlots.map((s) => (
-              <Card key={s.slot}>
+              <Card key={`legacy-${s.slot}`}>
                 <CardContent className="pt-4 pb-3">
                   <p className="font-medium text-sm">{s.label || s.slot}</p>
                   <p className="text-xs text-muted-foreground">Slot: {s.slot}</p>

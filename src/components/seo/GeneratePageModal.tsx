@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertCircle } from "lucide-react";
 import { SeoForm, type SeoFormData } from "./SeoForm";
+import { QaGate } from "./QaGate";
 
 type ClusterPageRow = Tables<"cluster_pages">;
 type ClusterRow = Tables<"clusters">;
@@ -99,6 +100,16 @@ export function GeneratePageModal({
   // Deep pages from sibling cluster_pages
   const [deepPagesText, setDeepPagesText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [phase, setPhase] = useState<"form" | "qa">("form");
+  const [pendingForm, setPendingForm] = useState<SeoFormData | null>(null);
+
+  // Reset phase whenever modal reopens
+  useEffect(() => {
+    if (open) {
+      setPhase("form");
+      setPendingForm(null);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

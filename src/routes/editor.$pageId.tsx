@@ -679,6 +679,28 @@ function EditorPage() {
           )}
         </aside>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sektion entfernen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{activeBlock?.label}" wird aus der Seite entfernt. Die Änderung
+              wird erst beim Speichern dauerhaft – ältere Versionen bleiben
+              erhalten.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Entfernen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

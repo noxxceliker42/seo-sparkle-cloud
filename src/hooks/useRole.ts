@@ -31,9 +31,9 @@ export function useRole() {
     role,
     firmId,
     loading,
-    canEdit: ['admin', 'editor'].includes(role ?? ''),
-    canUseAI: ['admin', 'editor'].includes(role ?? ''),
+    canEdit: role === 'admin' || role === 'editor',
+    canUseAI: role === 'admin' || role === 'editor',
     canManageTemplates: role === 'admin',
-    isReadOnly: role === 'viewer'
+    isReadOnly: role === 'viewer' || role === null,
   }
 }

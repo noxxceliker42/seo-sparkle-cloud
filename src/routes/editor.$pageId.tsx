@@ -517,23 +517,25 @@ function EditorPage() {
                 Keine data-section Marker gefunden.
               </p>
             ) : (
-              blocks.map((block) => (
-                <div
-                  key={block.id}
-                  onClick={() => setActiveBlockId(block.id)}
-                  className={cn(
-                    "flex flex-col gap-0.5 px-3 py-2.5 rounded-lg mx-2 my-0.5 cursor-pointer transition-colors text-sm",
-                    activeBlockId === block.id
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "hover:bg-secondary text-foreground",
-                  )}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={blocks.map((b) => b.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <div className="truncate">{block.label}</div>
-                  <div className="text-[10px] font-mono text-muted-foreground truncate">
-                    {block.type}
-                  </div>
-                </div>
-              ))
+                  {blocks.map((block) => (
+                    <SortableBlockItem
+                      key={block.id}
+                      block={block}
+                      isActive={activeBlockId === block.id}
+                      onClick={() => setActiveBlockId(block.id)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             )}
           </div>
         </aside>

@@ -227,7 +227,7 @@ function extractColorsFromHtml(html: string) {
 function EditorPage() {
   const { pageId } = Route.useParams();
   const navigate = useNavigate();
-  const { canEdit, isReadOnly } = useRole();
+  const { canEdit, canUseAI, isReadOnly } = useRole();
 
   const [page, setPage] = useState<PageRow | null>(null);
   const [firm, setFirm] = useState<FirmRow | null>(null);

@@ -251,6 +251,18 @@ function EditorPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [kiPrompt, setKiPrompt] = useState("");
   const [isKiLoading, setIsKiLoading] = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [templateFilter, setTemplateFilter] = useState<string>("all");
+  const [templates, setTemplates] = useState<
+    Array<{
+      id: string;
+      section_type: string;
+      name: string;
+      description: string | null;
+      html: string;
+    }>
+  >([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),

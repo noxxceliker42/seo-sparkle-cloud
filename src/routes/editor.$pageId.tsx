@@ -76,14 +76,68 @@ function injectColorVars(html: string, colors: { primary: string; bg: string; ac
 function parseHtmlToBlocks(html: string): Block[] {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
+
+  // Versuch 1: data-section Attribute
   const sections = doc.querySelectorAll("[data-section]");
-  return Array.from(sections).map((el, i) => ({
-    id: el.getAttribute("data-section-id") || `sec_${i}`,
-    type: el.getAttribute("data-section") || "unknown",
-    label: el.getAttribute("data-section-label") || `Sektion ${i + 1}`,
-    html: el.outerHTML,
-    index: i,
-  }));
+  if (sections.length > 0) {
+    return Array.from(sections).map((el, i) => ({
+      id: el.getAttribute("data-section-id") || `sec_${i}`,
+      type: el.getAttribute("data-section") || "unknown",
+      label: el.getAttribute("data-section-label") || `Sektion ${i + 1}`,
+      html: el.outerHTML,
+      index: i,
+    }));
+  }
+
+  // Fallback: <section> Tags ohne Attribute
+  const fallbackSections = doc.querySelectorAll("section");
+  if (fallbackSections.length > 0) {
+    return Array.from(fallbackSections).map((el, i) => {
+      const heading = el.querySelector("h1,h2,h3");
+      return {
+        id: `sec_${i}`,
+        type: "section",
+        label:
+          heading?.textContent?.trim().slice(0, 40) || `Sektion ${i + 1}`,
+        html: el.outerHTML,
+        index: i,
+      };
+    });
+  }
+
+  // Letzter Fallback: gesamtes <body> als ein Block
+  return [
+    {
+      id: "sec_body",
+      type: "body",
+      label: "Gesamte Seite",
+      html: doc.body.innerHTML,
+      index: 0,
+    },
+  ];
+}
+
+function extractColorsFromHtml(html: string) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const styleEls = doc.querySelectorAll("style");
+  const styleText = Array.from(styleEls)
+    .map((el) => el.textContent || "")
+    .join("\n");
+
+  const extract = (varName: string): string | null => {
+    const re = new RegExp(
+      varName.replace(/[-]/g, "\\-") + "\\s*:\\s*(#[0-9a-fA-F]{3,8})",
+    );
+    const match = styleText.match(re);
+    return match?.[1] || null;
+  };
+
+  return {
+    primary: extract("--c-primary") || "#1d4ed8",
+    secondary: extract("--c-bg") || "#ffffff",
+    accent: extract("--c-accent") || "#dc2626",
+  };
 }
 
 function EditorPage() {

@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   ExternalLink,
   GripVertical,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -226,7 +227,7 @@ function extractColorsFromHtml(html: string) {
 function EditorPage() {
   const { pageId } = Route.useParams();
   const navigate = useNavigate();
-  const { canEdit, isReadOnly } = useRole();
+  const { canEdit, canUseAI, isReadOnly } = useRole();
 
   const [page, setPage] = useState<PageRow | null>(null);
   const [firm, setFirm] = useState<FirmRow | null>(null);
@@ -241,6 +242,8 @@ function EditorPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [kiPrompt, setKiPrompt] = useState("");
+  const [isKiLoading, setIsKiLoading] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -357,6 +360,44 @@ function EditorPage() {
     setIsDirty(true);
     setDeleteDialogOpen(false);
     toast.success("Sektion entfernt", removedLabel ? { description: removedLabel } : undefined);
+  };
+
+  const handleKiEdit = async () => {
+    if (!kiPrompt.trim() || !activeBlockId || !canUseAI) return;
+    const block = blocks.find((b) => b.id === activeBlockId);
+    if (!block) return;
+
+    setIsKiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("edit-block", {
+        body: {
+          blockHtml: block.html,
+          userPrompt: kiPrompt,
+          keyword: page?.keyword || "",
+          firmName: firm?.name || "",
+          branche: firm?.branche || "",
+          designPhilosophy: page?.design_philosophy || "",
+          pageType: page?.page_type || "",
+        },
+      });
+      if (error) throw error;
+      if (!data?.html) throw new Error("Kein HTML zurückgegeben");
+
+      setBlocks((prev) =>
+        prev.map((b) => (b.id === activeBlockId ? { ...b, html: data.html } : b)),
+      );
+      setIsDirty(true);
+      setKiPrompt("");
+      toast.success("Block aktualisiert", {
+        description: "Vorschau wurde aktualisiert. Speichern um zu sichern.",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
+      console.error("KI Edit Error:", err);
+      toast.error("KI-Bearbeitung fehlgeschlagen", { description: msg });
+    } finally {
+      setIsKiLoading(false);
+    }
   };
 
   const handleSave = useCallback(async () => {
@@ -670,11 +711,53 @@ function EditorPage() {
                 </Button>
               </div>
 
-              <div className="border border-dashed border-border rounded-lg p-4 text-center">
-                <p className="text-xs text-muted-foreground">
-                  KI-Editor verfügbar in Phase 2
-                </p>
-              </div>
+              {canUseAI ? (
+                <div className="border border-border rounded-lg p-3 space-y-2 bg-muted/30">
+                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    KI-Editor
+                  </div>
+                  <textarea
+                    value={kiPrompt}
+                    onChange={(e) => setKiPrompt(e.target.value)}
+                    placeholder={`z.B. "Mache den Hero überzeugender"\noder "Füge mehr Social Proof hinzu"`}
+                    rows={3}
+                    disabled={isKiLoading}
+                    className="w-full text-xs p-2 rounded border border-input bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        handleKiEdit();
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    className="w-full gap-2"
+                    onClick={handleKiEdit}
+                    disabled={!kiPrompt.trim() || isKiLoading}
+                  >
+                    {isKiLoading ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Wird bearbeitet...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Block bearbeiten
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    Ctrl+Enter zum Ausführen
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-dashed border-border rounded-lg p-3 text-center text-xs text-muted-foreground">
+                  KI-Editor nur für Admin + Editor
+                </div>
+              )}
             </div>
           )}
         </aside>

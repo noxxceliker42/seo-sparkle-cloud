@@ -664,7 +664,7 @@ function EditorPage() {
                   size="sm"
                   className="w-full text-destructive hover:text-destructive border-destructive/30"
                   disabled={!canEdit}
-                  onClick={handleRemoveBlock}
+                  onClick={() => setDeleteDialogOpen(true)}
                 >
                   <Trash2 className="h-4 w-4" /> Sektion entfernen
                 </Button>

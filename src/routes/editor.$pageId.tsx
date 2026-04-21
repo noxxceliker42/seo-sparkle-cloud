@@ -12,9 +12,37 @@ import {
   Trash2,
   ArrowLeft,
   ExternalLink,
+  GripVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/editor/$pageId")({
   component: EditorPage,
@@ -50,6 +78,61 @@ const COLOR_VAR_RE = {
   bg: /--c-bg\s*:\s*[^;}]+/g,
   accent: /--c-accent\s*:\s*[^;}]+/g,
 };
+
+function SortableBlockItem({
+  block,
+  isActive,
+  onClick,
+}: {
+  block: Block;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: block.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-2 px-2 py-2.5 rounded-lg mx-2 my-0.5 cursor-pointer transition-colors text-sm",
+        isActive
+          ? "bg-primary/10 text-primary font-medium"
+          : "hover:bg-secondary text-foreground",
+      )}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        onClick={(e) => e.stopPropagation()}
+        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
+        aria-label="Sektion verschieben"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+        <div className="truncate">{block.label}</div>
+        <div className="text-[10px] font-mono text-muted-foreground truncate">
+          {block.type}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function injectColorVars(html: string, colors: { primary: string; bg: string; accent: string }) {
   // Replace existing --c-* tokens or inject a style block in <head>
@@ -157,6 +240,24 @@ function EditorPage() {
   const [accentColor, setAccentColor] = useState("#dc2626");
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    setBlocks((prev) => {
+      const oldIndex = prev.findIndex((b) => b.id === active.id);
+      const newIndex = prev.findIndex((b) => b.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+    setIsDirty(true);
+  };
 
   const previewRef = useRef<HTMLIFrameElement | null>(null);
   const originalHtmlRef = useRef<string>("");
@@ -248,12 +349,14 @@ function EditorPage() {
     iframe.contentDocument.documentElement.style.setProperty(varName, value);
   };
 
-  const handleRemoveBlock = () => {
+  const handleConfirmDelete = () => {
     if (!activeBlockId) return;
-    if (!confirm("Sektion wirklich entfernen?")) return;
+    const removedLabel = blocks.find((b) => b.id === activeBlockId)?.label;
     setBlocks((prev) => prev.filter((b) => b.id !== activeBlockId));
     setActiveBlockId(null);
     setIsDirty(true);
+    setDeleteDialogOpen(false);
+    toast.success("Sektion entfernt", removedLabel ? { description: removedLabel } : undefined);
   };
 
   const handleSave = useCallback(async () => {
@@ -414,23 +517,25 @@ function EditorPage() {
                 Keine data-section Marker gefunden.
               </p>
             ) : (
-              blocks.map((block) => (
-                <div
-                  key={block.id}
-                  onClick={() => setActiveBlockId(block.id)}
-                  className={cn(
-                    "flex flex-col gap-0.5 px-3 py-2.5 rounded-lg mx-2 my-0.5 cursor-pointer transition-colors text-sm",
-                    activeBlockId === block.id
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "hover:bg-secondary text-foreground",
-                  )}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={blocks.map((b) => b.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <div className="truncate">{block.label}</div>
-                  <div className="text-[10px] font-mono text-muted-foreground truncate">
-                    {block.type}
-                  </div>
-                </div>
-              ))
+                  {blocks.map((block) => (
+                    <SortableBlockItem
+                      key={block.id}
+                      block={block}
+                      isActive={activeBlockId === block.id}
+                      onClick={() => setActiveBlockId(block.id)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             )}
           </div>
         </aside>
@@ -559,7 +664,7 @@ function EditorPage() {
                   size="sm"
                   className="w-full text-destructive hover:text-destructive border-destructive/30"
                   disabled={!canEdit}
-                  onClick={handleRemoveBlock}
+                  onClick={() => setDeleteDialogOpen(true)}
                 >
                   <Trash2 className="h-4 w-4" /> Sektion entfernen
                 </Button>
@@ -574,6 +679,28 @@ function EditorPage() {
           )}
         </aside>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sektion entfernen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{activeBlock?.label}" wird aus der Seite entfernt. Die Änderung
+              wird erst beim Speichern dauerhaft – ältere Versionen bleiben
+              erhalten.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Entfernen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -349,12 +349,14 @@ function EditorPage() {
     iframe.contentDocument.documentElement.style.setProperty(varName, value);
   };
 
-  const handleRemoveBlock = () => {
+  const handleConfirmDelete = () => {
     if (!activeBlockId) return;
-    if (!confirm("Sektion wirklich entfernen?")) return;
+    const removedLabel = blocks.find((b) => b.id === activeBlockId)?.label;
     setBlocks((prev) => prev.filter((b) => b.id !== activeBlockId));
     setActiveBlockId(null);
     setIsDirty(true);
+    setDeleteDialogOpen(false);
+    toast.success("Sektion entfernt", removedLabel ? { description: removedLabel } : undefined);
   };
 
   const handleSave = useCallback(async () => {

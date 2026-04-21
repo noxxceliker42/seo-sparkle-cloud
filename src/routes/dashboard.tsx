@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, CheckCircle2, Clock, BarChart3, Search, Trash2, ExternalLink, Download, ArrowUpDown, Layers, X, Loader2 } from "lucide-react";
+import { FileText, CheckCircle2, Clock, BarChart3, Search, Trash2, ExternalLink, Download, ArrowUpDown, Layers, X, Loader2, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cancelCurrentJob } from "@/hooks/useGenerationJob";
@@ -397,6 +397,13 @@ function DashboardPage() {
                         </Button>
                       )}
                       <Button variant="ghost" size="icon" onClick={() => setDetailPage(page)} title="Öffnen"><ExternalLink className="h-4 w-4" /></Button>
+                      {page.html_output && (
+                        <Button asChild variant="outline" size="sm" title="Seite bearbeiten">
+                          <Link to="/editor/$pageId" params={{ pageId: page.id }}>
+                            <Pencil className="h-4 w-4" /> Bearbeiten
+                          </Link>
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => exportHtml(page)} title="HTML exportieren"><Download className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(page.id)} title="Löschen"><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>

@@ -289,22 +289,34 @@ function DashboardPage() {
         ))}
       </div>
 
+      {/* Status Tabs */}
+      <div className="flex flex-wrap gap-1 border-b border-border">
+        {[
+          { id: "all", label: "Alle" },
+          { id: "draft", label: "Geplant" },
+          { id: "reviewed", label: "Generiert" },
+          { id: "published", label: "Veröffentlicht" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setStatusFilter(tab.id)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              statusFilter === tab.id
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Keyword suchen…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Alle Status</SelectItem>
-            <SelectItem value="draft">Entwurf</SelectItem>
-            <SelectItem value="reviewed">Geprüft</SelectItem>
-            <SelectItem value="approved">Freigegeben</SelectItem>
-            <SelectItem value="published">Veröffentlicht</SelectItem>
-          </SelectContent>
-        </Select>
         <Select value={intentFilter} onValueChange={setIntentFilter}>
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Intent" /></SelectTrigger>
           <SelectContent>

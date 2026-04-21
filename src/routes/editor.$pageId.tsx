@@ -402,6 +402,12 @@ function EditorPage() {
             <span className="text-sm font-medium">Sektionen</span>
             <Badge variant="secondary">{blocks.length}</Badge>
           </div>
+          {showLegacyBanner && (
+            <div className="mx-2 mt-2 mb-1 p-2 rounded bg-yellow-50 border border-yellow-200 text-xs text-yellow-700">
+              Ältere Seite — Sektionen ohne Marker. Neu generieren für volle
+              Editor-Funktion.
+            </div>
+          )}
           <div className="py-2">
             {blocks.length === 0 ? (
               <p className="text-xs text-muted-foreground px-4 py-6 text-center">

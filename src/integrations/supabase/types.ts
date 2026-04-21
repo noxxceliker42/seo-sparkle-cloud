@@ -866,6 +866,42 @@ export type Database = {
           },
         ]
       }
+      section_templates: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          design_philosophy: string | null
+          firm_id: string | null
+          html: string
+          id: string
+          is_global: boolean | null
+          name: string
+          section_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          design_philosophy?: string | null
+          firm_id?: string | null
+          html: string
+          id?: string
+          is_global?: boolean | null
+          name: string
+          section_type: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          design_philosophy?: string | null
+          firm_id?: string | null
+          html?: string
+          id?: string
+          is_global?: boolean | null
+          name?: string
+          section_type?: string
+        }
+        Relationships: []
+      }
       seo_analyses: {
         Row: {
           city: string | null
@@ -1075,6 +1111,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_my_firm_id: { Args: never; Returns: string }
+      get_my_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

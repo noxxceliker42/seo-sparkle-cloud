@@ -14,9 +14,16 @@ import {
   ExternalLink,
   GripVertical,
   Sparkles,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DndContext,
   closestCenter,
@@ -244,6 +251,18 @@ function EditorPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [kiPrompt, setKiPrompt] = useState("");
   const [isKiLoading, setIsKiLoading] = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [templateFilter, setTemplateFilter] = useState<string>("all");
+  const [templates, setTemplates] = useState<
+    Array<{
+      id: string;
+      section_type: string;
+      name: string;
+      description: string | null;
+      html: string;
+    }>
+  >([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -314,6 +333,44 @@ function EditorPage() {
       setAccentColor(extracted.accent);
     }
   }, [page]);
+
+  // Load section templates (global + firm-scoped via RLS)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setTemplatesLoading(true);
+      const { data, error } = await supabase
+        .from("section_templates")
+        .select("id, section_type, name, description, html")
+        .order("section_type", { ascending: true })
+        .order("name", { ascending: true });
+      if (cancelled) return;
+      if (!error && data) setTemplates(data);
+      setTemplatesLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleInsertTemplate = (tpl: {
+    id: string;
+    section_type: string;
+    name: string;
+    html: string;
+  }) => {
+    const newBlock: Block = {
+      id: `${tpl.section_type}_${Date.now()}`,
+      type: tpl.section_type,
+      label: tpl.name,
+      html: tpl.html,
+      index: blocks.length,
+    };
+    setBlocks((prev) => [...prev, newBlock]);
+    setIsDirty(true);
+    setTemplatePickerOpen(false);
+    toast.success("Sektion eingefügt", { description: tpl.name, duration: 2000 });
+  };
 
   const buildPreviewHtml = useCallback((): string => {
     if (!originalHtmlRef.current) return "";
@@ -546,6 +603,19 @@ function EditorPage() {
             <span className="text-sm font-medium">Sektionen</span>
             <Badge variant="secondary">{blocks.length}</Badge>
           </div>
+          {canEdit && (
+            <div className="px-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-1.5"
+                onClick={() => setTemplatePickerOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Sektion hinzufügen
+              </Button>
+            </div>
+          )}
           {showLegacyBanner && (
             <div className="mx-2 mt-2 mb-1 p-2 rounded bg-yellow-50 border border-yellow-200 text-xs text-yellow-700">
               Ältere Seite — Sektionen ohne Marker. Neu generieren für volle
@@ -784,6 +854,84 @@ function EditorPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Sektion hinzufügen</DialogTitle>
+          </DialogHeader>
+
+          {(() => {
+            const templateTypes = [
+              "all",
+              ...Array.from(new Set(templates.map((t) => t.section_type))),
+            ];
+            const filteredTemplates =
+              templateFilter === "all"
+                ? templates
+                : templates.filter((t) => t.section_type === templateFilter);
+
+            return (
+              <>
+                <div className="flex flex-wrap gap-1.5 border-b border-border pb-3">
+                  {templateTypes.map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setTemplateFilter(type)}
+                      className={cn(
+                        "px-3 py-1 rounded text-xs transition-colors font-medium",
+                        templateFilter === type
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-secondary text-muted-foreground",
+                      )}
+                    >
+                      {type === "all" ? "Alle" : type}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex-1 overflow-y-auto pt-2">
+                  {templatesLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : filteredTemplates.length === 0 ? (
+                    <p className="text-center text-sm text-muted-foreground py-12">
+                      {templates.length === 0
+                        ? "Noch keine Templates angelegt."
+                        : "Keine Templates für diesen Typ"}
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {filteredTemplates.map((tpl) => (
+                        <button
+                          key={tpl.id}
+                          onClick={() => handleInsertTemplate(tpl)}
+                          className="text-left p-4 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-all space-y-1.5 group"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-sm font-medium group-hover:text-primary">
+                              {tpl.name}
+                            </span>
+                            <Badge variant="secondary" className="text-[10px] shrink-0">
+                              {tpl.section_type}
+                            </Badge>
+                          </div>
+                          {tpl.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {tpl.description}
+                            </p>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

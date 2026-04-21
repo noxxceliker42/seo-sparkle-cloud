@@ -289,22 +289,34 @@ function DashboardPage() {
         ))}
       </div>
 
+      {/* Status Tabs */}
+      <div className="flex flex-wrap gap-1 border-b border-border">
+        {[
+          { id: "all", label: "Alle" },
+          { id: "draft", label: "Geplant" },
+          { id: "reviewed", label: "Generiert" },
+          { id: "published", label: "Veröffentlicht" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setStatusFilter(tab.id)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              statusFilter === tab.id
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Keyword suchen…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Alle Status</SelectItem>
-            <SelectItem value="draft">Entwurf</SelectItem>
-            <SelectItem value="reviewed">Geprüft</SelectItem>
-            <SelectItem value="approved">Freigegeben</SelectItem>
-            <SelectItem value="published">Veröffentlicht</SelectItem>
-          </SelectContent>
-        </Select>
         <Select value={intentFilter} onValueChange={setIntentFilter}>
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Intent" /></SelectTrigger>
           <SelectContent>
@@ -343,12 +355,11 @@ function DashboardPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Keyword</TableHead>
-                <TableHead>Firma</TableHead>
-                <TableHead>Intent</TableHead>
                 <TableHead>Typ</TableHead>
                 <TableHead>Cluster</TableHead>
-                <TableHead>QA-Score</TableHead>
+                <TableHead>Firma</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>QA</TableHead>
                 <TableHead>Datum</TableHead>
                 <TableHead className="text-right">Aktionen</TableHead>
               </TableRow>
@@ -356,29 +367,35 @@ function DashboardPage() {
             <TableBody>
               {filtered.map((page) => (
                 <TableRow key={page.id} className="cursor-pointer" onClick={() => setDetailPage(page)}>
-                  <TableCell className="font-medium">{page.keyword}</TableCell>
-                  <TableCell>{page.firm_name || page.firm || "–"}</TableCell>
-                  <TableCell><Badge variant="outline">{page.intent || "–"}</Badge></TableCell>
-                  <TableCell className="text-sm">{page.page_type || "–"}</TableCell>
+                  <TableCell className="font-medium">
+                    {page.keyword}
+                    {page.intent && (
+                      <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0">{page.intent}</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">{page.page_type || "–"}</span>
+                      {page.cluster_info?.pillar_tier && TIER_CONFIG[page.cluster_info.pillar_tier] && (
+                        <Badge className={`text-[10px] px-1 py-0 ${TIER_CONFIG[page.cluster_info.pillar_tier].className}`}>
+                          {TIER_CONFIG[page.cluster_info.pillar_tier].label}
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {page.cluster_info ? (
-                      <div className="flex items-center gap-1.5">
-                        <Link to="/cluster/$id" params={{ id: page.cluster_info.cluster_id }} className="text-sm text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
-                          {page.cluster_info.cluster_name}
-                        </Link>
-                        {page.cluster_info.pillar_tier && TIER_CONFIG[page.cluster_info.pillar_tier] && (
-                          <Badge className={`text-[10px] px-1 py-0 ${TIER_CONFIG[page.cluster_info.pillar_tier].className}`}>
-                            {TIER_CONFIG[page.cluster_info.pillar_tier].label}
-                          </Badge>
-                        )}
-                      </div>
-                    ) : "–"}
+                      <Link to="/cluster/$id" params={{ id: page.cluster_info.cluster_id }} className="text-sm text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {page.cluster_info.cluster_name}
+                      </Link>
+                    ) : "—"}
+                  </TableCell>
+                  <TableCell className="text-sm">{page.firm_name || page.firm || "—"}</TableCell>
+                  <TableCell>
+                    <Badge className={STATUS_COLORS[page.status || "draft"]}>{STATUS_LABELS[page.status || "draft"]}</Badge>
                   </TableCell>
                   <TableCell>
                     <span className={`font-semibold ${scoreColor(page.qa_score || 0)}`}>{page.qa_score || 0}%</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={STATUS_COLORS[page.status || "draft"]}>{STATUS_LABELS[page.status || "draft"]}</Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDateTime(page.created_at)}</TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>

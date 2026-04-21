@@ -854,6 +854,84 @@ function EditorPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Sektion hinzufügen</DialogTitle>
+          </DialogHeader>
+
+          {(() => {
+            const templateTypes = [
+              "all",
+              ...Array.from(new Set(templates.map((t) => t.section_type))),
+            ];
+            const filteredTemplates =
+              templateFilter === "all"
+                ? templates
+                : templates.filter((t) => t.section_type === templateFilter);
+
+            return (
+              <>
+                <div className="flex flex-wrap gap-1.5 border-b border-border pb-3">
+                  {templateTypes.map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setTemplateFilter(type)}
+                      className={cn(
+                        "px-3 py-1 rounded text-xs transition-colors font-medium",
+                        templateFilter === type
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-secondary text-muted-foreground",
+                      )}
+                    >
+                      {type === "all" ? "Alle" : type}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex-1 overflow-y-auto pt-2">
+                  {templatesLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : filteredTemplates.length === 0 ? (
+                    <p className="text-center text-sm text-muted-foreground py-12">
+                      {templates.length === 0
+                        ? "Noch keine Templates angelegt."
+                        : "Keine Templates für diesen Typ"}
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {filteredTemplates.map((tpl) => (
+                        <button
+                          key={tpl.id}
+                          onClick={() => handleInsertTemplate(tpl)}
+                          className="text-left p-4 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-all space-y-1.5 group"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-sm font-medium group-hover:text-primary">
+                              {tpl.name}
+                            </span>
+                            <Badge variant="secondary" className="text-[10px] shrink-0">
+                              {tpl.section_type}
+                            </Badge>
+                          </div>
+                          {tpl.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {tpl.description}
+                            </p>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

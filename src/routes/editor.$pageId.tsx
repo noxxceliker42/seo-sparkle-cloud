@@ -346,7 +346,15 @@ function EditorPage() {
         .order("section_type", { ascending: true })
         .order("name", { ascending: true });
       if (cancelled) return;
-      if (!error && data) setTemplates(data);
+      if (error) {
+        console.error('Templates Error:', error);
+      }
+      if (data) {
+        if (data.length === 0) {
+          console.warn('[Editor] section_templates leer — RLS/Daten prüfen');
+        }
+        setTemplates(data);
+      }
       setTemplatesLoading(false);
     })();
     return () => {
@@ -782,7 +790,12 @@ function EditorPage() {
                 </Button>
               </div>
 
-              {canUseAI ? (
+              {roleLoading ? (
+                <div className="border border-dashed border-border rounded-lg p-3 text-center text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin mx-auto mb-1" />
+                  Lade Berechtigungen...
+                </div>
+              ) : canUseAI ? (
                 <div className="border border-border rounded-lg p-3 space-y-2 bg-muted/30">
                   <div className="flex items-center gap-1.5 text-xs font-medium">
                     <Sparkles className="h-3.5 w-3.5 text-primary" />

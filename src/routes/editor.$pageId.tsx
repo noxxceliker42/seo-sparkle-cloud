@@ -334,6 +334,44 @@ function EditorPage() {
     }
   }, [page]);
 
+  // Load section templates (global + firm-scoped via RLS)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setTemplatesLoading(true);
+      const { data, error } = await supabase
+        .from("section_templates")
+        .select("id, section_type, name, description, html")
+        .order("section_type", { ascending: true })
+        .order("name", { ascending: true });
+      if (cancelled) return;
+      if (!error && data) setTemplates(data);
+      setTemplatesLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleInsertTemplate = (tpl: {
+    id: string;
+    section_type: string;
+    name: string;
+    html: string;
+  }) => {
+    const newBlock: Block = {
+      id: `${tpl.section_type}_${Date.now()}`,
+      type: tpl.section_type,
+      label: tpl.name,
+      html: tpl.html,
+      index: blocks.length,
+    };
+    setBlocks((prev) => [...prev, newBlock]);
+    setIsDirty(true);
+    setTemplatePickerOpen(false);
+    toast.success("Sektion eingefügt", { description: tpl.name, duration: 2000 });
+  };
+
   const buildPreviewHtml = useCallback((): string => {
     if (!originalHtmlRef.current) return "";
     const parser = new DOMParser();

@@ -344,6 +344,10 @@ function EditorPage() {
   }
 
   const activeBlock = blocks.find((b) => b.id === activeBlockId) || null;
+  const hasDataSections = blocks.some(
+    (b) => b.type !== "section" && b.type !== "body",
+  );
+  const showLegacyBanner = blocks.length > 0 && !hasDataSections;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">

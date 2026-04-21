@@ -711,11 +711,53 @@ function EditorPage() {
                 </Button>
               </div>
 
-              <div className="border border-dashed border-border rounded-lg p-4 text-center">
-                <p className="text-xs text-muted-foreground">
-                  KI-Editor verfügbar in Phase 2
-                </p>
-              </div>
+              {canUseAI ? (
+                <div className="border border-border rounded-lg p-3 space-y-2 bg-muted/30">
+                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    KI-Editor
+                  </div>
+                  <textarea
+                    value={kiPrompt}
+                    onChange={(e) => setKiPrompt(e.target.value)}
+                    placeholder={`z.B. "Mache den Hero überzeugender"\noder "Füge mehr Social Proof hinzu"`}
+                    rows={3}
+                    disabled={isKiLoading}
+                    className="w-full text-xs p-2 rounded border border-input bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        handleKiEdit();
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    className="w-full gap-2"
+                    onClick={handleKiEdit}
+                    disabled={!kiPrompt.trim() || isKiLoading}
+                  >
+                    {isKiLoading ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Wird bearbeitet...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Block bearbeiten
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    Ctrl+Enter zum Ausführen
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-dashed border-border rounded-lg p-3 text-center text-xs text-muted-foreground">
+                  KI-Editor nur für Admin + Editor
+                </div>
+              )}
             </div>
           )}
         </aside>

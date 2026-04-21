@@ -603,7 +603,19 @@ function EditorPage() {
             <span className="text-sm font-medium">Sektionen</span>
             <Badge variant="secondary">{blocks.length}</Badge>
           </div>
-          {showLegacyBanner && (
+          {canEdit && (
+            <div className="px-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-1.5"
+                onClick={() => setTemplatePickerOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Sektion hinzufügen
+              </Button>
+            </div>
+          )}
             <div className="mx-2 mt-2 mb-1 p-2 rounded bg-yellow-50 border border-yellow-200 text-xs text-yellow-700">
               Ältere Seite — Sektionen ohne Marker. Neu generieren für volle
               Editor-Funktion.

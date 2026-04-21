@@ -616,6 +616,7 @@ function EditorPage() {
               </Button>
             </div>
           )}
+          {showLegacyBanner && (
             <div className="mx-2 mt-2 mb-1 p-2 rounded bg-yellow-50 border border-yellow-200 text-xs text-yellow-700">
               Ältere Seite — Sektionen ohne Marker. Neu generieren für volle
               Editor-Funktion.

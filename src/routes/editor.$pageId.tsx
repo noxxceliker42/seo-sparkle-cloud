@@ -199,11 +199,15 @@ function EditorPage() {
     };
   }, [pageId]);
 
-  // Parse blocks once page is loaded
+  // Parse blocks once page is loaded + extract colors directly from HTML
   useEffect(() => {
     if (page?.html_output) {
       originalHtmlRef.current = page.html_output;
       setBlocks(parseHtmlToBlocks(page.html_output));
+      const extracted = extractColorsFromHtml(page.html_output);
+      setPrimaryColor(extracted.primary);
+      setSecondaryColor(extracted.secondary);
+      setAccentColor(extracted.accent);
     }
   }, [page]);
 

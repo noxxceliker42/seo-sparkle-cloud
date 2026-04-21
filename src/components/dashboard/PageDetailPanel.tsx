@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   CheckCircle2, XCircle, AlertTriangle, Download, ExternalLink,
-  RefreshCw, Save, Clock, Calendar, Zap, Timer,
+  RefreshCw, Save, Clock, Calendar, Pencil, Eye, Copy,
 } from "lucide-react";
 
 /* ────────── Types ────────── */
@@ -94,71 +95,42 @@ function scoreRingColor(s: number) {
   return "stroke-destructive";
 }
 
+function copyText(text: string) {
+  navigator.clipboard.writeText(text).then(
+    () => toast.success("In Zwischenablage kopiert"),
+    () => toast.error("Kopieren fehlgeschlagen")
+  );
+}
+
 /* ────────── Component ────────── */
 
-export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }: Props) {
+export default function PageDetailPanel({ page: initialPage, onUpdate, onClose: _onClose }: Props) {
+  const navigate = useNavigate();
   const [page, setPage] = useState<SeoPage>(initialPage);
   const [activeTab, setActiveTab] = useState("overview");
 
   // Meta state
   const [metaTitle, setMetaTitle] = useState(page.meta_title || "");
   const [metaDesc, setMetaDesc] = useState(page.meta_desc || "");
-  const [metaKw, setMetaKw] = useState(page.meta_keywords || "");
-
-  // HTML state
-  const [htmlCode, setHtmlCode] = useState(page.html_output || "");
-  const [htmlSubTab, setHtmlSubTab] = useState<"preview" | "code">("preview");
-
-  // JSON-LD state
-  const [jsonLd, setJsonLd] = useState(page.json_ld || "");
-  const [jsonValid, setJsonValid] = useState<boolean | null>(null);
+  const [canonicalUrl, setCanonicalUrl] = useState(page.published_url || "");
+  const [robots, setRobots] = useState<"index" | "noindex">("index");
 
   // URL state
   const [publishedUrl, setPublishedUrl] = useState(page.published_url || "");
   const [sitemapAdded, setSitemapAdded] = useState(page.sitemap_added || false);
 
-  // Cluster siblings for Links tab
-  const [siblings, setSiblings] = useState<{ id: string; keyword: string; url_slug: string; linked: boolean }[]>([]);
-  const [internalLinksSet, setInternalLinksSet] = useState(false);
-
   useEffect(() => {
     setPage(initialPage);
     setMetaTitle(initialPage.meta_title || "");
     setMetaDesc(initialPage.meta_desc || "");
-    setMetaKw(initialPage.meta_keywords || "");
-    setHtmlCode(initialPage.html_output || "");
-    setJsonLd(initialPage.json_ld || "");
+    setCanonicalUrl(initialPage.published_url || "");
     setPublishedUrl(initialPage.published_url || "");
     setSitemapAdded(initialPage.sitemap_added || false);
+    // Detect robots from HTML
+    const html = initialPage.html_output || "";
+    const m = html.match(/<meta\s+name="robots"\s+content="([^"]+)"/i);
+    setRobots(m && /noindex/i.test(m[1]) ? "noindex" : "index");
   }, [initialPage]);
-
-  // Validate JSON-LD on change
-  useEffect(() => {
-    if (!jsonLd.trim()) { setJsonValid(null); return; }
-    try { JSON.parse(jsonLd); setJsonValid(true); } catch { setJsonValid(false); }
-  }, [jsonLd]);
-
-  // Load siblings for Links tab
-  useEffect(() => {
-    if (!page.cluster_info) return;
-    (async () => {
-      const { data } = await supabase
-        .from("cluster_pages")
-        .select("id, keyword, url_slug, internal_links_set")
-        .eq("cluster_id", page.cluster_info!.cluster_id)
-        .neq("seo_page_id", page.id);
-      if (data) {
-        setSiblings(data.map((d) => ({ id: d.id, keyword: d.keyword, url_slug: d.url_slug, linked: false })));
-      }
-      // Check if current page has links set
-      const { data: cp } = await supabase
-        .from("cluster_pages")
-        .select("internal_links_set")
-        .eq("seo_page_id", page.id)
-        .maybeSingle();
-      setInternalLinksSet(cp?.internal_links_set || false);
-    })();
-  }, [page.cluster_info, page.id]);
 
   const updatePage = useCallback(async (fields: Partial<SeoPage>) => {
     const { error } = await supabase.from("seo_pages").update(fields as any).eq("id", page.id);
@@ -176,39 +148,13 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
 
   /* ── Meta save ── */
   const saveMeta = async () => {
-    await updatePage({ meta_title: metaTitle, meta_desc: metaDesc, meta_keywords: metaKw, status_changed_at: new Date().toISOString() });
-    toast.success("Meta gespeichert");
-  };
-
-  /* ── HTML save ── */
-  const saveHtml = async () => {
-    // Save version first
-    const { data: lastVersion } = await supabase
-      .from("page_versions")
-      .select("version_number")
-      .eq("seo_page_id", page.id)
-      .order("version_number", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const nextVersion = (lastVersion?.version_number || 0) + 1;
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("page_versions").insert({
-      seo_page_id: page.id,
-      user_id: user?.id,
-      html_output: htmlCode,
+    await updatePage({
       meta_title: metaTitle,
       meta_desc: metaDesc,
-      version_number: nextVersion,
+      published_url: canonicalUrl,
+      status_changed_at: new Date().toISOString(),
     });
-    await updatePage({ html_output: htmlCode });
-    toast.success(`HTML gespeichert (Version ${nextVersion})`);
-  };
-
-  /* ── JSON-LD save ── */
-  const saveJsonLd = async () => {
-    if (jsonValid === false) { toast.error("JSON ist ungültig"); return; }
-    await updatePage({ json_ld: jsonLd });
-    toast.success("Schema-Markup gespeichert");
+    toast.success("Meta gespeichert");
   };
 
   /* ── URL save ── */
@@ -225,13 +171,6 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
     toast.success("Als Pillar-Seite gesetzt");
   };
 
-  /* ── Links set ── */
-  const markLinksSet = async () => {
-    await supabase.from("cluster_pages").update({ internal_links_set: true }).eq("seo_page_id", page.id);
-    setInternalLinksSet(true);
-    toast.success("Interne Links als gesetzt markiert");
-  };
-
   /* ── Export ── */
   const exportHtml = () => {
     const html = page.html_output;
@@ -245,41 +184,34 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
     URL.revokeObjectURL(url);
   };
 
-  /* ── QA Checks ── */
-  const qaChecks = useMemo(() => {
-    const html = page.html_output || "";
-    const checks = [
-      { label: "HTML vollständig", ok: html.includes("</html>"), points: 25, warn: false },
-      { label: "Meta-Title (10–60 Z.)", ok: metaTitle.length >= 10 && metaTitle.length <= 60, points: 20, warn: metaTitle.length > 60 },
-      { label: "Meta-Description (50–155 Z.)", ok: metaDesc.length >= 50 && metaDesc.length <= 155, points: 15, warn: metaDesc.length > 155 },
-      { label: "JSON-LD Schema", ok: !!page.json_ld && jsonValid !== false, points: 20, warn: false },
-      { label: "FAQ-Sektion", ok: /faq/i.test(html), points: 10, warn: false },
-      { label: "Autor-Box", ok: /auto(r|hor)/i.test(html), points: 10, warn: false },
-      { label: "Interne Links gesetzt", ok: internalLinksSet, points: 0, warn: false },
-    ];
-    const score = checks.reduce((s, c) => s + (c.ok ? c.points : 0), 0);
-    return { checks, score };
-  }, [page.html_output, metaTitle, metaDesc, page.json_ld, jsonValid, internalLinksSet]);
-
-  const saveQaScore = async () => {
-    await updatePage({ qa_score: qaChecks.score });
-    toast.success(`QA-Score ${qaChecks.score}% gespeichert`);
+  const openInEditor = () => {
+    navigate({ to: "/editor/$pageId", params: { pageId: page.id } });
   };
 
-  /* ── Image slots from HTML ── */
-  const imageSlots = useMemo(() => {
+  const openPreview = () => {
+    window.open(`/preview/${page.id}`, "_blank", "noopener,noreferrer");
+  };
+
+  /* ── JSON-LD blocks extracted from html_output ── */
+  const jsonLdBlocks = useMemo(() => {
     const html = page.html_output || "";
-    const regex = /data-slot="([^"]+)"[^>]*data-label="([^"]*)"/g;
-    const slots: { slot: string; label: string }[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = regex.exec(html))) slots.push({ slot: m[1], label: m[2] });
-    return slots;
+    const matches = html.match(/<script\s+type="application\/ld\+json"[^>]*>[\s\S]*?<\/script>/gi) || [];
+    return matches.map((block, idx) => {
+      const inner = block.replace(/<script[^>]*>/i, "").replace(/<\/script>/i, "").trim();
+      let pretty = inner;
+      let valid = true;
+      try {
+        pretty = JSON.stringify(JSON.parse(inner), null, 2);
+      } catch {
+        valid = false;
+      }
+      return { id: idx, pretty, valid, raw: inner };
+    });
   }, [page.html_output]);
 
-  /* ── NanoBanana placeholder slots from HTML ── */
+  /* ── Image slots from HTML (NanoBanana placeholders) ── */
   const nbImageSlots = useMemo(() => {
     const html = page.html_output || "";
-    // Match each <img ... data-nb-slot="..."> tag, then extract attributes
     const tagRegex = /<img\b[^>]*data-nb-slot=[^>]*>/gi;
     const tags = html.match(tagRegex) || [];
     const attr = (tag: string, name: string) => {
@@ -301,20 +233,10 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
 
   const [nbImageUrls, setNbImageUrls] = useState<Record<string, string>>({});
 
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success("In Zwischenablage kopiert");
-    } catch {
-      toast.error("Kopieren fehlgeschlagen");
-    }
-  };
-
   const handleInsertNbImage = async (slot: string) => {
     const url = (nbImageUrls[slot] || "").trim();
     if (!url) return;
     const html = page.html_output || "";
-    // Replace src of the <img> with matching data-nb-slot
     const tagRegex = new RegExp(
       `(<img\\b[^>]*\\bdata-nb-slot="${slot.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}"[^>]*>)`,
       "i"
@@ -334,6 +256,67 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
     toast.success("Bild erfolgreich eingebaut ✓");
   };
 
+  /* ── Links extracted from HTML ── */
+  const linkData = useMemo(() => {
+    const html = page.html_output || "";
+    const linkRegex = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+    const internal: { href: string; text: string }[] = [];
+    const external: { href: string; text: string; rel: string }[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = linkRegex.exec(html))) {
+      const attrs = m[1];
+      const text = m[2].replace(/<[^>]+>/g, "").trim().slice(0, 100);
+      const hrefMatch = attrs.match(/href="([^"]+)"/i);
+      if (!hrefMatch) continue;
+      const href = hrefMatch[1];
+      if (href.startsWith("/") || href.startsWith("#")) {
+        internal.push({ href, text: text || "(kein Text)" });
+      } else if (/^https?:\/\//i.test(href)) {
+        const relMatch = attrs.match(/rel="([^"]+)"/i);
+        external.push({ href, text: text || "(kein Text)", rel: relMatch?.[1] || "" });
+      }
+    }
+    return { internal, external };
+  }, [page.html_output]);
+
+  /* ── QA Checks (Tech / Content / LP) ── */
+  const qaResult = useMemo(() => {
+    const html = page.html_output || "";
+    const isLp = (page.page_type || "").toLowerCase().startsWith("lp") ||
+                 (page.page_type || "").toLowerCase().includes("landing");
+
+    const tech = [
+      { label: "H1 vorhanden", ok: /<h1\b/i.test(html) },
+      { label: "Meta-Title (50–60 Zeichen)", ok: metaTitle.length >= 50 && metaTitle.length <= 60 },
+      { label: "JSON-LD vorhanden", ok: jsonLdBlocks.length > 0 && jsonLdBlocks.every((b) => b.valid) },
+      { label: "data-section Attribute", ok: /data-section=/i.test(html) },
+      { label: "Mobile viewport Meta-Tag", ok: /<meta\s+name="viewport"/i.test(html) },
+      { label: "Telefon als tel:-Link", ok: /href="tel:/i.test(html) },
+    ];
+    const content = [
+      { label: "Mindest-Wortanzahl (>800)", ok: html.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length > 800 },
+      { label: "FAQ-Sektion vorhanden", ok: /faq/i.test(html) },
+      { label: "Interne Links (min. 1)", ok: linkData.internal.length >= 1 },
+    ];
+    const lp = isLp ? [
+      { label: "Social Proof Widget", ok: /social[-_]?proof|testimonial|bewertung|review/i.test(html) },
+      { label: "CTA-Button vorhanden", ok: /<(a|button)[^>]*\b(class|id)="[^"]*\b(cta|btn-primary|primary-btn)\b/i.test(html) || /jetzt\s+(anrufen|buchen|kontakt|termin)/i.test(html) },
+      { label: "Formular vorhanden", ok: /<form\b/i.test(html) },
+    ] : [];
+
+    const allChecks = [...tech, ...content, ...lp];
+    const score = Math.round((allChecks.filter((c) => c.ok).length / allChecks.length) * 100);
+    return { tech, content, lp, isLp, score };
+  }, [page.html_output, page.page_type, metaTitle, jsonLdBlocks, linkData.internal.length]);
+
+  // Persist QA score automatically when it changes
+  useEffect(() => {
+    if (qaResult.score !== (page.qa_score || 0)) {
+      supabase.from("seo_pages").update({ qa_score: qaResult.score }).eq("id", page.id).then(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qaResult.score]);
+
   /* ── Score ring SVG ── */
   const ScoreRing = ({ score }: { score: number }) => {
     const r = 36, c = 2 * Math.PI * r, offset = c - (score / 100) * c;
@@ -347,6 +330,13 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
       </div>
     );
   };
+
+  const CheckRow = ({ label, ok }: { label: string; ok: boolean }) => (
+    <div className="flex items-center gap-2 text-sm">
+      {ok ? <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" /> : <XCircle className="h-4 w-4 text-destructive shrink-0" />}
+      <span className={ok ? "" : "text-muted-foreground"}>{label}</span>
+    </div>
+  );
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -365,6 +355,7 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
         <h2 className="text-xl font-bold">{page.keyword}</h2>
         <div className="flex flex-wrap gap-2 items-center">
           {page.firm_name && <Badge variant="outline">{page.firm_name}</Badge>}
+          {page.page_type && <Badge variant="secondary">{page.page_type}</Badge>}
           {page.cluster_info && (
             <div className="flex items-center gap-1">
               <Link to="/cluster/$id" params={{ id: page.cluster_info.cluster_id }} className="text-sm text-primary hover:underline">
@@ -376,6 +367,21 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
                 </Badge>
               )}
             </div>
+          )}
+          <Badge className={STATUS_COLORS[page.status || "draft"]}>{STATUS_LABELS[page.status || "draft"]}</Badge>
+        </div>
+
+        {/* Quick actions */}
+        <div className="flex flex-wrap gap-2">
+          {page.html_output && (
+            <Button onClick={openInEditor} className="gap-2">
+              <Pencil className="h-4 w-4" /> Im Editor öffnen
+            </Button>
+          )}
+          {page.html_output && (
+            <Button variant="outline" onClick={openPreview} className="gap-2">
+              <Eye className="h-4 w-4" /> Vorschau öffnen
+            </Button>
           )}
         </div>
 
@@ -392,12 +398,10 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
         </div>
 
         {/* Info grid */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2">
           {[
-            { label: "Tokens", value: "–", icon: Zap },
-            { label: "Dauer", value: "–", icon: Timer },
-            { label: "Erstellt", value: formatDT(page.created_at), icon: Calendar },
-            { label: "Geändert", value: formatDT(page.updated_at), icon: Clock },
+            { label: "Erstellt am", value: formatDT(page.created_at), icon: Calendar },
+            { label: "Zuletzt geändert", value: formatDT(page.updated_at), icon: Clock },
           ].map((c) => (
             <Card key={c.label}>
               <CardContent className="pt-4 pb-3 flex items-center gap-3">
@@ -424,7 +428,6 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
           </div>
         </div>
 
-        {/* Action buttons */}
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" asChild>
             <Link to="/">
@@ -443,11 +446,10 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
           <Label>Meta-Title</Label>
           <Input value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} />
           <p className={`text-xs ${metaTitle.length > 60 ? "text-destructive" : "text-muted-foreground"}`}>{metaTitle.length}/60</p>
-          {/* SERP Preview */}
           <div className="border border-border rounded-lg p-3 bg-card">
             <p className="text-xs text-muted-foreground mb-1">Google SERP Preview</p>
             <p className="text-[#1a0dab] text-base truncate">{metaTitle || "Kein Titel"}</p>
-            <p className="text-[#006621] text-sm truncate">{publishedUrl || "https://example.com/seite"}</p>
+            <p className="text-[#006621] text-sm truncate">{canonicalUrl || publishedUrl || "https://example.com/seite"}</p>
             <p className="text-sm text-[#545454] line-clamp-2">{metaDesc || "Keine Beschreibung"}</p>
           </div>
         </div>
@@ -457,62 +459,83 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
           <p className={`text-xs ${metaDesc.length > 155 ? "text-destructive" : "text-muted-foreground"}`}>{metaDesc.length}/155</p>
         </div>
         <div className="space-y-2">
-          <Label>Meta-Keywords (kommasepariert)</Label>
-          <Input value={metaKw} onChange={(e) => setMetaKw(e.target.value)} />
+          <Label>Canonical URL</Label>
+          <Input value={canonicalUrl} onChange={(e) => setCanonicalUrl(e.target.value)} placeholder="https://example.com/seite" />
+        </div>
+        <div className="space-y-2">
+          <Label>Robots</Label>
+          <Select value={robots} onValueChange={(v) => setRobots(v as "index" | "noindex")}>
+            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="index">index, follow</SelectItem>
+              <SelectItem value="noindex">noindex, nofollow</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Hinweis: Wird als Information gespeichert. HTML-Anpassung erfolgt beim nächsten Generieren oder manuell im Editor.
+          </p>
         </div>
         <Button onClick={saveMeta}><Save className="h-4 w-4 mr-1" /> Speichern</Button>
       </TabsContent>
 
       {/* ═══ TAB 3: HTML ═══ */}
       <TabsContent value="html" className="space-y-4 mt-4">
-        <div className="flex gap-2">
-          <Button size="sm" variant={htmlSubTab === "preview" ? "default" : "outline"} onClick={() => setHtmlSubTab("preview")}>Vorschau</Button>
-          <Button size="sm" variant={htmlSubTab === "code" ? "default" : "outline"} onClick={() => setHtmlSubTab("code")}>Code</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => copyText(page.html_output || "")} disabled={!page.html_output} className="gap-1">
+            <Copy className="h-4 w-4" /> Kopieren
+          </Button>
+          {page.html_output && (
+            <Button size="sm" variant="default" onClick={openInEditor} className="gap-1">
+              <Pencil className="h-4 w-4" /> Im Editor öffnen
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={exportHtml} disabled={!page.html_output} className="gap-1">
+            <Download className="h-4 w-4" /> HTML exportieren
+          </Button>
         </div>
-
-        {htmlSubTab === "preview" ? (
-          <div className="border border-border rounded-lg overflow-hidden">
-            <iframe srcDoc={page.html_output || ""} className="w-full h-[400px]" sandbox="allow-same-origin" title="Preview" />
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm text-amber-800 dark:text-amber-200">
-              <AlertTriangle className="inline h-4 w-4 mr-1" />
-              Direkte HTML-Bearbeitung überschreibt generierte Inhalte. Version wird gespeichert.
-            </div>
-            <Textarea value={htmlCode} onChange={(e) => setHtmlCode(e.target.value)} className="font-mono text-xs min-h-[400px]" />
-            <div className="flex gap-2">
-              <Button onClick={saveHtml}><Save className="h-4 w-4 mr-1" /> HTML speichern</Button>
-              <Button variant="outline" onClick={exportHtml}><Download className="h-4 w-4 mr-1" /> HTML exportieren</Button>
-            </div>
-          </div>
-        )}
+        <pre className="font-mono text-xs bg-secondary/50 border border-border rounded-lg p-3 max-h-[500px] overflow-auto whitespace-pre-wrap break-all">
+          {page.html_output || <em className="text-muted-foreground">Kein HTML vorhanden.</em>}
+        </pre>
       </TabsContent>
 
       {/* ═══ TAB 4: JSON-LD ═══ */}
       <TabsContent value="jsonld" className="space-y-4 mt-4">
-        <div className="flex items-center gap-2">
-          <Label>JSON-LD Schema</Label>
-          {jsonValid === true && <CheckCircle2 className="h-4 w-4 text-green-500" />}
-          {jsonValid === false && <XCircle className="h-4 w-4 text-destructive" />}
-        </div>
-        <Textarea value={jsonLd} onChange={(e) => setJsonLd(e.target.value)} className="font-mono text-xs min-h-[300px]" />
-        <div className="flex gap-2 items-center">
-          <Button onClick={saveJsonLd} disabled={jsonValid === false}><Save className="h-4 w-4 mr-1" /> JSON-LD speichern</Button>
-          <a href="https://search.google.com/test/rich-results" target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-            Im Rich Results Test prüfen <ExternalLink className="h-3 w-3" />
-          </a>
-        </div>
+        {jsonLdBlocks.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Keine JSON-LD Script-Tags im HTML gefunden.</p>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">{jsonLdBlocks.length} Schema{jsonLdBlocks.length !== 1 ? "s" : ""}</Badge>
+              <a href="https://search.google.com/test/rich-results" target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1 ml-auto">
+                Im Rich Results Test prüfen <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+            {jsonLdBlocks.map((block) => (
+              <div key={block.id} className="border border-border rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    {block.valid
+                      ? <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      : <XCircle className="h-4 w-4 text-destructive" />}
+                    <span className="text-xs font-medium">Schema #{block.id + 1}</span>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => copyText(block.pretty)} className="h-7 gap-1">
+                    <Copy className="h-3 w-3" /> Kopieren
+                  </Button>
+                </div>
+                <pre className="font-mono text-xs p-3 overflow-auto max-h-[300px] whitespace-pre-wrap">{block.pretty}</pre>
+              </div>
+            ))}
+          </>
+        )}
       </TabsContent>
 
       {/* ═══ TAB 5: Bilder ═══ */}
       <TabsContent value="images" className="space-y-4 mt-4">
-        {nbImageSlots.length === 0 && imageSlots.length === 0 ? (
+        {nbImageSlots.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <p>Keine Bild-Platzhalter in dieser Seite.</p>
-            <p className="text-sm mt-1">
-              Aktiviere "Bild-Platzhalter einbauen" beim nächsten Generieren.
-            </p>
+            <p className="text-sm mt-1">Aktiviere "Bild-Platzhalter einbauen" beim nächsten Generieren.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -523,14 +546,8 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
                     {s.slot} — {s.width}×{s.height}
                     {s.ratio && <span className="text-muted-foreground ml-1">({s.ratio})</span>}
                   </span>
-                  <span
-                    className={`text-xs px-2 py-1 rounded ${
-                      s.isPlaceholder
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-green-100 text-green-700"
-                    }`}
-                  >
-                    {s.isPlaceholder ? "Platzhalter" : "Eingebaut"}
+                  <span className={`text-xs px-2 py-1 rounded ${s.isPlaceholder ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}`}>
+                    {s.isPlaceholder ? "Platzhalter" : "Bild gesetzt"}
                   </span>
                 </div>
 
@@ -540,30 +557,20 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
                     <code className="flex-1 text-xs bg-secondary p-2 rounded font-mono break-all">
                       {s.prompt || <em className="text-muted-foreground">— kein Prompt —</em>}
                     </code>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => copyToClipboard(s.prompt)}
-                      disabled={!s.prompt}
-                      className="whitespace-nowrap"
-                    >
-                      Kopieren
+                    <Button type="button" size="sm" onClick={() => copyText(s.prompt)} disabled={!s.prompt} className="whitespace-nowrap gap-1">
+                      <Copy className="h-3 w-3" /> Kopieren
                     </Button>
                   </div>
                 </div>
 
                 {s.isPlaceholder && (
                   <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">
-                      Bild-URL nach Generierung einfügen:
-                    </label>
+                    <label className="text-xs text-muted-foreground">Bild-URL einsetzen:</label>
                     <div className="flex gap-2">
                       <Input
                         placeholder="https://..."
                         value={nbImageUrls[s.slot] || ""}
-                        onChange={(e) =>
-                          setNbImageUrls((prev) => ({ ...prev, [s.slot]: e.target.value }))
-                        }
+                        onChange={(e) => setNbImageUrls((prev) => ({ ...prev, [s.slot]: e.target.value }))}
                         className="flex-1 text-xs h-9"
                       />
                       <Button
@@ -580,66 +587,106 @@ export default function PageDetailPanel({ page: initialPage, onUpdate, onClose }
                 )}
               </div>
             ))}
-
-            {imageSlots.map((s) => (
-              <Card key={`legacy-${s.slot}`}>
-                <CardContent className="pt-4 pb-3">
-                  <p className="font-medium text-sm">{s.label || s.slot}</p>
-                  <p className="text-xs text-muted-foreground">Slot: {s.slot}</p>
-                </CardContent>
-              </Card>
-            ))}
           </div>
         )}
       </TabsContent>
 
       {/* ═══ TAB 6: Links ═══ */}
       <TabsContent value="links" className="space-y-4 mt-4">
-        {page.cluster_info ? (
-          <>
-            <p className="text-sm text-muted-foreground">Cluster-Geschwister für interne Verlinkung:</p>
-            {siblings.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Keine Geschwister-Seiten gefunden.</p>
-            ) : (
-              <div className="space-y-2">
-                {siblings.map((s) => (
-                  <div key={s.id} className="flex items-center gap-2 text-sm">
-                    <Checkbox checked={s.linked} disabled />
-                    <span>{s.keyword}</span>
-                    <span className="text-xs text-muted-foreground">/{s.url_slug}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="flex items-center gap-3">
-              <Button onClick={markLinksSet} disabled={internalLinksSet} variant={internalLinksSet ? "secondary" : "default"}>
-                {internalLinksSet ? "✅ Links gesetzt" : "Links als gesetzt markieren"}
-              </Button>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-sm">Interne Links</h3>
+              <Badge variant="outline">{linkData.internal.length}</Badge>
             </div>
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">Diese Seite gehört keinem Cluster an.</p>
-        )}
-      </TabsContent>
+            {linkData.internal.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Keine internen Links gefunden.</p>
+            ) : (
+              <ul className="space-y-1.5 max-h-[400px] overflow-auto pr-2">
+                {linkData.internal.map((l, i) => (
+                  <li key={i} className="border border-border rounded p-2 text-xs">
+                    <div className="font-medium truncate">{l.text}</div>
+                    <code className="text-muted-foreground break-all">{l.href}</code>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
-      {/* ═══ TAB 7: QA ═══ */}
-      <TabsContent value="qa" className="space-y-5 mt-4">
-        <div className="flex items-start gap-6">
-          <ScoreRing score={qaChecks.score} />
-          <div className="space-y-2 flex-1">
-            {qaChecks.checks.map((c) => (
-              <div key={c.label} className="flex items-center gap-2 text-sm">
-                {c.ok ? <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" /> : c.warn ? <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" /> : <XCircle className="h-4 w-4 text-destructive shrink-0" />}
-                <span>{c.label}</span>
-                {c.points > 0 && <span className="text-xs text-muted-foreground">({c.points} Pkt.)</span>}
-                {!c.ok && c.label === "Interne Links gesetzt" && (
-                  <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setActiveTab("links")}>→ Links-Tab</Button>
-                )}
-              </div>
-            ))}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-sm">Externe Links</h3>
+              <Badge variant="outline">{linkData.external.length}</Badge>
+            </div>
+            {linkData.external.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Keine externen Links gefunden.</p>
+            ) : (
+              <ul className="space-y-1.5 max-h-[400px] overflow-auto pr-2">
+                {linkData.external.map((l, i) => (
+                  <li key={i} className="border border-border rounded p-2 text-xs">
+                    <div className="font-medium truncate flex items-center gap-1">
+                      {l.text}
+                      <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    </div>
+                    <code className="text-muted-foreground break-all">{l.href}</code>
+                    {l.rel && (
+                      <div className="mt-1">
+                        <Badge variant="secondary" className="text-[10px]">rel: {l.rel}</Badge>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
-        <Button onClick={saveQaScore}><Save className="h-4 w-4 mr-1" /> QA-Score speichern</Button>
+      </TabsContent>
+
+      {/* ═══ TAB 7: QA-Analyse ═══ */}
+      <TabsContent value="qa" className="space-y-5 mt-4">
+        <div className="flex items-start gap-6">
+          <ScoreRing score={qaResult.score} />
+          <div className="flex-1 space-y-1">
+            <h3 className="font-bold text-lg">QA-Analyse</h3>
+            <p className="text-sm text-muted-foreground">
+              {qaResult.tech.filter((c) => c.ok).length + qaResult.content.filter((c) => c.ok).length + qaResult.lp.filter((c) => c.ok).length} von {qaResult.tech.length + qaResult.content.length + qaResult.lp.length} Checks bestanden
+            </p>
+            {page.html_output && (
+              <Button size="sm" onClick={openInEditor} className="mt-2 gap-2">
+                <Pencil className="h-4 w-4" /> Im Editor verbessern
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Technische Checks</h4>
+          <div className="space-y-1.5">
+            {qaResult.tech.map((c) => <CheckRow key={c.label} {...c} />)}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Content Checks</h4>
+          <div className="space-y-1.5">
+            {qaResult.content.map((c) => <CheckRow key={c.label} {...c} />)}
+          </div>
+        </div>
+
+        {qaResult.isLp && qaResult.lp.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Landing-Page Checks</h4>
+            <div className="space-y-1.5">
+              {qaResult.lp.map((c) => <CheckRow key={c.label} {...c} />)}
+            </div>
+          </div>
+        )}
+
+        {!qaResult.isLp && (
+          <p className="text-xs text-muted-foreground italic">
+            LP-Checks werden nur für Landing-Page-Typen angezeigt.
+          </p>
+        )}
       </TabsContent>
     </Tabs>
   );

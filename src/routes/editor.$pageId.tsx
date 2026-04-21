@@ -79,6 +79,61 @@ const COLOR_VAR_RE = {
   accent: /--c-accent\s*:\s*[^;}]+/g,
 };
 
+function SortableBlockItem({
+  block,
+  isActive,
+  onClick,
+}: {
+  block: Block;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: block.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-2 px-2 py-2.5 rounded-lg mx-2 my-0.5 cursor-pointer transition-colors text-sm",
+        isActive
+          ? "bg-primary/10 text-primary font-medium"
+          : "hover:bg-secondary text-foreground",
+      )}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        onClick={(e) => e.stopPropagation()}
+        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
+        aria-label="Sektion verschieben"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+        <div className="truncate">{block.label}</div>
+        <div className="text-[10px] font-mono text-muted-foreground truncate">
+          {block.type}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function injectColorVars(html: string, colors: { primary: string; bg: string; accent: string }) {
   // Replace existing --c-* tokens or inject a style block in <head>
   let out = html;

@@ -362,6 +362,44 @@ function EditorPage() {
     toast.success("Sektion entfernt", removedLabel ? { description: removedLabel } : undefined);
   };
 
+  const handleKiEdit = async () => {
+    if (!kiPrompt.trim() || !activeBlockId || !canUseAI) return;
+    const block = blocks.find((b) => b.id === activeBlockId);
+    if (!block) return;
+
+    setIsKiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("edit-block", {
+        body: {
+          blockHtml: block.html,
+          userPrompt: kiPrompt,
+          keyword: page?.keyword || "",
+          firmName: firm?.name || "",
+          branche: firm?.branche || "",
+          designPhilosophy: page?.design_philosophy || "",
+          pageType: page?.page_type || "",
+        },
+      });
+      if (error) throw error;
+      if (!data?.html) throw new Error("Kein HTML zurückgegeben");
+
+      setBlocks((prev) =>
+        prev.map((b) => (b.id === activeBlockId ? { ...b, html: data.html } : b)),
+      );
+      setIsDirty(true);
+      setKiPrompt("");
+      toast.success("Block aktualisiert", {
+        description: "Vorschau wurde aktualisiert. Speichern um zu sichern.",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
+      console.error("KI Edit Error:", err);
+      toast.error("KI-Bearbeitung fehlgeschlagen", { description: msg });
+    } finally {
+      setIsKiLoading(false);
+    }
+  };
+
   const handleSave = useCallback(async () => {
     if (!canEdit || !page) return;
     setIsSaving(true);

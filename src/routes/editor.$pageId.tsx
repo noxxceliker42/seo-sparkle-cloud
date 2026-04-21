@@ -242,6 +242,8 @@ function EditorPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [kiPrompt, setKiPrompt] = useState("");
+  const [isKiLoading, setIsKiLoading] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),

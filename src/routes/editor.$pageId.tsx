@@ -346,7 +346,15 @@ function EditorPage() {
         .order("section_type", { ascending: true })
         .order("name", { ascending: true });
       if (cancelled) return;
-      if (!error && data) setTemplates(data);
+      if (error) {
+        console.error('Templates Error:', error);
+      }
+      if (data) {
+        if (data.length === 0) {
+          console.warn('[Editor] section_templates leer — RLS/Daten prüfen');
+        }
+        setTemplates(data);
+      }
       setTemplatesLoading(false);
     })();
     return () => {

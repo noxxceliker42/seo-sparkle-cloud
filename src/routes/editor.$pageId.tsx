@@ -394,7 +394,10 @@ function EditorPage() {
     blocks.forEach((block) => {
       const tmp = parser.parseFromString(block.html, "text/html");
       const el = tmp.querySelector("[data-section]");
-      if (el) body.appendChild(el);
+      if (el) {
+        el.setAttribute("data-editable", "true");
+        body.appendChild(el);
+      }
     });
 
     let html = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
@@ -403,16 +406,55 @@ function EditorPage() {
       bg: secondaryColor,
       accent: accentColor,
     });
+    if (/<\/body>/i.test(html)) {
+      html = html.replace(/<\/body>/i, INLINE_EDITOR_SCRIPT + "</body>");
+    } else {
+      html += INLINE_EDITOR_SCRIPT;
+    }
     return html;
   }, [blocks, primaryColor, secondaryColor, accentColor]);
 
   // iframe srcDoc
   const [previewSrc, setPreviewSrc] = useState<string>("");
   useEffect(() => {
-    if (blocks.length > 0 || originalHtmlRef.current) {
-      setPreviewSrc(buildPreviewHtml());
-    }
-  }, [blocks, buildPreviewHtml]);
+    if (blocks.length === 0 && !originalHtmlRef.current) return;
+    // Don't reload iframe while user is inline-editing (would lose focus)
+    if (isInlineEditing) return;
+    setPreviewSrc(buildPreviewHtml());
+  }, [blocks, buildPreviewHtml, isInlineEditing]);
+
+  // postMessage from iframe (inline edits + section clicks)
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      const data = e.data as
+        | { type: string; sectionId?: string; html?: string }
+        | null;
+      if (!data || typeof data !== "object") return;
+      if (data.type === "BLOCK_UPDATED" && data.sectionId && data.html) {
+        setIsInlineEditing(true);
+        setBlocks((prev) =>
+          prev.map((b) =>
+            b.id === data.sectionId ? { ...b, html: data.html! } : b,
+          ),
+        );
+        setIsDirty(true);
+      }
+      if (data.type === "SECTION_CLICKED") {
+        if (data.sectionId) {
+          setActiveBlockId(data.sectionId);
+          const el = document.querySelector(
+            `[data-sidebar-id="${data.sectionId}"]`,
+          );
+          el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      }
+      if (data.type === "EDIT_EXITED") {
+        setIsInlineEditing(false);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   const updateIframeVar = (varName: string, value: string) => {
     const iframe = previewRef.current;

@@ -661,6 +661,7 @@ function EditorPage() {
       }
 
       setIsDirty(false);
+      setIsInlineEditing(false);
       originalHtmlRef.current = newHtml;
       toast.success("Gespeichert", { description: "Version wurde gesichert." });
     } catch (err) {
@@ -831,6 +832,15 @@ function EditorPage() {
 
         {/* PREVIEW */}
         <section className="flex-1 flex flex-col overflow-hidden bg-muted/20">
+          {canEdit && (
+            <div className="flex items-center justify-between px-4 py-1.5 bg-blue-50 border-b border-blue-100 text-xs text-blue-600">
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                {isInlineEditing ? "Bearbeitung aktiv …" : "Klick auf Text zum Editieren"}
+              </span>
+              <span className="text-blue-400">Esc zum Beenden</span>
+            </div>
+          )}
           <div className="flex items-center justify-center gap-1 px-3 py-2 border-b border-border bg-background">
             <div className="flex items-center gap-0.5 bg-muted rounded p-0.5">
               <button
@@ -868,7 +878,7 @@ function EditorPage() {
                 ref={previewRef}
                 srcDoc={previewSrc}
                 title="Editor Preview"
-                sandbox="allow-same-origin"
+                sandbox="allow-same-origin allow-scripts"
                 className="w-full h-full border-0"
                 style={{ minHeight: "calc(100vh - 140px)" }}
               />

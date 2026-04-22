@@ -87,6 +87,131 @@ const COLOR_VAR_RE = {
   accent: /--c-accent\s*:\s*[^;}]+/g,
 };
 
+const INLINE_EDITOR_SCRIPT = `
+<style>
+  [data-section] { position: relative; }
+  [data-section]:hover { outline: 1px dashed rgba(59,130,246,0.4); outline-offset: 2px; }
+  [data-section].section-active { outline: 2px solid #3b82f6 !important; outline-offset: 2px; }
+  .inline-editable:hover { outline: 1px dashed rgba(59,130,246,0.6); outline-offset: 1px; cursor: text; border-radius: 2px; }
+  .inline-editable:focus { outline: 2px solid #3b82f6 !important; outline-offset: 2px; border-radius: 2px; }
+  .editor-toolbar { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-family: sans-serif; z-index: 99999; display: none; gap: 8px; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .editor-toolbar.visible { display: flex; }
+  .toolbar-btn { background: rgba(255,255,255,0.15); border: none; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; font-family: sans-serif; }
+  .toolbar-btn:hover { background: rgba(255,255,255,0.25); }
+</style>
+<div class="editor-toolbar" id="editorToolbar">
+  <span id="toolbarLabel" style="opacity:.7;font-size:11px;">Text editieren</span>
+  <button class="toolbar-btn" onclick="document.execCommand('bold')"><b>B</b></button>
+  <button class="toolbar-btn" style="font-style:italic" onclick="document.execCommand('italic')">I</button>
+  <button class="toolbar-btn" onclick="window.exitEdit && window.exitEdit()">✓ Fertig</button>
+</div>
+<script>
+(function(){
+  var EDITABLE_TAGS = ['H1','H2','H3','H4','H5','H6','P','SPAN','LI','BUTTON','A','STRONG','EM','TD','TH','LABEL','SMALL'];
+  var activeSection = null;
+  var activeEl = null;
+  var toolbar = document.getElementById('editorToolbar');
+
+  function markEditables(){
+    document.querySelectorAll('[data-editable="true"]').forEach(function(section){
+      EDITABLE_TAGS.forEach(function(tag){
+        section.querySelectorAll(tag).forEach(function(el){
+          if (el.classList.contains('inline-editable')) return;
+          var hasOnlyText = true;
+          for (var i=0; i<el.children.length; i++){
+            var c = el.children[i];
+            if (EDITABLE_TAGS.indexOf(c.tagName) === -1 && c.tagName !== 'BR') { hasOnlyText = false; break; }
+          }
+          if (el.children.length === 0 || el.tagName === 'BUTTON' || el.tagName === 'A' || hasOnlyText){
+            el.classList.add('inline-editable');
+          }
+        });
+      });
+    });
+  }
+
+  function highlightSection(section){
+    document.querySelectorAll('[data-section]').forEach(function(s){ s.classList.remove('section-active'); });
+    if (section) section.classList.add('section-active');
+  }
+
+  function startEdit(el){
+    if (activeEl === el) return;
+    exitEdit();
+    activeEl = el;
+    el.contentEditable = 'true';
+    el.focus();
+    try {
+      var range = document.createRange();
+      var sel = window.getSelection();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch(_){}
+    document.getElementById('toolbarLabel').textContent = el.tagName + ' editieren';
+    toolbar.classList.add('visible');
+    el.addEventListener('input', onInput, { passive: true });
+  }
+
+  function onInput(){
+    if (!activeEl) return;
+    var section = activeEl.closest('[data-section]');
+    if (!section) return;
+    window.parent.postMessage({
+      type: 'BLOCK_UPDATED',
+      sectionId: section.getAttribute('data-section-id'),
+      html: section.outerHTML
+    }, '*');
+  }
+
+  window.exitEdit = function(){
+    if (!activeEl) return;
+    activeEl.contentEditable = 'false';
+    activeEl.removeEventListener('input', onInput);
+    activeEl = null;
+    toolbar.classList.remove('visible');
+    window.parent.postMessage({ type: 'EDIT_EXITED' }, '*');
+  };
+
+  document.addEventListener('click', function(e){
+    var el = e.target;
+    var section = el.closest && el.closest('[data-section]');
+    if (section !== activeSection){
+      activeSection = section;
+      highlightSection(section);
+      if (section){
+        window.parent.postMessage({
+          type: 'SECTION_CLICKED',
+          sectionId: section.getAttribute('data-section-id')
+        }, '*');
+      }
+    }
+    if (el.classList && el.classList.contains('inline-editable')){
+      e.preventDefault();
+      startEdit(el);
+      return;
+    }
+    if (activeEl && !activeEl.contains(el) && el.id !== 'editorToolbar' && !(el.closest && el.closest('#editorToolbar'))){
+      window.exitEdit();
+    }
+  });
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') window.exitEdit();
+  });
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', markEditables);
+  } else {
+    markEditables();
+  }
+  var observer = new MutationObserver(function(){ markEditables(); });
+  observer.observe(document.body, { childList: true, subtree: true });
+})();
+<\/script>
+`;
+
 function SortableBlockItem({
   block,
   isActive,

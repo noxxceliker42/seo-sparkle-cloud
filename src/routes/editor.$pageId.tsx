@@ -114,6 +114,7 @@ function SortableBlockItem({
   return (
     <div
       ref={setNodeRef}
+      data-sidebar-id={block.id}
       style={style}
       onClick={onClick}
       className={cn(

@@ -253,6 +253,7 @@ function EditorPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [kiPrompt, setKiPrompt] = useState("");
   const [isKiLoading, setIsKiLoading] = useState(false);
+  const [isInlineEditing, setIsInlineEditing] = useState(false);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [templateFilter, setTemplateFilter] = useState<string>("all");
   const [templates, setTemplates] = useState<

@@ -95,8 +95,11 @@ export function useComponentJob() {
           status: "generating",
         });
 
-        return pollJob(jobId);
+        const result = await pollJob(jobId);
+        inFlightRef.current = false;
+        return result;
       } catch (e: any) {
+        inFlightRef.current = false;
         setIsGenerating(false);
         setError(e.message ?? "Fehler beim Starten der Generierung");
         throw e;

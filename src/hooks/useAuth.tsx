@@ -43,25 +43,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: false,
   });
 
-  const fetchProfileAndRole = useCallback(async (userId: string) => {
-    try {
-      const [profileRes, roleRes] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-        supabase.from("user_roles").select("role").eq("user_id", userId),
-      ]);
-
-      const profile = profileRes.data as Profile | null;
-      const roles = (roleRes.data || []).map((r: { role: string }) => r.role as AppRole);
-      let bestRole: AppRole | null = null;
-      for (const r of roles) {
-        if (!bestRole || ROLE_HIERARCHY[r] > ROLE_HIERARCHY[bestRole]) bestRole = r;
+  const fetchProfileAndRole = useCallback(async (userId: string): Promise<{ profile: Profile | null; role: AppRole | null }> => {
+    const timeout = new Promise<{ profile: null; role: null }>((resolve) =>
+      setTimeout(() => {
+        console.warn("fetchProfileAndRole timeout (5s) — continuing without profile");
+        resolve({ profile: null, role: null });
+      }, 5000)
+    );
+    const work = (async () => {
+      try {
+        const [profileRes, roleRes] = await Promise.all([
+          supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+          supabase.from("user_roles").select("role").eq("user_id", userId),
+        ]);
+        const profile = profileRes.data as Profile | null;
+        const roles = (roleRes.data || []).map((r: { role: string }) => r.role as AppRole);
+        let bestRole: AppRole | null = null;
+        for (const r of roles) {
+          if (!bestRole || ROLE_HIERARCHY[r] > ROLE_HIERARCHY[bestRole]) bestRole = r;
+        }
+        return { profile, role: bestRole };
+      } catch (err) {
+        console.error("fetchProfileAndRole error:", err);
+        return { profile: null, role: null };
       }
-
-      return { profile, role: bestRole };
-    } catch (err) {
-      console.error("fetchProfileAndRole error:", err);
-      return { profile: null, role: null };
-    }
+    })();
+    return Promise.race([work, timeout]);
   }, []);
 
   const refreshProfile = useCallback(async () => {

@@ -79,6 +79,9 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
   const [saveOpen, setSaveOpen] = useState(false);
   const [consultOpen, setConsultOpen] = useState(false);
   const [aiProposal, setAiProposal] = useState<DesignProposal | null>(null);
+  const [isExpandingDesign, setIsExpandingDesign] = useState(false);
+  const [expandedDesign, setExpandedDesign] = useState<ExpandedDesign | null>(null);
+  const [isDesignConfirmed, setIsDesignConfirmed] = useState(false);
   const [pages, setPages] = useState<{ id: string; keyword: string }[]>([]);
   const [previewWidth, setPreviewWidth] = useState<375 | 768 | 1200>(1200);
   const [elapsed, setElapsed] = useState(0);

@@ -145,7 +145,9 @@ const buildKitPreviewHtml = (kit: BrandKit) => `
 /* ───── Component ───── */
 
 function StudioPage() {
-  const { firmId, loading: roleLoading } = useRole();
+  const { firmId: roleFirmId, loading: roleLoading } = useRole();
+  const [firmId, setFirmId] = useState<string | null>(null);
+  const [resolvingFirm, setResolvingFirm] = useState(true);
   const [brandKits, setBrandKits] = useState<BrandKit[]>([]);
   const [activeBrandKit, setActiveBrandKit] = useState<BrandKit | null>(null);
   const [components, setComponents] = useState<Component[]>([]);
@@ -154,16 +156,54 @@ function StudioPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /* Load */
+  /* Resolve firmId with fallbacks */
   useEffect(() => {
     if (roleLoading) return;
+    const resolveFirmId = async () => {
+      setResolvingFirm(true);
+      try {
+        if (roleFirmId) {
+          setFirmId(roleFirmId);
+          return;
+        }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: firm } = await supabase
+          .from("firms")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (firm?.id) {
+          setFirmId(firm.id);
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("firm_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (profile?.firm_id) {
+          setFirmId(profile.firm_id);
+        }
+      } finally {
+        setResolvingFirm(false);
+      }
+    };
+    void resolveFirmId();
+  }, [roleFirmId, roleLoading]);
+
+  /* Load */
+  useEffect(() => {
+    if (roleLoading || resolvingFirm) return;
     if (!firmId) {
       setLoading(false);
       return;
     }
     void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firmId, roleLoading]);
+  }, [firmId, roleLoading, resolvingFirm]);
 
   const loadData = async () => {
     if (!firmId) return;
@@ -351,6 +391,29 @@ function StudioPage() {
   );
 
   /* ───── Render ───── */
+
+  if (roleLoading || resolvingFirm) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!firmId) {
+    return (
+      <div className="flex items-center justify-center h-64 text-center">
+        <div>
+          <p className="text-sm font-medium text-muted-foreground mb-2">
+            Keine Firma zugeordnet
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Bitte in Einstellungen eine Firma anlegen oder zuordnen.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">

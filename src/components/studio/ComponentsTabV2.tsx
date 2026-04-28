@@ -411,16 +411,117 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
         </div>
 
         {useCustom && (
-          <div className="mt-4">
-            <Label className="text-xs uppercase tracking-wider text-mc-accent">
-              Eigener Stil
-            </Label>
-            <Textarea
-              value={customDescription}
-              onChange={(e) => setCustomDescription(e.target.value)}
-              rows={3}
-              placeholder="z.B. Luxuriöser Goldton auf tiefem Schwarz, große elegante Serifen-Schrift, subtile Partikel-Animation im Hintergrund"
-            />
+          <div className="mt-4 space-y-3">
+            <div>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <Label className="text-xs uppercase tracking-wider text-mc-accent">
+                  Eigener Stil
+                </Label>
+                {isDesignConfirmed && (
+                  <span className="text-[10px] px-2 py-1 rounded bg-primary/10 text-primary font-medium">
+                    ✨ KI-vervollständigt
+                  </span>
+                )}
+              </div>
+              <Textarea
+                value={customDescription}
+                onChange={(e) => {
+                  setCustomDescription(e.target.value);
+                  if (isDesignConfirmed) setIsDesignConfirmed(false);
+                }}
+                rows={3}
+                placeholder='Stichworte reichen: "Luxury Gold", "Dark Tech Neon", "Warm Organic"…'
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Tipp: Gib Stichworte ein — die KI erstellt daraus ein komplettes Design-System.
+              </p>
+              {customDescription.trim().length >= 3 && !isDesignConfirmed && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 gap-2 min-h-[44px]"
+                  onClick={handleExpandDesign}
+                  disabled={isExpandingDesign}
+                >
+                  {isExpandingDesign ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Design wird analysiert…</>
+                  ) : (
+                    <>🎨 Design vervollständigen</>
+                  )}
+                </Button>
+              )}
+            </div>
+
+            {expandedDesign && (
+              <div className="rounded-lg border border-border bg-card/50 p-4 space-y-3">
+                <div className="text-sm font-semibold">
+                  🎨 Design-Vorschlag: „{expandedDesign.name}"
+                </div>
+
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Farben</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {[
+                      { k: "primary", label: "Primary" },
+                      { k: "primaryDark", label: "Dark" },
+                      { k: "accent", label: "Accent" },
+                      { k: "background", label: "Background" },
+                      { k: "text", label: "Text" },
+                    ].map((c) => {
+                      const hex = (expandedDesign.colors as any)?.[c.k];
+                      return (
+                        <div key={c.k} className="flex items-center gap-2">
+                          <span
+                            className="inline-block w-5 h-5 rounded border border-border"
+                            style={{ background: hex }}
+                          />
+                          <div className="text-[11px] leading-tight">
+                            <div className="font-medium">{c.label}</div>
+                            <div className="text-muted-foreground font-mono">{hex}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="text-xs italic text-muted-foreground">"{expandedDesign.mood}"</div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                  {expandedDesign.googleFonts?.length > 0 && (
+                    <div><span className="text-muted-foreground">Fonts:</span> {expandedDesign.googleFonts.join(" + ")}</div>
+                  )}
+                  {expandedDesign.animations?.length > 0 && (
+                    <div><span className="text-muted-foreground">Animationen:</span> {expandedDesign.animations.join(", ")}</div>
+                  )}
+                  {expandedDesign.textures && (
+                    <div className="sm:col-span-2"><span className="text-muted-foreground">Texturen:</span> {expandedDesign.textures}</div>
+                  )}
+                </div>
+
+                {expandedDesign.rules?.length > 0 && (
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Design-Regeln</div>
+                    <ul className="text-xs list-disc pl-5 space-y-0.5">
+                      {expandedDesign.rules.map((r, i) => <li key={i}>{r}</li>)}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button size="sm" variant="outline" className="gap-1 min-h-[44px]" onClick={handleEditExpanded}>
+                    <Pencil className="h-3.5 w-3.5" /> Anpassen
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1 min-h-[44px]" onClick={handleExpandDesign} disabled={isExpandingDesign}>
+                    <RefreshCw className="h-3.5 w-3.5" /> Neu generieren
+                  </Button>
+                  <Button size="sm" className="gap-1 min-h-[44px]" onClick={handleConfirmExpanded} disabled={isDesignConfirmed}>
+                    ✅ {isDesignConfirmed ? "Übernommen" : "Übernehmen"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

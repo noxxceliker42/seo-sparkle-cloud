@@ -165,6 +165,49 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
     toast.success(`Vorlage „${t.name}" geladen`);
   };
 
+  const handleExpandDesign = async () => {
+    const input = customDescription.trim();
+    if (input.length < 3) {
+      toast.error("Bitte mindestens 3 Zeichen eingeben");
+      return;
+    }
+    setIsExpandingDesign(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("studio-design-expand", {
+        body: {
+          shortInput: input,
+          componentType,
+          branche: branche ?? "hausgeraete",
+          firm: firmName ?? "",
+        },
+      });
+      if (error) throw error;
+      if (!data || data.error) throw new Error(data?.error ?? "Keine Antwort");
+      if (!data.name || !data.colors) throw new Error("Unvollständige Antwort");
+      setExpandedDesign(data as ExpandedDesign);
+      setIsDesignConfirmed(false);
+      toast.success("Design-Vorschlag erstellt ✓");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Vervollständigung fehlgeschlagen");
+    } finally {
+      setIsExpandingDesign(false);
+    }
+  };
+
+  const handleConfirmExpanded = () => {
+    if (!expandedDesign) return;
+    setCustomDescription(expandedDesign.expandedDescription);
+    setIsDesignConfirmed(true);
+    toast.success("Design übernommen ✨");
+  };
+
+  const handleEditExpanded = () => {
+    if (!expandedDesign) return;
+    setCustomDescription(expandedDesign.expandedDescription);
+    setExpandedDesign(null);
+    setIsDesignConfirmed(false);
+  };
+
   const handleGenerate = async () => {
     if (isGenerating) return; // hard guard against double-fire
     if (!firmId) {

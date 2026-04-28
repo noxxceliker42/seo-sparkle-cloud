@@ -15,9 +15,12 @@ const QaContext = createContext<QaContextValue>({
 });
 
 export function QaProvider({ children }: { children: ReactNode }) {
-  const [qaState, _setQaState] = useState<Record<string, unknown>>(() =>
-    storage.get<Record<string, unknown>>("qa", {}),
-  );
+  const [qaState, _setQaState] = useState<Record<string, unknown>>({});
+
+  useEffect(() => {
+    const stored = storage.get<Record<string, unknown>>("qa", {});
+    if (stored && Object.keys(stored).length > 0) _setQaState(stored);
+  }, []);
 
   const setQaState = useCallback((state: Record<string, unknown>) => {
     _setQaState(state);

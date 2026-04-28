@@ -217,6 +217,27 @@ export function ComponentsTab({
               }}
             />
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setKiOpen(true)}
+            className="gap-1.5 h-8 text-xs w-full"
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Mit KI erstellen
+          </Button>
+          <KiGenerateDialog
+            open={kiOpen}
+            onOpenChange={setKiOpen}
+            firmId={firmId}
+            brandKits={brandKits}
+            activeBrandKit={activeBrandKit}
+            defaultType={filterType !== "all" ? filterType : "header"}
+            onCreated={(c) => {
+              onComponentsChange([...components, c]);
+              setActiveId(c.id);
+              setKiOpen(false);
+            }}
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto max-h-[70vh]">

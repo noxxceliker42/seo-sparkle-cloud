@@ -145,6 +145,7 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
   };
 
   const handleGenerate = async () => {
+    if (isGenerating) return; // hard guard against double-fire
     if (!firmId) {
       toast.error("Keine Firma zugeordnet");
       return;
@@ -159,6 +160,10 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
     setResultHtml(null); setResultCss(null); setResultJs(null);
     setQaScore(null); setTokens(null); setWarnings([]);
 
+    const philosophyOverride = aiProposal
+      ? `KI-Vorschlag: ${aiProposal.name} — ${aiProposal.mood}\nCSS: ${aiProposal.css}\nRegeln: ${aiProposal.rules?.join(" | ")}\nFonts: ${aiProposal.googleFonts?.join(", ")}\nAnimationen: ${aiProposal.animations?.join(", ")}\nTexturen: ${aiProposal.textures}`
+      : (useCustom ? customDescription : undefined);
+
     try {
       const job = await triggerGeneration({
         componentType,
@@ -166,17 +171,20 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
         name,
         description: customDescription || undefined,
         prompt: extraPrompt || undefined,
-        designPhilosophy: philosophy,
-        designPhilosophyCustom: useCustom ? customDescription : undefined,
+        designPhilosophy: aiProposal ? "custom_ai" : philosophy,
+        designPhilosophyCustom: philosophyOverride,
         brandKit: activeBrandKit ? { ...activeBrandKit } as Record<string, unknown> : undefined,
         brandKitId: activeBrandKit?.id,
         templateId: templateId ?? undefined,
         templateHtml: templateHtml ?? undefined,
+        config: aiProposal ? { aiProposal } : undefined,
         firmId,
         userId,
         firm: firmName ?? "",
         branche: branche ?? "hausgeraete",
       });
+
+      if (!job) return; // ignored due to lock
 
       if (job.status === "completed") {
         setResultHtml(job.html_output);
@@ -192,6 +200,47 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
     } catch (e: any) {
       toast.error(e.message ?? "Fehler bei der Generierung");
     }
+  };
+
+  const handleInsertIntoPage = async (pageId: string, pageLabel: string) => {
+    if (!resultHtml) return;
+    // Persist the component first if not already saved
+    let componentId: string | null = null;
+    const { data: comp, error: compErr } = await supabase
+      .from("components")
+      .insert({
+        firm_id: firmId,
+        component_type: componentType,
+        variant,
+        name,
+        html_output: resultHtml,
+        css_output: resultCss,
+        js_output: resultJs,
+      })
+      .select("id")
+      .single();
+    if (compErr || !comp) {
+      toast.error("Komponente konnte nicht gespeichert werden");
+      return;
+    }
+    componentId = comp.id;
+    const { error: pcErr } = await supabase.from("page_components").insert({
+      seo_page_id: pageId,
+      component_id: componentId,
+      position: componentType === "footer" ? "footer" : "header",
+      inject_mode: "replace",
+    });
+    if (pcErr) {
+      toast.error("Einbau fehlgeschlagen");
+      return;
+    }
+    toast.success(`Komponente wurde zu „${pageLabel}" hinzugefügt`);
+  };
+
+  const handlePickProposal = (p: DesignProposal) => {
+    setAiProposal(p);
+    setUseCustom(false);
+    toast.success(`✨ Design „${p.name}" übernommen`);
   };
 
   /* Preview srcdoc */

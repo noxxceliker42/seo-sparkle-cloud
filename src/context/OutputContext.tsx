@@ -45,9 +45,12 @@ const OutputContext = createContext<OutputContextValue>({
 });
 
 export function OutputProvider({ children }: { children: ReactNode }) {
-  const [output, _setOutput] = useState<OutputState>(() =>
-    storage.get<OutputState>("output", EMPTY_OUTPUT),
-  );
+  const [output, _setOutput] = useState<OutputState>(EMPTY_OUTPUT);
+
+  useEffect(() => {
+    const stored = storage.get<OutputState>("output", EMPTY_OUTPUT);
+    if (stored) _setOutput(stored);
+  }, []);
 
   const setOutput = useCallback((data: Partial<OutputState>) => {
     _setOutput((prev) => {

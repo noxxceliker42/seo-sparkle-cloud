@@ -90,14 +90,23 @@ const PUBLIC_ROUTES = ["/login", "/reset-password"];
 function AuthGate() {
   const { isAuthenticated, loading, role, profile, signOut, hasRole } = useAuth();
   const navigate = useNavigate();
+  const [authTimedOut, setAuthTimedOut] = useState(false);
 
-  // Show nothing while loading
-  if (loading) {
+  useEffect(() => {
+    if (!loading) { setAuthTimedOut(false); return; }
+    const t = setTimeout(() => {
+      console.warn("Auth timeout — forcing UI to render");
+      setAuthTimedOut(true);
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [loading]);
+
+  if (loading && !authTimedOut) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-3">
-          <h1 className="text-2xl font-bold text-destructive">SEO-OS</h1>
-          <p className="text-sm text-muted-foreground">Wird geladen…</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">SEO-OS wird geladen...</p>
         </div>
       </div>
     );

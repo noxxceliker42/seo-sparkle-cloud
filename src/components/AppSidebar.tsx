@@ -1,4 +1,4 @@
-import { LayoutDashboard, PlusCircle, Network, Layers, Building2, Settings, Users, BarChart3, ImageIcon } from "lucide-react";
+import { LayoutDashboard, PlusCircle, Network, Layers, Building2, Settings, Users, BarChart3, ImageIcon, Palette } from "lucide-react";
 import { Link, useLocation } from "@tanstack/react-router";
 import {
   Sidebar,
@@ -27,6 +27,7 @@ export function AppSidebar() {
     { title: "Analysen", url: "/analysen", icon: BarChart3, minRole: "editor" },
     { title: "Cluster", url: "/cluster", icon: Layers, minRole: "editor" },
     { title: "Bilder", url: "/bilder", icon: ImageIcon, minRole: "editor" },
+    { title: "Studio", url: "/studio", icon: Palette, minRole: "editor" },
     { title: "Firmen", url: "/firmen", icon: Building2, minRole: "editor" },
     { title: "Einstellungen", url: "/settings", icon: Settings, minRole: "viewer" },
   ];

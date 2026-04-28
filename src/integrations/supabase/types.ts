@@ -53,6 +53,65 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_kits: {
+        Row: {
+          accent_color: string | null
+          created_at: string | null
+          custom_css_vars: Json | null
+          design_philosophy: string | null
+          firm_id: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          logo_alt: string | null
+          logo_url: string | null
+          name: string
+          primary_color: string | null
+          secondary_color: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          accent_color?: string | null
+          created_at?: string | null
+          custom_css_vars?: Json | null
+          design_philosophy?: string | null
+          firm_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          logo_alt?: string | null
+          logo_url?: string | null
+          name?: string
+          primary_color?: string | null
+          secondary_color?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          accent_color?: string | null
+          created_at?: string | null
+          custom_css_vars?: Json | null
+          design_philosophy?: string | null
+          firm_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          logo_alt?: string | null
+          logo_url?: string | null
+          name?: string
+          primary_color?: string | null
+          secondary_color?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_kits_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cluster_pages: {
         Row: {
           ai_description: string | null
@@ -260,6 +319,91 @@ export type Database = {
             columns: ["pillar_page_id"]
             isOneToOne: false
             referencedRelation: "seo_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      components: {
+        Row: {
+          brand_kit_id: string | null
+          component_type: string
+          config: Json | null
+          created_at: string | null
+          css_output: string | null
+          description: string | null
+          embed_id: string | null
+          embed_type: string | null
+          firm_id: string | null
+          html_output: string | null
+          id: string
+          is_global: boolean | null
+          js_output: string | null
+          name: string
+          parent_id: string | null
+          updated_at: string | null
+          variant: string
+          version: number | null
+        }
+        Insert: {
+          brand_kit_id?: string | null
+          component_type: string
+          config?: Json | null
+          created_at?: string | null
+          css_output?: string | null
+          description?: string | null
+          embed_id?: string | null
+          embed_type?: string | null
+          firm_id?: string | null
+          html_output?: string | null
+          id?: string
+          is_global?: boolean | null
+          js_output?: string | null
+          name: string
+          parent_id?: string | null
+          updated_at?: string | null
+          variant?: string
+          version?: number | null
+        }
+        Update: {
+          brand_kit_id?: string | null
+          component_type?: string
+          config?: Json | null
+          created_at?: string | null
+          css_output?: string | null
+          description?: string | null
+          embed_id?: string | null
+          embed_type?: string | null
+          firm_id?: string | null
+          html_output?: string | null
+          id?: string
+          is_global?: boolean | null
+          js_output?: string | null
+          name?: string
+          parent_id?: string | null
+          updated_at?: string | null
+          variant?: string
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "components_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "components_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "components_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "components"
             referencedColumns: ["id"]
           },
         ]
@@ -587,6 +731,48 @@ export type Database = {
           {
             foreignKeyName: "image_jobs_page_id_fkey"
             columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "seo_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      page_components: {
+        Row: {
+          component_id: string | null
+          created_at: string | null
+          id: string
+          inject_mode: string
+          position: string
+          seo_page_id: string | null
+        }
+        Insert: {
+          component_id?: string | null
+          created_at?: string | null
+          id?: string
+          inject_mode?: string
+          position?: string
+          seo_page_id?: string | null
+        }
+        Update: {
+          component_id?: string | null
+          created_at?: string | null
+          id?: string
+          inject_mode?: string
+          position?: string
+          seo_page_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_components_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "page_components_seo_page_id_fkey"
+            columns: ["seo_page_id"]
             isOneToOne: false
             referencedRelation: "seo_pages"
             referencedColumns: ["id"]

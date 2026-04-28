@@ -87,11 +87,11 @@ function ClusterNeuPage() {
   const [firms, setFirms] = useState<Firm[]>([]);
 
   // Load firms for per-page selector
-  useState(() => {
+  useEffect(() => {
     supabase.from("firms").select("*").order("name").then(({ data }) => {
       if (data) setFirms(data);
     });
-  });
+  }, []);
 
   const handleAnalyze = async () => {
     if (!pillarKeyword.trim()) return;

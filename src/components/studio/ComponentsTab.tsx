@@ -12,6 +12,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +39,7 @@ import {
   Monitor,
   ArrowUp,
   ArrowDown,
+  Sparkles,
 } from "lucide-react";
 import {
   renderComponentHtml,
@@ -102,6 +107,7 @@ export function ComponentsTab({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [kiOpen, setKiOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
 
   const filtered = useMemo(
@@ -211,6 +217,27 @@ export function ComponentsTab({
               }}
             />
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setKiOpen(true)}
+            className="gap-1.5 h-8 text-xs w-full"
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Mit KI erstellen
+          </Button>
+          <KiGenerateDialog
+            open={kiOpen}
+            onOpenChange={setKiOpen}
+            firmId={firmId}
+            brandKits={brandKits}
+            activeBrandKit={activeBrandKit}
+            defaultType={filterType !== "all" ? filterType : "header"}
+            onCreated={(c) => {
+              onComponentsChange([...components, c]);
+              setActiveId(c.id);
+              setKiOpen(false);
+            }}
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto max-h-[70vh]">
@@ -418,9 +445,7 @@ export function ComponentsTab({
             </TabsContent>
 
             <TabsContent value="embed" className="mt-4">
-              <div className="border rounded-lg p-8 text-center text-sm text-muted-foreground">
-                Embed-Export folgt im nächsten Schritt (Prompt 3).
-              </div>
+              <EmbedTab component={active} firmId={firmId} />
             </TabsContent>
           </Tabs>
         )}
@@ -938,6 +963,415 @@ function CtaBarForm({ config, onChange }: { config: any; onChange: (p: any) => v
           <Switch checked={!!config.mobile_only} onCheckedChange={(v) => onChange({ mobile_only: v })} />
           <span className="text-xs">Nur Mobile</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ───── KI Generate Dialog ───── */
+function KiGenerateDialog({
+  open,
+  onOpenChange,
+  firmId,
+  brandKits,
+  activeBrandKit,
+  defaultType,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (b: boolean) => void;
+  firmId: string | null;
+  brandKits: BrandKitLite[];
+  activeBrandKit: BrandKitLite | null;
+  defaultType: string;
+  onCreated: (c: CompRow) => void;
+}) {
+  const [prompt, setPrompt] = useState("");
+  const [type, setType] = useState<string>(defaultType in COMPONENT_TYPE_META ? defaultType : "header");
+  const [kitId, setKitId] = useState<string>(activeBrandKit?.id || "");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setKitId(activeBrandKit?.id || brandKits[0]?.id || "");
+      setType(defaultType in COMPONENT_TYPE_META ? defaultType : "header");
+      setPrompt("");
+    }
+  }, [open, activeBrandKit, brandKits, defaultType]);
+
+  const handleGenerate = async () => {
+    if (!firmId) {
+      toast.error("Keine Firma zugeordnet");
+      return;
+    }
+    if (!prompt.trim()) {
+      toast.error("Bitte Beschreibung eingeben");
+      return;
+    }
+    const kit = brandKits.find((k) => k.id === kitId) || activeBrandKit;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-component", {
+        body: {
+          prompt,
+          component_type: type,
+          brand_kit: kit
+            ? {
+                primary_color: kit.primary_color,
+                secondary_color: kit.secondary_color,
+                accent_color: kit.accent_color,
+                logo_url: kit.logo_url,
+                logo_alt: kit.logo_alt,
+                name: kit.name,
+              }
+            : {},
+          firm_name: kit?.name || "",
+        },
+      });
+      if (error || !data?.html) {
+        toast.error("KI-Generierung fehlgeschlagen");
+        console.error(error || data);
+        return;
+      }
+      const { data: newComp, error: insErr } = await supabase
+        .from("components")
+        .insert({
+          firm_id: firmId,
+          brand_kit_id: kitId || null,
+          component_type: type,
+          variant: "ki_generated",
+          name: `KI: ${prompt.slice(0, 40)}`,
+          html_output: data.html,
+          embed_type: "both",
+          config: {},
+          is_global: false,
+        })
+        .select()
+        .single();
+      if (insErr || !newComp) {
+        toast.error("Speichern fehlgeschlagen");
+        console.error(insErr);
+        return;
+      }
+      onCreated(newComp as CompRow);
+      toast.success("Komponente erstellt ✓");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" /> Komponente mit KI erstellen
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label className="text-xs">Beschreibe die Komponente</Label>
+            <Textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              rows={5}
+              placeholder="z.B. Ein moderner Header im Ferrari-Stil mit Mega-Menu für 5 Hauptpunkte, Sticky beim Scrollen, Topbar mit Urgency-Text und WhatsApp-Button"
+              className="mt-1"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Komponenten-Typ</Label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.keys(COMPONENT_TYPE_META).map((t) => (
+                    <SelectItem key={t} value={t}>{TYPE_LABELS[t] || t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Brand Kit</Label>
+              <Select value={kitId} onValueChange={setKitId}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Kit wählen" /></SelectTrigger>
+                <SelectContent>
+                  {brandKits.map((k) => (
+                    <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            Abbrechen
+          </Button>
+          <Button onClick={() => void handleGenerate()} disabled={loading} className="gap-2">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            Generieren
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ───── Embed Tab ───── */
+interface SeoPageRow {
+  id: string;
+  keyword: string;
+  status: string | null;
+}
+
+function EmbedTab({
+  component,
+  firmId,
+}: {
+  component: CompRow;
+  firmId: string | null;
+}) {
+  const [pages, setPages] = useState<SeoPageRow[]>([]);
+  const [loadingPages, setLoadingPages] = useState(true);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [position, setPosition] = useState<"header" | "footer" | "before_content">("header");
+  const [applying, setApplying] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!firmId) {
+      setLoadingPages(false);
+      return;
+    }
+    void (async () => {
+      setLoadingPages(true);
+      const { data } = await supabase
+        .from("seo_pages")
+        .select("id, keyword, status")
+        .eq("firm_id", firmId)
+        .order("created_at", { ascending: false });
+      setPages((data as SeoPageRow[]) || []);
+      setLoadingPages(false);
+    })();
+  }, [firmId]);
+
+  const projectUrl = import.meta.env.VITE_SUPABASE_URL as string;
+  const html = component.html_output || "";
+
+  const jsEmbed = `<script>
+(function(){
+  fetch('${projectUrl}/functions/v1/embed-component?id=${component.embed_id}')
+    .then(function(r){ return r.text(); })
+    .then(function(html){
+      var el = document.createElement('div');
+      el.innerHTML = html;
+      var s = document.currentScript;
+      if (s && s.parentNode && el.firstChild) {
+        s.parentNode.insertBefore(el.firstChild, s);
+      }
+    });
+})();
+</script>`;
+
+  const copy = (text: string, label: string) => {
+    void navigator.clipboard.writeText(text);
+    toast.success(`${label} kopiert ✓`);
+  };
+
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  };
+
+  const toggleAll = () => {
+    if (selected.size === pages.length) setSelected(new Set());
+    else setSelected(new Set(pages.map((p) => p.id)));
+  };
+
+  const apply = async () => {
+    if (selected.size === 0) {
+      toast.error("Keine Seiten ausgewählt");
+      return;
+    }
+    setApplying(true);
+    setProgress(0);
+    let i = 0;
+    let failed = 0;
+    for (const pageId of selected) {
+      const { error } = await supabase
+        .from("page_components")
+        .upsert(
+          {
+            seo_page_id: pageId,
+            component_id: component.id,
+            position,
+            inject_mode: "replace",
+          },
+          { onConflict: "seo_page_id,position" },
+        );
+      if (error) {
+        console.error(error);
+        failed++;
+      }
+      i++;
+      setProgress(Math.round((i / selected.size) * 100));
+    }
+    setApplying(false);
+    if (failed > 0) {
+      toast.error(`${failed} Seite(n) fehlgeschlagen`);
+    } else {
+      toast.success(`Komponente auf ${selected.size} Seiten angewendet ✓`);
+      setSelected(new Set());
+    }
+  };
+
+  const showJsEmbed = component.embed_type !== "copy_paste";
+
+  return (
+    <div className="space-y-6">
+      {/* Two embed options */}
+      <div className={`grid gap-4 ${showJsEmbed ? "grid-cols-2" : "grid-cols-1"}`}>
+        <div className="border rounded-lg p-4 space-y-3">
+          <div>
+            <h4 className="font-medium text-sm">HTML kopieren</h4>
+            <p className="text-xs text-muted-foreground">
+              Direkt in externe HTML-Seite einbauen.
+            </p>
+          </div>
+          <Textarea
+            readOnly
+            value={html || "<!-- Erst 'Generieren' klicken -->"}
+            rows={6}
+            className="font-mono text-[11px]"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => copy(html, "HTML")}
+            disabled={!html}
+            className="gap-1.5 h-7 text-xs"
+          >
+            <Copy className="h-3 w-3" /> Code kopieren
+          </Button>
+        </div>
+
+        {showJsEmbed && (
+          <div className="border rounded-lg p-4 space-y-3">
+            <div>
+              <h4 className="font-medium text-sm">JavaScript Embed</h4>
+              <p className="text-xs text-muted-foreground">
+                Automatische Updates wenn Komponente geändert.
+              </p>
+            </div>
+            <Textarea
+              readOnly
+              value={jsEmbed}
+              rows={6}
+              className="font-mono text-[11px]"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => copy(jsEmbed, "Embed-Code")}
+              className="gap-1.5 h-7 text-xs"
+            >
+              <Copy className="h-3 w-3" /> Embed-Code kopieren
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Apply to SEO pages */}
+      <div className="border rounded-lg p-4 space-y-4">
+        <div>
+          <h4 className="font-medium text-sm">Auf SEO-Seiten anwenden</h4>
+          <p className="text-xs text-muted-foreground">
+            Komponente auf eine oder mehrere bestehende Seiten anwenden.
+          </p>
+        </div>
+
+        <div>
+          <Label className="text-xs mb-2 block">Position</Label>
+          <RadioGroup
+            value={position}
+            onValueChange={(v) => setPosition(v as typeof position)}
+            className="flex gap-4"
+          >
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="header" id="pos-header" />
+              <Label htmlFor="pos-header" className="text-xs">Header</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="footer" id="pos-footer" />
+              <Label htmlFor="pos-footer" className="text-xs">Footer</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="before_content" id="pos-before" />
+              <Label htmlFor="pos-before" className="text-xs">Vor Inhalt</Label>
+            </div>
+          </RadioGroup>
+        </div>
+
+        <div className="border rounded max-h-64 overflow-y-auto">
+          {loadingPages ? (
+            <div className="p-6 text-center text-xs text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+            </div>
+          ) : pages.length === 0 ? (
+            <p className="p-6 text-xs text-muted-foreground text-center">
+              Keine SEO-Seiten vorhanden.
+            </p>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 p-2 border-b bg-muted/30">
+                <Checkbox
+                  checked={selected.size === pages.length && pages.length > 0}
+                  onCheckedChange={toggleAll}
+                />
+                <span className="text-xs">Alle ({pages.length})</span>
+              </div>
+              {pages.map((p) => (
+                <label
+                  key={p.id}
+                  className="flex items-center gap-2 p-2 border-b last:border-b-0 hover:bg-muted/30 cursor-pointer"
+                >
+                  <Checkbox
+                    checked={selected.has(p.id)}
+                    onCheckedChange={() => toggle(p.id)}
+                  />
+                  <span className="text-xs flex-1 truncate">{p.keyword}</span>
+                  <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
+                    {p.status || "draft"}
+                  </span>
+                </label>
+              ))}
+            </>
+          )}
+        </div>
+
+        {applying && (
+          <div className="space-y-1">
+            <div className="h-2 bg-muted rounded overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground text-center">{progress}%</p>
+          </div>
+        )}
+
+        <Button
+          onClick={() => void apply()}
+          disabled={applying || selected.size === 0}
+          className="gap-2 w-full"
+        >
+          {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Auf ausgewählte Seiten anwenden ({selected.size})
+        </Button>
       </div>
     </div>
   );

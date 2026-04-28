@@ -392,6 +392,29 @@ function StudioPage() {
 
   /* ───── Render ───── */
 
+  if (roleLoading || resolvingFirm) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!firmId) {
+    return (
+      <div className="flex items-center justify-center h-64 text-center">
+        <div>
+          <p className="text-sm font-medium text-muted-foreground mb-2">
+            Keine Firma zugeordnet
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Bitte in Einstellungen eine Firma anlegen oder zuordnen.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       {/* Header */}

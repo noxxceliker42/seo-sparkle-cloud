@@ -541,13 +541,22 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
           name,
           componentType,
           variant,
-          designPhilosophy: philosophy,
+          designPhilosophy: aiProposal ? "custom_ai" : philosophy,
           htmlOutput: resultHtml,
           cssOutput: resultCss,
           jsOutput: resultJs,
           qaScore: qaScore ?? 0,
-          designData: { mood: useCustom ? customDescription : undefined },
+          designData: aiProposal ? { aiProposal } : { mood: useCustom ? customDescription : undefined },
         }}
+      />
+
+      <DesignConsultDialog
+        open={consultOpen}
+        onOpenChange={setConsultOpen}
+        componentType={componentType}
+        branche={branche ?? "hausgeraete"}
+        firm={firmName ?? ""}
+        onPick={handlePickProposal}
       />
     </div>
   );

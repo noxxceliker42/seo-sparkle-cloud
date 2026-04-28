@@ -9,14 +9,18 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Sparkles, Loader2, Star, Save, Copy, RefreshCw, Pencil,
-  Smartphone, Tablet, Monitor, AlertTriangle,
+  Smartphone, Tablet, Monitor, AlertTriangle, Wand2, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useComponentJob } from "@/hooks/useComponentJob";
 import { TemplatePickerDialog } from "./TemplatePickerDialog";
 import { SaveTemplateDialog } from "./SaveTemplateDialog";
+import { DesignConsultDialog, type DesignProposal } from "./DesignConsultDialog";
 import {
   STUDIO_COMPONENT_TYPES,
   STUDIO_PHILOSOPHIES,
@@ -73,11 +77,26 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
   /* UI */
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [consultOpen, setConsultOpen] = useState(false);
+  const [aiProposal, setAiProposal] = useState<DesignProposal | null>(null);
+  const [pages, setPages] = useState<{ id: string; keyword: string }[]>([]);
   const [previewWidth, setPreviewWidth] = useState<375 | 768 | 1200>(1200);
   const [elapsed, setElapsed] = useState(0);
   const startedRef = useRef<number | null>(null);
 
   const { triggerGeneration, isGenerating, error, cancel } = useComponentJob();
+
+  /* Load firm pages for "In Seite einbauen" */
+  useEffect(() => {
+    if (!firmId) { setPages([]); return; }
+    void supabase
+      .from("seo_pages")
+      .select("id, keyword")
+      .eq("firm_id", firmId)
+      .order("updated_at", { ascending: false })
+      .limit(50)
+      .then(({ data }) => setPages((data ?? []) as any));
+  }, [firmId]);
 
   /* Update variant when type changes */
   const variants = useMemo(
@@ -126,6 +145,7 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
   };
 
   const handleGenerate = async () => {
+    if (isGenerating) return; // hard guard against double-fire
     if (!firmId) {
       toast.error("Keine Firma zugeordnet");
       return;
@@ -140,6 +160,10 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
     setResultHtml(null); setResultCss(null); setResultJs(null);
     setQaScore(null); setTokens(null); setWarnings([]);
 
+    const philosophyOverride = aiProposal
+      ? `KI-Vorschlag: ${aiProposal.name} — ${aiProposal.mood}\nCSS: ${aiProposal.css}\nRegeln: ${aiProposal.rules?.join(" | ")}\nFonts: ${aiProposal.googleFonts?.join(", ")}\nAnimationen: ${aiProposal.animations?.join(", ")}\nTexturen: ${aiProposal.textures}`
+      : (useCustom ? customDescription : undefined);
+
     try {
       const job = await triggerGeneration({
         componentType,
@@ -147,17 +171,20 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
         name,
         description: customDescription || undefined,
         prompt: extraPrompt || undefined,
-        designPhilosophy: philosophy,
-        designPhilosophyCustom: useCustom ? customDescription : undefined,
+        designPhilosophy: aiProposal ? "custom_ai" : philosophy,
+        designPhilosophyCustom: philosophyOverride,
         brandKit: activeBrandKit ? { ...activeBrandKit } as Record<string, unknown> : undefined,
         brandKitId: activeBrandKit?.id,
         templateId: templateId ?? undefined,
         templateHtml: templateHtml ?? undefined,
+        config: aiProposal ? { aiProposal } : undefined,
         firmId,
         userId,
         firm: firmName ?? "",
         branche: branche ?? "hausgeraete",
       });
+
+      if (!job) return; // ignored due to lock
 
       if (job.status === "completed") {
         setResultHtml(job.html_output);
@@ -173,6 +200,47 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
     } catch (e: any) {
       toast.error(e.message ?? "Fehler bei der Generierung");
     }
+  };
+
+  const handleInsertIntoPage = async (pageId: string, pageLabel: string) => {
+    if (!resultHtml) return;
+    // Persist the component first if not already saved
+    let componentId: string | null = null;
+    const { data: comp, error: compErr } = await supabase
+      .from("components")
+      .insert({
+        firm_id: firmId,
+        component_type: componentType,
+        variant,
+        name,
+        html_output: resultHtml,
+        css_output: resultCss,
+        js_output: resultJs,
+      })
+      .select("id")
+      .single();
+    if (compErr || !comp) {
+      toast.error("Komponente konnte nicht gespeichert werden");
+      return;
+    }
+    componentId = comp.id;
+    const { error: pcErr } = await supabase.from("page_components").insert({
+      seo_page_id: pageId,
+      component_id: componentId,
+      position: componentType === "footer" ? "footer" : "header",
+      inject_mode: "replace",
+    });
+    if (pcErr) {
+      toast.error("Einbau fehlgeschlagen");
+      return;
+    }
+    toast.success(`Komponente wurde zu „${pageLabel}" hinzugefügt`);
+  };
+
+  const handlePickProposal = (p: DesignProposal) => {
+    setAiProposal(p);
+    setUseCustom(false);
+    toast.success(`✨ Design „${p.name}" übernommen`);
   };
 
   /* Preview srcdoc */
@@ -212,29 +280,58 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
           </Field>
 
           <Field label="Design-Stil">
-            <Select value={philosophy} onValueChange={setPhilosophy}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STUDIO_PHILOSOPHIES.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    <span className="flex items-center gap-2">
-                      <span className="flex gap-0.5">
-                        {p.colors.map((c, i) => (
-                          <span key={i} className="w-2.5 h-2.5 rounded-full border border-white/20" style={{ background: c }} />
-                        ))}
+            {aiProposal ? (
+              <div className="flex items-center gap-2 border border-primary/40 rounded-md px-3 py-2 bg-primary/5">
+                <Wand2 className="h-4 w-4 text-primary flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">✨ {aiProposal.name} (KI-Vorschlag)</div>
+                  <div className="flex gap-1 mt-1">
+                    {[aiProposal.colors?.primary, aiProposal.colors?.primaryDark, aiProposal.colors?.accent, aiProposal.colors?.background, aiProposal.colors?.text]
+                      .filter(Boolean)
+                      .map((c, i) => (
+                        <span key={i} className="w-2.5 h-2.5 rounded-full border border-white/20" style={{ background: c }} />
+                      ))}
+                  </div>
+                </div>
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAiProposal(null)}>
+                  Entfernen
+                </Button>
+              </div>
+            ) : (
+              <Select value={philosophy} onValueChange={setPhilosophy}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STUDIO_PHILOSOPHIES.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <span className="flex items-center gap-2">
+                        <span className="flex gap-0.5">
+                          {p.colors.map((c, i) => (
+                            <span key={i} className="w-2.5 h-2.5 rounded-full border border-white/20" style={{ background: c }} />
+                          ))}
+                        </span>
+                        {p.name}
                       </span>
-                      {p.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <label className="flex items-center gap-2 text-xs mt-2 cursor-pointer">
-              <Checkbox checked={useCustom} onCheckedChange={(v) => setUseCustom(Boolean(v))} />
-              Custom-Beschreibung
-            </label>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <div className="flex items-center justify-between mt-2 gap-2 flex-wrap">
+              <label className="flex items-center gap-2 text-xs cursor-pointer">
+                <Checkbox checked={useCustom} onCheckedChange={(v) => setUseCustom(Boolean(v))} disabled={!!aiProposal} />
+                Custom-Beschreibung
+              </label>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1"
+                onClick={() => setConsultOpen(true)}
+              >
+                <Wand2 className="h-3 w-3" /> KI Design-Beratung
+              </Button>
+            </div>
           </Field>
 
           <Field label="Name">
@@ -382,21 +479,43 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
             </TabsContent>
           </Tabs>
 
-          {/* Action bar */}
-          <div className="border-t border-mc-border px-4 py-3 flex flex-wrap items-center gap-3 bg-mc-bg">
-            <Stat label="QA" value={qaScore != null ? `${qaScore}%` : "—"} ok={(qaScore ?? 0) >= 85} />
-            <Stat label="Tokens" value={tokens != null ? `${(tokens / 1000).toFixed(1)}k` : "—"} />
-            <Stat label="Zeit" value={`${elapsed}s`} />
-            <div className="flex-1" />
-            <Button size="sm" onClick={() => setSaveOpen(true)} className="gap-2">
-              <Save className="h-3.5 w-3.5" /> Als Vorlage speichern
-            </Button>
-            <Button size="sm" variant="outline" onClick={handleGenerate} disabled={isGenerating} className="gap-2">
-              <RefreshCw className="h-3.5 w-3.5" /> Regenerieren
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setUseCustom(true)} className="gap-2">
-              <Pencil className="h-3.5 w-3.5" /> Anpassen
-            </Button>
+          {/* Action bar — stack on mobile, row on md+ */}
+          <div className="border-t border-mc-border px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 bg-mc-bg">
+            <div className="flex flex-wrap items-center gap-3">
+              <Stat label="QA" value={qaScore != null ? `${qaScore}%` : "—"} ok={(qaScore ?? 0) >= 85} />
+              <Stat label="Tokens" value={tokens != null ? `${(tokens / 1000).toFixed(1)}k` : "—"} />
+              <Stat label="Zeit" value={`${elapsed}s`} />
+            </div>
+            <div className="md:flex-1" />
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setSaveOpen(true)} className="gap-2 min-h-[44px] md:min-h-0">
+                <Save className="h-3.5 w-3.5" /> Als Vorlage speichern
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="gap-2 min-h-[44px] md:min-h-0" disabled={pages.length === 0}>
+                    <Download className="h-3.5 w-3.5" /> In Seite einbauen
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                  {pages.length === 0 ? (
+                    <DropdownMenuItem disabled>Keine Seiten verfügbar</DropdownMenuItem>
+                  ) : (
+                    pages.map((p) => (
+                      <DropdownMenuItem key={p.id} onClick={() => handleInsertIntoPage(p.id, p.keyword)}>
+                        {p.keyword}
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button size="sm" variant="outline" onClick={handleGenerate} disabled={isGenerating} className="gap-2 min-h-[44px] md:min-h-0">
+                <RefreshCw className="h-3.5 w-3.5" /> Regenerieren
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setUseCustom(true)} className="gap-2 min-h-[44px] md:min-h-0">
+                <Pencil className="h-3.5 w-3.5" /> Anpassen
+              </Button>
+            </div>
           </div>
 
           {warnings.length > 0 && (
@@ -422,13 +541,22 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
           name,
           componentType,
           variant,
-          designPhilosophy: philosophy,
+          designPhilosophy: aiProposal ? "custom_ai" : philosophy,
           htmlOutput: resultHtml,
           cssOutput: resultCss,
           jsOutput: resultJs,
           qaScore: qaScore ?? 0,
-          designData: { mood: useCustom ? customDescription : undefined },
+          designData: aiProposal ? { aiProposal } : { mood: useCustom ? customDescription : undefined },
         }}
+      />
+
+      <DesignConsultDialog
+        open={consultOpen}
+        onOpenChange={setConsultOpen}
+        componentType={componentType}
+        branche={branche ?? "hausgeraete"}
+        firm={firmName ?? ""}
+        onPick={handlePickProposal}
       />
     </div>
   );

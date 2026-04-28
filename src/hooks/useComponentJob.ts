@@ -17,6 +17,7 @@ export function useComponentJob() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cancelRef = useRef(false);
+  const inFlightRef = useRef(false);
 
   const getJobByJobId = useCallback(async (jobId: string) => {
     const { data, error } = await supabase
@@ -56,6 +57,11 @@ export function useComponentJob() {
 
   const triggerGeneration = useCallback(
     async (payload: TriggerGenerationPayload) => {
+      if (inFlightRef.current) {
+        console.warn("[useComponentJob] triggerGeneration ignored — already in flight");
+        return null as any;
+      }
+      inFlightRef.current = true;
       setIsGenerating(true);
       setError(null);
       setJob(null);

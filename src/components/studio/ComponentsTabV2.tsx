@@ -77,11 +77,26 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
   /* UI */
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [consultOpen, setConsultOpen] = useState(false);
+  const [aiProposal, setAiProposal] = useState<DesignProposal | null>(null);
+  const [pages, setPages] = useState<{ id: string; keyword: string }[]>([]);
   const [previewWidth, setPreviewWidth] = useState<375 | 768 | 1200>(1200);
   const [elapsed, setElapsed] = useState(0);
   const startedRef = useRef<number | null>(null);
 
   const { triggerGeneration, isGenerating, error, cancel } = useComponentJob();
+
+  /* Load firm pages for "In Seite einbauen" */
+  useEffect(() => {
+    if (!firmId) { setPages([]); return; }
+    void supabase
+      .from("seo_pages")
+      .select("id, keyword")
+      .eq("firm_id", firmId)
+      .order("updated_at", { ascending: false })
+      .limit(50)
+      .then(({ data }) => setPages((data ?? []) as any));
+  }, [firmId]);
 
   /* Update variant when type changes */
   const variants = useMemo(

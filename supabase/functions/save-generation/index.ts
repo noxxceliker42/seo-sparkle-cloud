@@ -224,6 +224,77 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
+    // ── ACTION: save_component ──────────────────────────────
+    if (action === "save_component") {
+      const componentJobId = body.componentId || body.jobId;
+      if (!componentJobId) {
+        return jsonResponse({ error: "componentId (job_id) is required" }, 400);
+      }
+
+      const { error: jobErr } = await supabase
+        .from("component_jobs")
+        .update({
+          status: "completed",
+          html_output: body.htmlOutput ?? null,
+          css_output: body.cssOutput ?? null,
+          js_output: body.jsOutput ?? null,
+          qa_score: body.qaScore ?? null,
+          warnings: body.warnings ?? [],
+          tokens_used: body.tokensUsed ?? 0,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("job_id", componentJobId);
+
+      if (jobErr) {
+        console.error("save_component update error:", jobErr);
+        return jsonResponse({ error: "Failed to update component_job", detail: jobErr.message }, 500);
+      }
+
+      // Optional: also persist into components table
+      if (body.firmId && body.componentType) {
+        const { error: compErr } = await supabase.from("components").upsert({
+          firm_id: body.firmId,
+          brand_kit_id: body.brandKitId || null,
+          component_type: body.componentType,
+          variant: body.variant || "standard",
+          name: body.name || "Unbenannt",
+          description: body.description || null,
+          html_output: body.htmlOutput ?? null,
+          css_output: body.cssOutput ?? null,
+          js_output: body.jsOutput ?? null,
+          config: body.config || {},
+          updated_at: new Date().toISOString(),
+        });
+        if (compErr) console.error("components upsert error:", compErr);
+      }
+
+      return jsonResponse({ success: true, jobId: componentJobId });
+    }
+
+    // ── ACTION: component_error ─────────────────────────────
+    if (action === "component_error") {
+      const componentJobId = body.jobId || body.componentId;
+      if (!componentJobId) {
+        return jsonResponse({ error: "jobId is required" }, 400);
+      }
+
+      const { error: errUpdate } = await supabase
+        .from("component_jobs")
+        .update({
+          status: "error",
+          error_message: body.error || body.errorMessage || "Unknown error",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("job_id", componentJobId);
+
+      if (errUpdate) {
+        console.error("component_error update error:", errUpdate);
+        return jsonResponse({ error: "Failed to update component_job", detail: errUpdate.message }, 500);
+      }
+
+      return jsonResponse({ success: true, jobId: componentJobId });
+    }
+
     // ── ACTION: save (default) ──────────────────────────────
     const {
       jobId,

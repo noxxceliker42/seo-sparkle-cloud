@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,11 +87,11 @@ function ClusterNeuPage() {
   const [firms, setFirms] = useState<Firm[]>([]);
 
   // Load firms for per-page selector
-  useState(() => {
+  useEffect(() => {
     supabase.from("firms").select("*").order("name").then(({ data }) => {
       if (data) setFirms(data);
     });
-  });
+  }, []);
 
   const handleAnalyze = async () => {
     if (!pillarKeyword.trim()) return;

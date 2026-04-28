@@ -58,28 +58,31 @@ const AnalysisContext = createContext<AnalysisContextValue>({
 /* ── Provider ── */
 
 export function AnalysisProvider({ children }: { children: ReactNode }) {
-  const [state, _setState] = useState<AnalysisState>(() => {
+  const [state, _setState] = useState<AnalysisState>(EMPTY_STATE);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
     const stored = storage.get<AnalysisState>("analysis", EMPTY_STATE);
-    // If was running, keep that state so polling resumes
     if (stored.isRunning && stored.jobId) {
-      return {
+      _setState({
         ...EMPTY_STATE,
         isRunning: true,
         keyword: stored.keyword || "",
         mode: stored.mode || "standard",
         jobId: stored.jobId,
         savedAnalysisId: stored.savedAnalysisId || null,
-        // Restore result if it was persisted
         result: stored.result || null,
-      };
+      });
+    } else {
+      _setState({
+        ...EMPTY_STATE,
+        keyword: stored.keyword || "",
+        savedAnalysisId: stored.savedAnalysisId || null,
+        result: stored.result || null,
+      });
     }
-    return {
-      ...EMPTY_STATE,
-      keyword: stored.keyword || "",
-      savedAnalysisId: stored.savedAnalysisId || null,
-      result: stored.result || null,
-    };
-  });
+    setHydrated(true);
+  }, []);
 
   const stateRef = useRef(state);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);

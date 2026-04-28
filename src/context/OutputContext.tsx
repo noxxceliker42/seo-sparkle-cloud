@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { storage } from "@/lib/storage";
 
@@ -45,9 +45,12 @@ const OutputContext = createContext<OutputContextValue>({
 });
 
 export function OutputProvider({ children }: { children: ReactNode }) {
-  const [output, _setOutput] = useState<OutputState>(() =>
-    storage.get<OutputState>("output", EMPTY_OUTPUT),
-  );
+  const [output, _setOutput] = useState<OutputState>(EMPTY_OUTPUT);
+
+  useEffect(() => {
+    const stored = storage.get<OutputState>("output", EMPTY_OUTPUT);
+    if (stored) _setOutput(stored);
+  }, []);
 
   const setOutput = useCallback((data: Partial<OutputState>) => {
     _setOutput((prev) => {

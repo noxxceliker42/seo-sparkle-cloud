@@ -9,14 +9,18 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Sparkles, Loader2, Star, Save, Copy, RefreshCw, Pencil,
-  Smartphone, Tablet, Monitor, AlertTriangle,
+  Smartphone, Tablet, Monitor, AlertTriangle, Wand2, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useComponentJob } from "@/hooks/useComponentJob";
 import { TemplatePickerDialog } from "./TemplatePickerDialog";
 import { SaveTemplateDialog } from "./SaveTemplateDialog";
+import { DesignConsultDialog, type DesignProposal } from "./DesignConsultDialog";
 import {
   STUDIO_COMPONENT_TYPES,
   STUDIO_PHILOSOPHIES,

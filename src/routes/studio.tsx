@@ -36,6 +36,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { ComponentsTab } from "@/components/studio/ComponentsTab";
+import { ComponentsTabV2 } from "@/components/studio/ComponentsTabV2";
 
 export const Route = createFileRoute("/studio")({
   component: StudioPage,
@@ -716,8 +717,17 @@ function StudioPage() {
           )}
         </TabsContent>
 
-        {/* Tab 2: Components */}
+        {/* Tab 2: Components — KI-Generator */}
         <TabsContent value="components" className="mt-6">
+          <ComponentsTabV2
+            firmId={firmId}
+            brandKits={brandKits}
+            activeBrandKit={activeBrandKit}
+          />
+        </TabsContent>
+
+        {/* Tab 2b: Legacy Komponenten-Manager (vorhanden, deaktiviert) */}
+        {false && (
           <ComponentsTab
             firmId={firmId}
             brandKits={brandKits}
@@ -725,7 +735,7 @@ function StudioPage() {
             components={components}
             onComponentsChange={setComponents}
           />
-        </TabsContent>
+        )}
 
         {/* Tab 3: Export (Stub) */}
         <TabsContent value="export" className="mt-6">

@@ -479,21 +479,43 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
             </TabsContent>
           </Tabs>
 
-          {/* Action bar */}
-          <div className="border-t border-mc-border px-4 py-3 flex flex-wrap items-center gap-3 bg-mc-bg">
-            <Stat label="QA" value={qaScore != null ? `${qaScore}%` : "—"} ok={(qaScore ?? 0) >= 85} />
-            <Stat label="Tokens" value={tokens != null ? `${(tokens / 1000).toFixed(1)}k` : "—"} />
-            <Stat label="Zeit" value={`${elapsed}s`} />
-            <div className="flex-1" />
-            <Button size="sm" onClick={() => setSaveOpen(true)} className="gap-2">
-              <Save className="h-3.5 w-3.5" /> Als Vorlage speichern
-            </Button>
-            <Button size="sm" variant="outline" onClick={handleGenerate} disabled={isGenerating} className="gap-2">
-              <RefreshCw className="h-3.5 w-3.5" /> Regenerieren
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setUseCustom(true)} className="gap-2">
-              <Pencil className="h-3.5 w-3.5" /> Anpassen
-            </Button>
+          {/* Action bar — stack on mobile, row on md+ */}
+          <div className="border-t border-mc-border px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 bg-mc-bg">
+            <div className="flex flex-wrap items-center gap-3">
+              <Stat label="QA" value={qaScore != null ? `${qaScore}%` : "—"} ok={(qaScore ?? 0) >= 85} />
+              <Stat label="Tokens" value={tokens != null ? `${(tokens / 1000).toFixed(1)}k` : "—"} />
+              <Stat label="Zeit" value={`${elapsed}s`} />
+            </div>
+            <div className="md:flex-1" />
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setSaveOpen(true)} className="gap-2 min-h-[44px] md:min-h-0">
+                <Save className="h-3.5 w-3.5" /> Als Vorlage speichern
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="gap-2 min-h-[44px] md:min-h-0" disabled={pages.length === 0}>
+                    <Download className="h-3.5 w-3.5" /> In Seite einbauen
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                  {pages.length === 0 ? (
+                    <DropdownMenuItem disabled>Keine Seiten verfügbar</DropdownMenuItem>
+                  ) : (
+                    pages.map((p) => (
+                      <DropdownMenuItem key={p.id} onClick={() => handleInsertIntoPage(p.id, p.keyword)}>
+                        {p.keyword}
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button size="sm" variant="outline" onClick={handleGenerate} disabled={isGenerating} className="gap-2 min-h-[44px] md:min-h-0">
+                <RefreshCw className="h-3.5 w-3.5" /> Regenerieren
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setUseCustom(true)} className="gap-2 min-h-[44px] md:min-h-0">
+                <Pencil className="h-3.5 w-3.5" /> Anpassen
+              </Button>
+            </div>
           </div>
 
           {warnings.length > 0 && (

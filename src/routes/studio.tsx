@@ -169,11 +169,13 @@ function StudioPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { data: firm } = await supabase
+        const { data: firms } = await supabase
           .from("firms")
-          .select("id")
+          .select("id, name")
           .eq("user_id", user.id)
-          .maybeSingle();
+          .order("created_at")
+          .limit(1);
+        const firm = firms?.[0] ?? null;
         if (firm?.id) {
           setFirmId(firm.id);
           return;

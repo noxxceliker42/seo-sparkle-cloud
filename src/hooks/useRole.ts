@@ -9,22 +9,34 @@ export function useRole() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setLoading(false); return }
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user || cancelled) {
+          if (!cancelled) setLoading(false)
+          return
+        }
 
-      const [roleRes, profileRes] = await Promise.all([
-        supabase.from('user_roles')
-          .select('role').eq('user_id', user.id).maybeSingle(),
-        supabase.from('profiles')
-          .select('firm_id').eq('id', user.id).maybeSingle()
-      ])
+        const [roleRes, profileRes] = await Promise.all([
+          supabase.from('user_roles')
+            .select('role').eq('user_id', user.id).maybeSingle(),
+          supabase.from('profiles')
+            .select('firm_id').eq('id', user.id).maybeSingle()
+        ])
 
-      setRole((roleRes.data?.role as AppRole) ?? null)
-      setFirmId(profileRes.data?.firm_id ?? null)
-      setLoading(false)
+        if (cancelled) return
+
+        setRole((roleRes.data?.role as AppRole) ?? null)
+        setFirmId(profileRes.data?.firm_id ?? null)
+      } catch (err) {
+        console.error('useRole error:', err)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
     load()
+    return () => { cancelled = true }
   }, [])
 
   return {

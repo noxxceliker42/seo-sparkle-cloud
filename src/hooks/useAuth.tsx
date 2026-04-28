@@ -44,20 +44,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const fetchProfileAndRole = useCallback(async (userId: string) => {
-    const [profileRes, roleRes] = await Promise.all([
-      supabase.from("profiles").select("*").eq("id", userId).single(),
-      supabase.from("user_roles").select("role").eq("user_id", userId),
-    ]);
+    try {
+      const [profileRes, roleRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+        supabase.from("user_roles").select("role").eq("user_id", userId),
+      ]);
 
-    const profile = profileRes.data as Profile | null;
-    // Pick highest role
-    const roles = (roleRes.data || []).map((r: { role: string }) => r.role as AppRole);
-    let bestRole: AppRole | null = null;
-    for (const r of roles) {
-      if (!bestRole || ROLE_HIERARCHY[r] > ROLE_HIERARCHY[bestRole]) bestRole = r;
+      const profile = profileRes.data as Profile | null;
+      const roles = (roleRes.data || []).map((r: { role: string }) => r.role as AppRole);
+      let bestRole: AppRole | null = null;
+      for (const r of roles) {
+        if (!bestRole || ROLE_HIERARCHY[r] > ROLE_HIERARCHY[bestRole]) bestRole = r;
+      }
+
+      return { profile, role: bestRole };
+    } catch (err) {
+      console.error("fetchProfileAndRole error:", err);
+      return { profile: null, role: null };
     }
-
-    return { profile, role: bestRole };
   }, []);
 
   const refreshProfile = useCallback(async () => {

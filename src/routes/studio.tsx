@@ -145,8 +145,48 @@ const buildKitPreviewHtml = (kit: BrandKit) => `
 /* ───── Component ───── */
 
 function StudioPage() {
-  const { firmId, loading: roleLoading } = useRole();
+  const { firmId: roleFirmId, loading: roleLoading } = useRole();
+  const [firmId, setFirmId] = useState<string | null>(null);
+  const [resolvingFirm, setResolvingFirm] = useState(true);
   const [brandKits, setBrandKits] = useState<BrandKit[]>([]);
+
+  /* Resolve firmId with fallbacks */
+  useEffect(() => {
+    if (roleLoading) return;
+    const resolveFirmId = async () => {
+      setResolvingFirm(true);
+      try {
+        if (roleFirmId) {
+          setFirmId(roleFirmId);
+          return;
+        }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: firm } = await supabase
+          .from("firms")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (firm?.id) {
+          setFirmId(firm.id);
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("firm_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (profile?.firm_id) {
+          setFirmId(profile.firm_id);
+        }
+      } finally {
+        setResolvingFirm(false);
+      }
+    };
+    void resolveFirmId();
+  }, [roleFirmId, roleLoading]);
   const [activeBrandKit, setActiveBrandKit] = useState<BrandKit | null>(null);
   const [components, setComponents] = useState<Component[]>([]);
   const [loading, setLoading] = useState(true);

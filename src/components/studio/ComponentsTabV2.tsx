@@ -181,9 +181,12 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
     setResultHtml(null); setResultCss(null); setResultJs(null);
     setQaScore(null); setTokens(null); setWarnings([]);
 
-    const philosophyOverride = aiProposal
-      ? `KI-Vorschlag: ${aiProposal.name} — ${aiProposal.mood}\nCSS: ${aiProposal.css}\nRegeln: ${aiProposal.rules?.join(" | ")}\nFonts: ${aiProposal.googleFonts?.join(", ")}\nAnimationen: ${aiProposal.animations?.join(", ")}\nTexturen: ${aiProposal.textures}`
-      : (useCustom ? customDescription : undefined);
+    const confirmedExpanded = isDesignConfirmed && expandedDesign ? expandedDesign : null;
+    const philosophyOverride = confirmedExpanded
+      ? `KI-vervollständigt: ${confirmedExpanded.name} — ${confirmedExpanded.mood}\n${confirmedExpanded.expandedDescription}\nCSS: ${confirmedExpanded.css}\nRegeln: ${confirmedExpanded.rules?.join(" | ")}\nFonts: ${confirmedExpanded.googleFonts?.join(", ")}\nAnimationen: ${confirmedExpanded.animations?.join(", ")}\nTexturen: ${confirmedExpanded.textures}`
+      : aiProposal
+        ? `KI-Vorschlag: ${aiProposal.name} — ${aiProposal.mood}\nCSS: ${aiProposal.css}\nRegeln: ${aiProposal.rules?.join(" | ")}\nFonts: ${aiProposal.googleFonts?.join(", ")}\nAnimationen: ${aiProposal.animations?.join(", ")}\nTexturen: ${aiProposal.textures}`
+        : (useCustom ? customDescription : undefined);
 
     try {
       const job = await triggerGeneration({
@@ -192,13 +195,17 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
         name,
         description: customDescription || undefined,
         prompt: extraPrompt || undefined,
-        designPhilosophy: aiProposal ? "custom_ai" : philosophy,
+        designPhilosophy: confirmedExpanded ? "custom_ai" : aiProposal ? "custom_ai" : philosophy,
         designPhilosophyCustom: philosophyOverride,
         brandKit: activeBrandKit ? { ...activeBrandKit } as Record<string, unknown> : undefined,
         brandKitId: activeBrandKit?.id,
         templateId: templateId ?? undefined,
         templateHtml: templateHtml ?? undefined,
-        config: aiProposal ? { aiProposal } : undefined,
+        config: confirmedExpanded
+          ? { expandedDesign: confirmedExpanded, hasCustomDesign: true }
+          : aiProposal
+            ? { aiProposal }
+            : undefined,
         firmId,
         userId,
         firm: firmName ?? "",

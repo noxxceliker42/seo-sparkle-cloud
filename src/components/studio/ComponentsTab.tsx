@@ -445,9 +445,7 @@ export function ComponentsTab({
             </TabsContent>
 
             <TabsContent value="embed" className="mt-4">
-              <div className="border rounded-lg p-8 text-center text-sm text-muted-foreground">
-                Embed-Export folgt im nächsten Schritt (Prompt 3).
-              </div>
+              <EmbedTab component={active} firmId={firmId} />
             </TabsContent>
           </Tabs>
         )}

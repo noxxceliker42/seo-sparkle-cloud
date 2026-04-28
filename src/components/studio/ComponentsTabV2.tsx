@@ -149,7 +149,7 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
         prompt: extraPrompt || undefined,
         designPhilosophy: philosophy,
         designPhilosophyCustom: useCustom ? customDescription : undefined,
-        brandKit: activeBrandKit ?? undefined,
+        brandKit: activeBrandKit ? { ...activeBrandKit } as Record<string, unknown> : undefined,
         brandKitId: activeBrandKit?.id,
         templateId: templateId ?? undefined,
         templateHtml: templateHtml ?? undefined,

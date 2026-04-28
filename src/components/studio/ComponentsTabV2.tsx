@@ -38,6 +38,24 @@ interface BrandKitLite {
   logo_alt: string | null;
 }
 
+interface ExpandedDesign {
+  name: string;
+  mood: string;
+  css: string;
+  rules: string[];
+  animations: string[];
+  textures: string;
+  googleFonts: string[];
+  colors: {
+    primary: string;
+    primaryDark: string;
+    accent: string;
+    background: string;
+    text: string;
+  };
+  expandedDescription: string;
+}
+
 interface Props {
   firmId: string | null;
   brandKits: BrandKitLite[];

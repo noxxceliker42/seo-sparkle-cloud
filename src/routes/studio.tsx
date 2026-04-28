@@ -149,6 +149,12 @@ function StudioPage() {
   const [firmId, setFirmId] = useState<string | null>(null);
   const [resolvingFirm, setResolvingFirm] = useState(true);
   const [brandKits, setBrandKits] = useState<BrandKit[]>([]);
+  const [activeBrandKit, setActiveBrandKit] = useState<BrandKit | null>(null);
+  const [components, setComponents] = useState<Component[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* Resolve firmId with fallbacks */
   useEffect(() => {
@@ -187,23 +193,17 @@ function StudioPage() {
     };
     void resolveFirmId();
   }, [roleFirmId, roleLoading]);
-  const [activeBrandKit, setActiveBrandKit] = useState<BrandKit | null>(null);
-  const [components, setComponents] = useState<Component[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* Load */
   useEffect(() => {
-    if (roleLoading) return;
+    if (roleLoading || resolvingFirm) return;
     if (!firmId) {
       setLoading(false);
       return;
     }
     void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firmId, roleLoading]);
+  }, [firmId, roleLoading, resolvingFirm]);
 
   const loadData = async () => {
     if (!firmId) return;

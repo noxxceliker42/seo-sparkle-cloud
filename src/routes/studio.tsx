@@ -650,16 +650,15 @@ function StudioPage() {
           )}
         </TabsContent>
 
-        {/* Tab 2: Components (Stub) */}
+        {/* Tab 2: Components */}
         <TabsContent value="components" className="mt-6">
-          <div className="border rounded-lg p-12 text-center">
-            <LayersIcon className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="font-medium mb-2">Komponenten</h3>
-            <p className="text-sm text-muted-foreground">
-              {components.length} Komponente{components.length === 1 ? "" : "n"} verfügbar.
-              Editor folgt im nächsten Schritt.
-            </p>
-          </div>
+          <ComponentsTab
+            firmId={firmId}
+            brandKits={brandKits}
+            activeBrandKit={activeBrandKit}
+            components={components}
+            onComponentsChange={setComponents}
+          />
         </TabsContent>
 
         {/* Tab 3: Export (Stub) */}

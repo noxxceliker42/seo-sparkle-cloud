@@ -38,6 +38,24 @@ interface BrandKitLite {
   logo_alt: string | null;
 }
 
+interface ExpandedDesign {
+  name: string;
+  mood: string;
+  css: string;
+  rules: string[];
+  animations: string[];
+  textures: string;
+  googleFonts: string[];
+  colors: {
+    primary: string;
+    primaryDark: string;
+    accent: string;
+    background: string;
+    text: string;
+  };
+  expandedDescription: string;
+}
+
 interface Props {
   firmId: string | null;
   brandKits: BrandKitLite[];
@@ -79,6 +97,9 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
   const [saveOpen, setSaveOpen] = useState(false);
   const [consultOpen, setConsultOpen] = useState(false);
   const [aiProposal, setAiProposal] = useState<DesignProposal | null>(null);
+  const [isExpandingDesign, setIsExpandingDesign] = useState(false);
+  const [expandedDesign, setExpandedDesign] = useState<ExpandedDesign | null>(null);
+  const [isDesignConfirmed, setIsDesignConfirmed] = useState(false);
   const [pages, setPages] = useState<{ id: string; keyword: string }[]>([]);
   const [previewWidth, setPreviewWidth] = useState<375 | 768 | 1200>(1200);
   const [elapsed, setElapsed] = useState(0);
@@ -144,6 +165,49 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
     toast.success(`Vorlage „${t.name}" geladen`);
   };
 
+  const handleExpandDesign = async () => {
+    const input = customDescription.trim();
+    if (input.length < 3) {
+      toast.error("Bitte mindestens 3 Zeichen eingeben");
+      return;
+    }
+    setIsExpandingDesign(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("studio-design-expand", {
+        body: {
+          shortInput: input,
+          componentType,
+          branche: branche ?? "hausgeraete",
+          firm: firmName ?? "",
+        },
+      });
+      if (error) throw error;
+      if (!data || data.error) throw new Error(data?.error ?? "Keine Antwort");
+      if (!data.name || !data.colors) throw new Error("Unvollständige Antwort");
+      setExpandedDesign(data as ExpandedDesign);
+      setIsDesignConfirmed(false);
+      toast.success("Design-Vorschlag erstellt ✓");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Vervollständigung fehlgeschlagen");
+    } finally {
+      setIsExpandingDesign(false);
+    }
+  };
+
+  const handleConfirmExpanded = () => {
+    if (!expandedDesign) return;
+    setCustomDescription(expandedDesign.expandedDescription);
+    setIsDesignConfirmed(true);
+    toast.success("Design übernommen ✨");
+  };
+
+  const handleEditExpanded = () => {
+    if (!expandedDesign) return;
+    setCustomDescription(expandedDesign.expandedDescription);
+    setExpandedDesign(null);
+    setIsDesignConfirmed(false);
+  };
+
   const handleGenerate = async () => {
     if (isGenerating) return; // hard guard against double-fire
     if (!firmId) {
@@ -160,9 +224,12 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
     setResultHtml(null); setResultCss(null); setResultJs(null);
     setQaScore(null); setTokens(null); setWarnings([]);
 
-    const philosophyOverride = aiProposal
-      ? `KI-Vorschlag: ${aiProposal.name} — ${aiProposal.mood}\nCSS: ${aiProposal.css}\nRegeln: ${aiProposal.rules?.join(" | ")}\nFonts: ${aiProposal.googleFonts?.join(", ")}\nAnimationen: ${aiProposal.animations?.join(", ")}\nTexturen: ${aiProposal.textures}`
-      : (useCustom ? customDescription : undefined);
+    const confirmedExpanded = isDesignConfirmed && expandedDesign ? expandedDesign : null;
+    const philosophyOverride = confirmedExpanded
+      ? `KI-vervollständigt: ${confirmedExpanded.name} — ${confirmedExpanded.mood}\n${confirmedExpanded.expandedDescription}\nCSS: ${confirmedExpanded.css}\nRegeln: ${confirmedExpanded.rules?.join(" | ")}\nFonts: ${confirmedExpanded.googleFonts?.join(", ")}\nAnimationen: ${confirmedExpanded.animations?.join(", ")}\nTexturen: ${confirmedExpanded.textures}`
+      : aiProposal
+        ? `KI-Vorschlag: ${aiProposal.name} — ${aiProposal.mood}\nCSS: ${aiProposal.css}\nRegeln: ${aiProposal.rules?.join(" | ")}\nFonts: ${aiProposal.googleFonts?.join(", ")}\nAnimationen: ${aiProposal.animations?.join(", ")}\nTexturen: ${aiProposal.textures}`
+        : (useCustom ? customDescription : undefined);
 
     try {
       const job = await triggerGeneration({
@@ -171,13 +238,17 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
         name,
         description: customDescription || undefined,
         prompt: extraPrompt || undefined,
-        designPhilosophy: aiProposal ? "custom_ai" : philosophy,
+        designPhilosophy: confirmedExpanded ? "custom_ai" : aiProposal ? "custom_ai" : philosophy,
         designPhilosophyCustom: philosophyOverride,
         brandKit: activeBrandKit ? { ...activeBrandKit } as Record<string, unknown> : undefined,
         brandKitId: activeBrandKit?.id,
         templateId: templateId ?? undefined,
         templateHtml: templateHtml ?? undefined,
-        config: aiProposal ? { aiProposal } : undefined,
+        config: confirmedExpanded
+          ? { expandedDesign: confirmedExpanded, hasCustomDesign: true }
+          : aiProposal
+            ? { aiProposal }
+            : undefined,
         firmId,
         userId,
         firm: firmName ?? "",
@@ -340,16 +411,117 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
         </div>
 
         {useCustom && (
-          <div className="mt-4">
-            <Label className="text-xs uppercase tracking-wider text-mc-accent">
-              Eigener Stil
-            </Label>
-            <Textarea
-              value={customDescription}
-              onChange={(e) => setCustomDescription(e.target.value)}
-              rows={3}
-              placeholder="z.B. Luxuriöser Goldton auf tiefem Schwarz, große elegante Serifen-Schrift, subtile Partikel-Animation im Hintergrund"
-            />
+          <div className="mt-4 space-y-3">
+            <div>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <Label className="text-xs uppercase tracking-wider text-mc-accent">
+                  Eigener Stil
+                </Label>
+                {isDesignConfirmed && (
+                  <span className="text-[10px] px-2 py-1 rounded bg-primary/10 text-primary font-medium">
+                    ✨ KI-vervollständigt
+                  </span>
+                )}
+              </div>
+              <Textarea
+                value={customDescription}
+                onChange={(e) => {
+                  setCustomDescription(e.target.value);
+                  if (isDesignConfirmed) setIsDesignConfirmed(false);
+                }}
+                rows={3}
+                placeholder='Stichworte reichen: "Luxury Gold", "Dark Tech Neon", "Warm Organic"…'
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Tipp: Gib Stichworte ein — die KI erstellt daraus ein komplettes Design-System.
+              </p>
+              {customDescription.trim().length >= 3 && !isDesignConfirmed && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 gap-2 min-h-[44px]"
+                  onClick={handleExpandDesign}
+                  disabled={isExpandingDesign}
+                >
+                  {isExpandingDesign ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Design wird analysiert…</>
+                  ) : (
+                    <>🎨 Design vervollständigen</>
+                  )}
+                </Button>
+              )}
+            </div>
+
+            {expandedDesign && (
+              <div className="rounded-lg border border-border bg-card/50 p-4 space-y-3">
+                <div className="text-sm font-semibold">
+                  🎨 Design-Vorschlag: „{expandedDesign.name}"
+                </div>
+
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Farben</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {[
+                      { k: "primary", label: "Primary" },
+                      { k: "primaryDark", label: "Dark" },
+                      { k: "accent", label: "Accent" },
+                      { k: "background", label: "Background" },
+                      { k: "text", label: "Text" },
+                    ].map((c) => {
+                      const hex = (expandedDesign.colors as any)?.[c.k];
+                      return (
+                        <div key={c.k} className="flex items-center gap-2">
+                          <span
+                            className="inline-block w-5 h-5 rounded border border-border"
+                            style={{ background: hex }}
+                          />
+                          <div className="text-[11px] leading-tight">
+                            <div className="font-medium">{c.label}</div>
+                            <div className="text-muted-foreground font-mono">{hex}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="text-xs italic text-muted-foreground">"{expandedDesign.mood}"</div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                  {expandedDesign.googleFonts?.length > 0 && (
+                    <div><span className="text-muted-foreground">Fonts:</span> {expandedDesign.googleFonts.join(" + ")}</div>
+                  )}
+                  {expandedDesign.animations?.length > 0 && (
+                    <div><span className="text-muted-foreground">Animationen:</span> {expandedDesign.animations.join(", ")}</div>
+                  )}
+                  {expandedDesign.textures && (
+                    <div className="sm:col-span-2"><span className="text-muted-foreground">Texturen:</span> {expandedDesign.textures}</div>
+                  )}
+                </div>
+
+                {expandedDesign.rules?.length > 0 && (
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Design-Regeln</div>
+                    <ul className="text-xs list-disc pl-5 space-y-0.5">
+                      {expandedDesign.rules.map((r, i) => <li key={i}>{r}</li>)}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button size="sm" variant="outline" className="gap-1 min-h-[44px]" onClick={handleEditExpanded}>
+                    <Pencil className="h-3.5 w-3.5" /> Anpassen
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1 min-h-[44px]" onClick={handleExpandDesign} disabled={isExpandingDesign}>
+                    <RefreshCw className="h-3.5 w-3.5" /> Neu generieren
+                  </Button>
+                  <Button size="sm" className="gap-1 min-h-[44px]" onClick={handleConfirmExpanded} disabled={isDesignConfirmed}>
+                    ✅ {isDesignConfirmed ? "Übernommen" : "Übernehmen"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

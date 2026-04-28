@@ -280,29 +280,58 @@ export function ComponentsTabV2({ firmId, brandKits, activeBrandKit, firmName, b
           </Field>
 
           <Field label="Design-Stil">
-            <Select value={philosophy} onValueChange={setPhilosophy}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STUDIO_PHILOSOPHIES.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    <span className="flex items-center gap-2">
-                      <span className="flex gap-0.5">
-                        {p.colors.map((c, i) => (
-                          <span key={i} className="w-2.5 h-2.5 rounded-full border border-white/20" style={{ background: c }} />
-                        ))}
+            {aiProposal ? (
+              <div className="flex items-center gap-2 border border-primary/40 rounded-md px-3 py-2 bg-primary/5">
+                <Wand2 className="h-4 w-4 text-primary flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">✨ {aiProposal.name} (KI-Vorschlag)</div>
+                  <div className="flex gap-1 mt-1">
+                    {[aiProposal.colors?.primary, aiProposal.colors?.primaryDark, aiProposal.colors?.accent, aiProposal.colors?.background, aiProposal.colors?.text]
+                      .filter(Boolean)
+                      .map((c, i) => (
+                        <span key={i} className="w-2.5 h-2.5 rounded-full border border-white/20" style={{ background: c }} />
+                      ))}
+                  </div>
+                </div>
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAiProposal(null)}>
+                  Entfernen
+                </Button>
+              </div>
+            ) : (
+              <Select value={philosophy} onValueChange={setPhilosophy}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STUDIO_PHILOSOPHIES.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <span className="flex items-center gap-2">
+                        <span className="flex gap-0.5">
+                          {p.colors.map((c, i) => (
+                            <span key={i} className="w-2.5 h-2.5 rounded-full border border-white/20" style={{ background: c }} />
+                          ))}
+                        </span>
+                        {p.name}
                       </span>
-                      {p.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <label className="flex items-center gap-2 text-xs mt-2 cursor-pointer">
-              <Checkbox checked={useCustom} onCheckedChange={(v) => setUseCustom(Boolean(v))} />
-              Custom-Beschreibung
-            </label>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <div className="flex items-center justify-between mt-2 gap-2 flex-wrap">
+              <label className="flex items-center gap-2 text-xs cursor-pointer">
+                <Checkbox checked={useCustom} onCheckedChange={(v) => setUseCustom(Boolean(v))} disabled={!!aiProposal} />
+                Custom-Beschreibung
+              </label>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1"
+                onClick={() => setConsultOpen(true)}
+              >
+                <Wand2 className="h-3 w-3" /> KI Design-Beratung
+              </Button>
+            </div>
           </Field>
 
           <Field label="Name">

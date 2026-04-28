@@ -18,9 +18,12 @@ const FormContext = createContext<FormContextValue>({
 });
 
 export function FormProvider({ children }: { children: ReactNode }) {
-  const [formData, _setFormData] = useState<Record<string, unknown>>(() =>
-    storage.get<Record<string, unknown>>("form", {}),
-  );
+  const [formData, _setFormData] = useState<Record<string, unknown>>({});
+
+  useEffect(() => {
+    const stored = storage.get<Record<string, unknown>>("form", {});
+    if (stored && Object.keys(stored).length > 0) _setFormData(stored);
+  }, []);
 
   const setFormData = useCallback((data: Record<string, unknown>) => {
     _setFormData(data);

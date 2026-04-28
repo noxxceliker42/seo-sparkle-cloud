@@ -12,7 +12,8 @@ import { GlobalGenerationIndicator } from "@/components/seo/GlobalGenerationIndi
 import { Toaster } from "@/components/ui/sonner";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, User, Users } from "lucide-react";
+import { LogOut, User, Users, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {

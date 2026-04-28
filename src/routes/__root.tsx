@@ -91,17 +91,35 @@ function AuthGate() {
   const { isAuthenticated, loading, role, profile, signOut, hasRole } = useAuth();
   const navigate = useNavigate();
   const [authTimedOut, setAuthTimedOut] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!loading) { setAuthTimedOut(false); return; }
     const t = setTimeout(() => {
       console.warn("Auth timeout — forcing UI to render");
       setAuthTimedOut(true);
-    }, 8000);
+    }, 3000);
     return () => clearTimeout(t);
   }, [loading]);
 
-  if (loading && !authTimedOut) {
+  // While loading on initial mount, show spinner — but force render after timeout
+  if (loading && !authTimedOut && mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-3">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">SEO-OS wird geladen...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // SSR / pre-mount: show same shell to avoid hydration mismatch
+  if (!mounted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-3">

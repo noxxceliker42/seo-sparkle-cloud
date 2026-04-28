@@ -323,6 +323,87 @@ export type Database = {
           },
         ]
       }
+      component_jobs: {
+        Row: {
+          completed_at: string | null
+          component_type: string
+          created_at: string | null
+          css_output: string | null
+          design_philosophy: string | null
+          error_message: string | null
+          firm_id: string | null
+          html_output: string | null
+          id: string
+          job_id: string
+          js_output: string | null
+          name: string | null
+          qa_score: number | null
+          saved_template_id: string | null
+          status: string | null
+          tokens_used: number | null
+          user_id: string | null
+          variant: string | null
+          warnings: Json | null
+        }
+        Insert: {
+          completed_at?: string | null
+          component_type: string
+          created_at?: string | null
+          css_output?: string | null
+          design_philosophy?: string | null
+          error_message?: string | null
+          firm_id?: string | null
+          html_output?: string | null
+          id?: string
+          job_id: string
+          js_output?: string | null
+          name?: string | null
+          qa_score?: number | null
+          saved_template_id?: string | null
+          status?: string | null
+          tokens_used?: number | null
+          user_id?: string | null
+          variant?: string | null
+          warnings?: Json | null
+        }
+        Update: {
+          completed_at?: string | null
+          component_type?: string
+          created_at?: string | null
+          css_output?: string | null
+          design_philosophy?: string | null
+          error_message?: string | null
+          firm_id?: string | null
+          html_output?: string | null
+          id?: string
+          job_id?: string
+          js_output?: string | null
+          name?: string | null
+          qa_score?: number | null
+          saved_template_id?: string | null
+          status?: string | null
+          tokens_used?: number | null
+          user_id?: string | null
+          variant?: string | null
+          warnings?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "component_jobs_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "component_jobs_saved_template_id_fkey"
+            columns: ["saved_template_id"]
+            isOneToOne: false
+            referencedRelation: "design_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       components: {
         Row: {
           brand_kit_id: string | null
@@ -404,6 +485,99 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      design_templates: {
+        Row: {
+          brand_kit_id: string | null
+          category: string | null
+          component_type: string
+          created_at: string | null
+          created_by: string | null
+          css_output: string | null
+          description: string | null
+          design_data: Json | null
+          design_philosophy: string | null
+          firm_id: string | null
+          html_output: string | null
+          id: string
+          is_active: boolean | null
+          is_favorite: boolean | null
+          is_global: boolean | null
+          js_output: string | null
+          last_used_at: string | null
+          name: string
+          qa_score: number | null
+          thumbnail_url: string | null
+          updated_at: string | null
+          usage_count: number | null
+          variant: string | null
+        }
+        Insert: {
+          brand_kit_id?: string | null
+          category?: string | null
+          component_type: string
+          created_at?: string | null
+          created_by?: string | null
+          css_output?: string | null
+          description?: string | null
+          design_data?: Json | null
+          design_philosophy?: string | null
+          firm_id?: string | null
+          html_output?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_favorite?: boolean | null
+          is_global?: boolean | null
+          js_output?: string | null
+          last_used_at?: string | null
+          name: string
+          qa_score?: number | null
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+          variant?: string | null
+        }
+        Update: {
+          brand_kit_id?: string | null
+          category?: string | null
+          component_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          css_output?: string | null
+          description?: string | null
+          design_data?: Json | null
+          design_philosophy?: string | null
+          firm_id?: string | null
+          html_output?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_favorite?: boolean | null
+          is_global?: boolean | null
+          js_output?: string | null
+          last_used_at?: string | null
+          name?: string
+          qa_score?: number | null
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+          variant?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "design_templates_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_templates_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "firms"
             referencedColumns: ["id"]
           },
         ]

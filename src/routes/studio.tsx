@@ -35,6 +35,7 @@ import {
   Save,
   Loader2,
 } from "lucide-react";
+import { ComponentsTab } from "@/components/studio/ComponentsTab";
 
 export const Route = createFileRoute("/studio")({
   component: StudioPage,

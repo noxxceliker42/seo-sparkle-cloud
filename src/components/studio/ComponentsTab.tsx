@@ -107,6 +107,7 @@ export function ComponentsTab({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [kiOpen, setKiOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
 
   const filtered = useMemo(

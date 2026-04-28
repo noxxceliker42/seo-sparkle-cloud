@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as StudioRouteImport } from './routes/studio'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ProfilRouteImport } from './routes/profil'
@@ -26,6 +27,11 @@ import { Route as EditorPageIdRouteImport } from './routes/editor.$pageId'
 import { Route as ClusterNeuRouteImport } from './routes/cluster.neu'
 import { Route as ClusterIdRouteImport } from './routes/cluster.$id'
 
+const StudioRoute = StudioRouteImport.update({
+  id: '/studio',
+  path: '/studio',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/profil': typeof ProfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/studio': typeof StudioRoute
   '/cluster/$id': typeof ClusterIdRoute
   '/cluster/neu': typeof ClusterNeuRoute
   '/editor/$pageId': typeof EditorPageIdRoute
@@ -136,6 +143,7 @@ export interface FileRoutesByTo {
   '/profil': typeof ProfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/studio': typeof StudioRoute
   '/cluster/$id': typeof ClusterIdRoute
   '/cluster/neu': typeof ClusterNeuRoute
   '/editor/$pageId': typeof EditorPageIdRoute
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   '/profil': typeof ProfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/studio': typeof StudioRoute
   '/cluster/$id': typeof ClusterIdRoute
   '/cluster/neu': typeof ClusterNeuRoute
   '/editor/$pageId': typeof EditorPageIdRoute
@@ -175,6 +184,7 @@ export interface FileRouteTypes {
     | '/profil'
     | '/reset-password'
     | '/settings'
+    | '/studio'
     | '/cluster/$id'
     | '/cluster/neu'
     | '/editor/$pageId'
@@ -192,6 +202,7 @@ export interface FileRouteTypes {
     | '/profil'
     | '/reset-password'
     | '/settings'
+    | '/studio'
     | '/cluster/$id'
     | '/cluster/neu'
     | '/editor/$pageId'
@@ -210,6 +221,7 @@ export interface FileRouteTypes {
     | '/profil'
     | '/reset-password'
     | '/settings'
+    | '/studio'
     | '/cluster/$id'
     | '/cluster/neu'
     | '/editor/$pageId'
@@ -229,12 +241,20 @@ export interface RootRouteChildren {
   ProfilRoute: typeof ProfilRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
+  StudioRoute: typeof StudioRoute
   EditorPageIdRoute: typeof EditorPageIdRoute
   PreviewPageIdRoute: typeof PreviewPageIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/studio': {
+      id: '/studio'
+      path: '/studio'
+      fullPath: '/studio'
+      preLoaderRoute: typeof StudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -377,6 +397,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfilRoute: ProfilRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,
+  StudioRoute: StudioRoute,
   EditorPageIdRoute: EditorPageIdRoute,
   PreviewPageIdRoute: PreviewPageIdRoute,
 }

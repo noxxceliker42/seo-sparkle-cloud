@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -117,6 +118,7 @@ export function ClusterGermanyStartModal({ open, onOpenChange, activeFirm }: Pro
         bundesland: bundesland || undefined,
         clusterDepth,
         clusterType: "brand_pillar",
+        scope: "germany",
         firm: activeFirm?.name || "",
         firmId: activeFirm?.id || null,
         userId: session.user.id,
@@ -143,27 +145,51 @@ export function ClusterGermanyStartModal({ open, onOpenChange, activeFirm }: Pro
       }
 
       const userId = session.user.id;
+      const firmId = activeFirm?.id;
+      const kw = mainKeyword.trim();
+      let attempts = 0;
+      const maxAttempts = 20; // ~60s
+
       pollRef.current = setInterval(async () => {
-        const { data: clusters } = await supabase
+        attempts++;
+
+        let query = supabase
           .from("clusters")
-          .select("id, status, plan_generated, scope")
+          .select("id, status, plan_generated, name, scope")
           .eq("user_id", userId)
-          .eq("scope", "germany")
+          .eq("main_keyword", kw)
           .order("created_at", { ascending: false })
           .limit(1);
 
-        if (!clusters || clusters.length === 0) return;
-        const latest = clusters[0];
+        if (firmId) {
+          query = query.eq("firm_id", firmId);
+        }
 
-        if (latest.plan_generated === true && latest.status === "active") {
+        const { data: clusters } = await query;
+
+        if (clusters && clusters.length > 0) {
+          const latest = clusters[0];
+
+          if (latest.plan_generated === true && latest.status === "active") {
+            cleanup();
+            setLoading(false);
+            onOpenChange(false);
+            toast.success(`Cluster-Plan erstellt!`);
+            navigate({ to: "/cluster-germany/$id", params: { id: latest.id } });
+            return;
+          } else if (latest.status === "error") {
+            cleanup();
+            setLoading(false);
+            setError("Cluster-Generierung fehlgeschlagen. Bitte erneut versuchen.");
+            return;
+          }
+        }
+
+        if (attempts >= maxAttempts) {
           cleanup();
           setLoading(false);
+          toast.info("Der Cluster wird noch erstellt. Bitte Seite neu laden.");
           onOpenChange(false);
-          navigate({ to: "/cluster-germany/$id", params: { id: latest.id } });
-        } else if (latest.status === "error") {
-          cleanup();
-          setLoading(false);
-          setError("Cluster-Generierung fehlgeschlagen. Bitte erneut versuchen.");
         }
       }, 3000);
     } catch (err: unknown) {

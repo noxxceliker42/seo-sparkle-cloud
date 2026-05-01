@@ -106,6 +106,7 @@ Deno.serve(async (req) => {
         designPhilosophy, designPhilosophyCustom,
         primaryColor, secondaryColor, accentColor,
         targetAudience, themeContext, differentiation,
+        scope, city, region, bundesland, brancheLabel,
       } = body;
 
       if (!resolvedUserId || !mainKeyword) {
@@ -132,6 +133,11 @@ Deno.serve(async (req) => {
           sprache: "de",
           status: "planning",
           plan_generated: false,
+          scope: scope || "default",
+          city: city || null,
+          region: region || null,
+          bundesland: bundesland || null,
+          branche_label: brancheLabel || null,
         })
         .select("id")
         .single();

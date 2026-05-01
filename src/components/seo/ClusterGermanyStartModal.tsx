@@ -117,6 +117,7 @@ export function ClusterGermanyStartModal({ open, onOpenChange, activeFirm }: Pro
         bundesland: bundesland || undefined,
         clusterDepth,
         clusterType: "brand_pillar",
+        scope: "germany",
         firm: activeFirm?.name || "",
         firmId: activeFirm?.id || null,
         userId: session.user.id,

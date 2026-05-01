@@ -206,10 +206,16 @@ function ClusterCard({ cluster, scope }: { cluster: ClusterWithPages; scope: Clu
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4);
 
-  const linkTo = isGermany ? "/cluster-germany/$id" : "/cluster/$id";
+  if (isGermany) {
+    return (
+      <Link to="/cluster-germany/$id" params={{ id: cluster.id }} className="block group">
+        <ClusterCardContent cluster={cluster} scope={scope} status={status} brancheColor={brancheColor} generated={generated} total={total} pct={pct} topTypes={topTypes} />
+      </Link>
+    );
+  }
 
   return (
-    <Link to={linkTo as any} params={{ id: cluster.id }} className="block group">
+    <Link to="/cluster/$id" params={{ id: cluster.id }} className="block group">
       <Card className="transition-all hover:ring-2 hover:ring-primary/30 hover:shadow-md cursor-pointer h-full">
         <CardContent className="pt-5 space-y-3">
           <div className="flex items-start justify-between gap-2">

@@ -1,4 +1,4 @@
-import { LayoutDashboard, PlusCircle, Network, Layers, Building2, Settings, Users, BarChart3, ImageIcon, Palette } from "lucide-react";
+import { LayoutDashboard, PlusCircle, Network, Layers, Building2, Settings, Users, BarChart3, ImageIcon, Palette, Globe } from "lucide-react";
 import { Link, useLocation } from "@tanstack/react-router";
 import {
   Sidebar,

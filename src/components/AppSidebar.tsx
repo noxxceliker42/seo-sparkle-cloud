@@ -26,6 +26,7 @@ export function AppSidebar() {
     { title: "Neue Seite", url: "/", icon: PlusCircle, minRole: "editor" },
     { title: "Analysen", url: "/analysen", icon: BarChart3, minRole: "editor" },
     { title: "Cluster", url: "/cluster", icon: Layers, minRole: "editor" },
+    { title: "Cluster Germany", url: "/cluster-germany", icon: Globe, minRole: "editor" },
     { title: "Bilder", url: "/bilder", icon: ImageIcon, minRole: "editor" },
     { title: "Studio", url: "/studio", icon: Palette, minRole: "editor" },
     { title: "Firmen", url: "/firmen", icon: Building2, minRole: "editor" },

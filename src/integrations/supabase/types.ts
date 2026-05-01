@@ -243,6 +243,9 @@ export type Database = {
         Row: {
           accent_color: string | null
           branche: string | null
+          branche_label: string | null
+          bundesland: string | null
+          city: string | null
           cluster_type: string | null
           created_at: string | null
           design_philosophy: string | null
@@ -255,6 +258,8 @@ export type Database = {
           pillar_page_id: string | null
           plan_generated: boolean | null
           primary_color: string | null
+          region: string | null
+          scope: string | null
           secondary_color: string | null
           sprache: string | null
           status: string | null
@@ -265,6 +270,9 @@ export type Database = {
         Insert: {
           accent_color?: string | null
           branche?: string | null
+          branche_label?: string | null
+          bundesland?: string | null
+          city?: string | null
           cluster_type?: string | null
           created_at?: string | null
           design_philosophy?: string | null
@@ -277,6 +285,8 @@ export type Database = {
           pillar_page_id?: string | null
           plan_generated?: boolean | null
           primary_color?: string | null
+          region?: string | null
+          scope?: string | null
           secondary_color?: string | null
           sprache?: string | null
           status?: string | null
@@ -287,6 +297,9 @@ export type Database = {
         Update: {
           accent_color?: string | null
           branche?: string | null
+          branche_label?: string | null
+          bundesland?: string | null
+          city?: string | null
           cluster_type?: string | null
           created_at?: string | null
           design_philosophy?: string | null
@@ -299,6 +312,8 @@ export type Database = {
           pillar_page_id?: string | null
           plan_generated?: boolean | null
           primary_color?: string | null
+          region?: string | null
+          scope?: string | null
           secondary_color?: string | null
           sprache?: string | null
           status?: string | null

@@ -206,88 +206,72 @@ function ClusterCard({ cluster, scope }: { cluster: ClusterWithPages; scope: Clu
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4);
 
+  const cardJsx = (
+    <Card className="transition-all hover:ring-2 hover:ring-primary/30 hover:shadow-md cursor-pointer h-full">
+      <CardContent className="pt-5 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+              {cluster.name}
+            </h3>
+            <p className="text-sm text-muted-foreground truncate">{cluster.main_keyword}</p>
+          </div>
+          <Badge className={`shrink-0 ${STATUS_COLORS[status] || STATUS_COLORS.draft}`}>
+            {STATUS_LABELS[status] || status}
+          </Badge>
+        </div>
+
+        {isGermany && (
+          <div className="flex flex-wrap gap-1.5">
+            {cluster.city && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded" style={{ background: "rgba(0,200,255,0.1)", color: "var(--accent, #06b6d4)", border: "1px solid rgba(0,200,255,0.2)" }}>
+                {cluster.city}
+              </span>
+            )}
+            {cluster.branche && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded" style={{ background: `${brancheColor}26`, color: brancheColor, border: `1px solid ${brancheColor}4D` }}>
+                {getBrancheLabel(cluster.branche)}
+              </span>
+            )}
+          </div>
+        )}
+
+        {!isGermany && cluster.firm_id && (
+          <Badge variant="outline" className="text-xs">Firma zugewiesen</Badge>
+        )}
+
+        <div className="space-y-1">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{generated} / {total} Seiten generiert</span>
+            <span>{pct}%</span>
+          </div>
+          <Progress value={pct} className="h-2" />
+        </div>
+
+        {!isGermany && topTypes.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {topTypes.map(([type, count]) => (
+              <Badge key={type} variant="secondary" className="text-[10px] px-1.5 py-0">
+                {TYPE_LABELS[type] || type} {count}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
   if (isGermany) {
     return (
       <Link to="/cluster-germany/$id" params={{ id: cluster.id }} className="block group">
-        <ClusterCardContent cluster={cluster} scope={scope} status={status} brancheColor={brancheColor} generated={generated} total={total} pct={pct} topTypes={topTypes} />
+        {cardJsx}
       </Link>
     );
   }
 
   return (
     <Link to="/cluster/$id" params={{ id: cluster.id }} className="block group">
-      <Card className="transition-all hover:ring-2 hover:ring-primary/30 hover:shadow-md cursor-pointer h-full">
-        <CardContent className="pt-5 space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-                {cluster.name}
-              </h3>
-              <p className="text-sm text-muted-foreground truncate">{cluster.main_keyword}</p>
-            </div>
-            <Badge className={`shrink-0 ${STATUS_COLORS[status] || STATUS_COLORS.draft}`}>
-              {STATUS_LABELS[status] || status}
-            </Badge>
-          </div>
-
-          {/* Germany-specific: City + Branche badges */}
-          {isGermany && (
-            <div className="flex flex-wrap gap-1.5">
-              {cluster.city && (
-                <span
-                  className="text-[11px] font-semibold px-2 py-0.5 rounded"
-                  style={{
-                    background: "rgba(0,200,255,0.1)",
-                    color: "var(--accent, #06b6d4)",
-                    border: "1px solid rgba(0,200,255,0.2)",
-                  }}
-                >
-                  {cluster.city}
-                </span>
-              )}
-              {cluster.branche && (
-                <span
-                  className="text-[11px] font-semibold px-2 py-0.5 rounded"
-                  style={{
-                    background: `${brancheColor}26`,
-                    color: brancheColor,
-                    border: `1px solid ${brancheColor}4D`,
-                  }}
-                >
-                  {getBrancheLabel(cluster.branche)}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Default scope: Firm badge */}
-          {!isGermany && cluster.firm_id && (
-            <Badge variant="outline" className="text-xs">
-              Firma zugewiesen
-            </Badge>
-          )}
-
-          {/* Progress */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{generated} / {total} Seiten generiert</span>
-              <span>{pct}%</span>
-            </div>
-            <Progress value={pct} className="h-2" />
-          </div>
-
-          {/* Default scope: Type mini-badges */}
-          {!isGermany && topTypes.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {topTypes.map(([type, count]) => (
-                <Badge key={type} variant="secondary" className="text-[10px] px-1.5 py-0">
-                  {TYPE_LABELS[type] || type} {count}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {cardJsx}
     </Link>
   );
 }

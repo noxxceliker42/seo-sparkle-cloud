@@ -57,6 +57,22 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+    } else if (webhookType === "cluster-germany-plan") {
+      n8nBaseUrl = Deno.env.get("N8N_CLUSTER_GERMANY_PLAN_URL");
+      if (!n8nBaseUrl) {
+        return new Response(JSON.stringify({ error: "N8N_CLUSTER_GERMANY_PLAN_URL nicht konfiguriert" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else if (webhookType === "cluster-germany-expand") {
+      n8nBaseUrl = Deno.env.get("N8N_CLUSTER_GERMANY_EXPAND_URL");
+      if (!n8nBaseUrl) {
+        return new Response(JSON.stringify({ error: "N8N_CLUSTER_GERMANY_EXPAND_URL nicht konfiguriert" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     } else if (webhookType === "studio-component") {
       n8nBaseUrl = Deno.env.get("N8N_STUDIO_URL");
       if (!n8nBaseUrl) {

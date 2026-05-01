@@ -16,16 +16,19 @@ import { Route as ProfilRouteImport } from './routes/profil'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FirmenRouteImport } from './routes/firmen'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ClusterGermanyRouteImport } from './routes/cluster-germany'
 import { Route as ClusterRouteImport } from './routes/cluster'
 import { Route as BilderRouteImport } from './routes/bilder'
 import { Route as BenutzerRouteImport } from './routes/benutzer'
 import { Route as AnalysenRouteImport } from './routes/analysen'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClusterIndexRouteImport } from './routes/cluster.index'
+import { Route as ClusterGermanyIndexRouteImport } from './routes/cluster-germany.index'
 import { Route as PreviewPageIdRouteImport } from './routes/preview.$pageId'
 import { Route as EditorPageIdRouteImport } from './routes/editor.$pageId'
 import { Route as ClusterNeuRouteImport } from './routes/cluster.neu'
 import { Route as ClusterIdRouteImport } from './routes/cluster.$id'
+import { Route as ClusterGermanyIdRouteImport } from './routes/cluster-germany.$id'
 
 const StudioRoute = StudioRouteImport.update({
   id: '/studio',
@@ -62,6 +65,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClusterGermanyRoute = ClusterGermanyRouteImport.update({
+  id: '/cluster-germany',
+  path: '/cluster-germany',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClusterRoute = ClusterRouteImport.update({
   id: '/cluster',
   path: '/cluster',
@@ -92,6 +100,11 @@ const ClusterIndexRoute = ClusterIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ClusterRoute,
 } as any)
+const ClusterGermanyIndexRoute = ClusterGermanyIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ClusterGermanyRoute,
+} as any)
 const PreviewPageIdRoute = PreviewPageIdRouteImport.update({
   id: '/preview/$pageId',
   path: '/preview/$pageId',
@@ -112,6 +125,11 @@ const ClusterIdRoute = ClusterIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => ClusterRoute,
 } as any)
+const ClusterGermanyIdRoute = ClusterGermanyIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ClusterGermanyRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -119,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/benutzer': typeof BenutzerRoute
   '/bilder': typeof BilderRoute
   '/cluster': typeof ClusterRouteWithChildren
+  '/cluster-germany': typeof ClusterGermanyRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/firmen': typeof FirmenRoute
   '/login': typeof LoginRoute
@@ -126,10 +145,12 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/studio': typeof StudioRoute
+  '/cluster-germany/$id': typeof ClusterGermanyIdRoute
   '/cluster/$id': typeof ClusterIdRoute
   '/cluster/neu': typeof ClusterNeuRoute
   '/editor/$pageId': typeof EditorPageIdRoute
   '/preview/$pageId': typeof PreviewPageIdRoute
+  '/cluster-germany/': typeof ClusterGermanyIndexRoute
   '/cluster/': typeof ClusterIndexRoute
 }
 export interface FileRoutesByTo {
@@ -144,10 +165,12 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/studio': typeof StudioRoute
+  '/cluster-germany/$id': typeof ClusterGermanyIdRoute
   '/cluster/$id': typeof ClusterIdRoute
   '/cluster/neu': typeof ClusterNeuRoute
   '/editor/$pageId': typeof EditorPageIdRoute
   '/preview/$pageId': typeof PreviewPageIdRoute
+  '/cluster-germany': typeof ClusterGermanyIndexRoute
   '/cluster': typeof ClusterIndexRoute
 }
 export interface FileRoutesById {
@@ -157,6 +180,7 @@ export interface FileRoutesById {
   '/benutzer': typeof BenutzerRoute
   '/bilder': typeof BilderRoute
   '/cluster': typeof ClusterRouteWithChildren
+  '/cluster-germany': typeof ClusterGermanyRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/firmen': typeof FirmenRoute
   '/login': typeof LoginRoute
@@ -164,10 +188,12 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/studio': typeof StudioRoute
+  '/cluster-germany/$id': typeof ClusterGermanyIdRoute
   '/cluster/$id': typeof ClusterIdRoute
   '/cluster/neu': typeof ClusterNeuRoute
   '/editor/$pageId': typeof EditorPageIdRoute
   '/preview/$pageId': typeof PreviewPageIdRoute
+  '/cluster-germany/': typeof ClusterGermanyIndexRoute
   '/cluster/': typeof ClusterIndexRoute
 }
 export interface FileRouteTypes {
@@ -178,6 +204,7 @@ export interface FileRouteTypes {
     | '/benutzer'
     | '/bilder'
     | '/cluster'
+    | '/cluster-germany'
     | '/dashboard'
     | '/firmen'
     | '/login'
@@ -185,10 +212,12 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/settings'
     | '/studio'
+    | '/cluster-germany/$id'
     | '/cluster/$id'
     | '/cluster/neu'
     | '/editor/$pageId'
     | '/preview/$pageId'
+    | '/cluster-germany/'
     | '/cluster/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -203,10 +232,12 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/settings'
     | '/studio'
+    | '/cluster-germany/$id'
     | '/cluster/$id'
     | '/cluster/neu'
     | '/editor/$pageId'
     | '/preview/$pageId'
+    | '/cluster-germany'
     | '/cluster'
   id:
     | '__root__'
@@ -215,6 +246,7 @@ export interface FileRouteTypes {
     | '/benutzer'
     | '/bilder'
     | '/cluster'
+    | '/cluster-germany'
     | '/dashboard'
     | '/firmen'
     | '/login'
@@ -222,10 +254,12 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/settings'
     | '/studio'
+    | '/cluster-germany/$id'
     | '/cluster/$id'
     | '/cluster/neu'
     | '/editor/$pageId'
     | '/preview/$pageId'
+    | '/cluster-germany/'
     | '/cluster/'
   fileRoutesById: FileRoutesById
 }
@@ -235,6 +269,7 @@ export interface RootRouteChildren {
   BenutzerRoute: typeof BenutzerRoute
   BilderRoute: typeof BilderRoute
   ClusterRoute: typeof ClusterRouteWithChildren
+  ClusterGermanyRoute: typeof ClusterGermanyRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   FirmenRoute: typeof FirmenRoute
   LoginRoute: typeof LoginRoute
@@ -297,6 +332,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cluster-germany': {
+      id: '/cluster-germany'
+      path: '/cluster-germany'
+      fullPath: '/cluster-germany'
+      preLoaderRoute: typeof ClusterGermanyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cluster': {
       id: '/cluster'
       path: '/cluster'
@@ -339,6 +381,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClusterIndexRouteImport
       parentRoute: typeof ClusterRoute
     }
+    '/cluster-germany/': {
+      id: '/cluster-germany/'
+      path: '/'
+      fullPath: '/cluster-germany/'
+      preLoaderRoute: typeof ClusterGermanyIndexRouteImport
+      parentRoute: typeof ClusterGermanyRoute
+    }
     '/preview/$pageId': {
       id: '/preview/$pageId'
       path: '/preview/$pageId'
@@ -367,6 +416,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClusterIdRouteImport
       parentRoute: typeof ClusterRoute
     }
+    '/cluster-germany/$id': {
+      id: '/cluster-germany/$id'
+      path: '/$id'
+      fullPath: '/cluster-germany/$id'
+      preLoaderRoute: typeof ClusterGermanyIdRouteImport
+      parentRoute: typeof ClusterGermanyRoute
+    }
   }
 }
 
@@ -385,12 +441,27 @@ const ClusterRouteChildren: ClusterRouteChildren = {
 const ClusterRouteWithChildren =
   ClusterRoute._addFileChildren(ClusterRouteChildren)
 
+interface ClusterGermanyRouteChildren {
+  ClusterGermanyIdRoute: typeof ClusterGermanyIdRoute
+  ClusterGermanyIndexRoute: typeof ClusterGermanyIndexRoute
+}
+
+const ClusterGermanyRouteChildren: ClusterGermanyRouteChildren = {
+  ClusterGermanyIdRoute: ClusterGermanyIdRoute,
+  ClusterGermanyIndexRoute: ClusterGermanyIndexRoute,
+}
+
+const ClusterGermanyRouteWithChildren = ClusterGermanyRoute._addFileChildren(
+  ClusterGermanyRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalysenRoute: AnalysenRoute,
   BenutzerRoute: BenutzerRoute,
   BilderRoute: BilderRoute,
   ClusterRoute: ClusterRouteWithChildren,
+  ClusterGermanyRoute: ClusterGermanyRouteWithChildren,
   DashboardRoute: DashboardRoute,
   FirmenRoute: FirmenRoute,
   LoginRoute: LoginRoute,

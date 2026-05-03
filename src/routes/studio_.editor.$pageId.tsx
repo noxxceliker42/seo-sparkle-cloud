@@ -423,10 +423,20 @@ function StudioEditorPage() {
             ))}
 
             {isProcessing && (
-              <div style={{ alignSelf: "flex-start", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: "12px 12px 12px 4px", padding: "10px 18px", display: "flex", gap: 4 }}>
-                <span className="typing-dot" style={{ animationDelay: "0s" }}>●</span>
-                <span className="typing-dot" style={{ animationDelay: "0.2s" }}>●</span>
-                <span className="typing-dot" style={{ animationDelay: "0.4s" }}>●</span>
+              <div style={{ alignSelf: "flex-start", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: "12px 12px 12px 4px", padding: "10px 18px", display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <span className="typing-dot" style={{ animationDelay: "0s" }}>●</span>
+                  <span className="typing-dot" style={{ animationDelay: "0.2s" }}>●</span>
+                  <span className="typing-dot" style={{ animationDelay: "0.4s" }}>●</span>
+                  <span style={{ fontFamily: "Rajdhani", fontSize: 13, color: "var(--accent)", marginLeft: 8 }}>
+                    KI bearbeitet... ({elapsedTime}s)
+                  </span>
+                </div>
+                {elapsedTime > 15 && (
+                  <span style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "Rajdhani" }}>
+                    Große Seiten dauern 30–60 Sekunden
+                  </span>
+                )}
               </div>
             )}
             <div ref={messagesEndRef} />

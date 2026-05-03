@@ -96,6 +96,16 @@ function StudioEditorPage() {
     })();
   }, [pageId]);
 
+  // Elapsed time counter
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (isProcessing) {
+      setElapsedTime(0);
+      interval = setInterval(() => setElapsedTime((p) => p + 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isProcessing]);
+
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

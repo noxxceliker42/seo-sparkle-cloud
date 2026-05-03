@@ -58,6 +58,7 @@ function StudioEditorPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const [previewWidth, setPreviewWidth] = useState("100%");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const isProcessingRef = useRef(false);
@@ -95,6 +96,16 @@ function StudioEditorPage() {
     })();
   }, [pageId]);
 
+  // Elapsed time counter
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (isProcessing) {
+      setElapsedTime(0);
+      interval = setInterval(() => setElapsedTime((p) => p + 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isProcessing]);
+
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -129,20 +140,42 @@ function StudioEditorPage() {
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      const { data, error } = await supabase.functions.invoke("studio-editor", {
-        body: {
-          currentHtml: currentHtml,
-          userCommand: command,
-          pageContext: {
-            keyword: page?.keyword || "",
-            pageType: page?.page_type || "",
-          },
-          chatHistory: messages.slice(-4),
-        },
-      });
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error("Nicht eingeloggt");
 
-      if (error) throw error;
-      if (!data.success) throw new Error(data.error || "Unbekannter Fehler");
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/n8n-proxy`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          signal: AbortSignal.timeout(180000),
+          body: JSON.stringify({
+            webhookType: "studio-editor",
+            payload: {
+              currentHtml,
+              userCommand: command,
+              pageContext: {
+                keyword: page?.keyword || "",
+                pageType: page?.page_type || "",
+              },
+              chatHistory: messages.slice(-4).map((m) => ({
+                role: m.role,
+                content: m.content,
+                changeSummary: m.changeSummary || "",
+              })),
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error(`Fehler: ${response.status}`);
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || "Bearbeitung fehlgeschlagen");
 
       const newHtml = data.html;
       setCurrentHtml(newHtml);
@@ -314,7 +347,7 @@ function StudioEditorPage() {
             <div style={{ position: "absolute", inset: 0, background: "rgba(5,8,16,0.6)", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
                 <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--accent)" }} />
-                <span style={{ fontFamily: "Rajdhani", color: "var(--accent)", fontSize: 14 }}>Änderung wird angewendet...</span>
+                <span style={{ fontFamily: "Rajdhani", color: "var(--accent)", fontSize: 14 }}>KI bearbeitet... ({elapsedTime}s)</span>
               </div>
             </div>
           )}
@@ -390,10 +423,20 @@ function StudioEditorPage() {
             ))}
 
             {isProcessing && (
-              <div style={{ alignSelf: "flex-start", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: "12px 12px 12px 4px", padding: "10px 18px", display: "flex", gap: 4 }}>
-                <span className="typing-dot" style={{ animationDelay: "0s" }}>●</span>
-                <span className="typing-dot" style={{ animationDelay: "0.2s" }}>●</span>
-                <span className="typing-dot" style={{ animationDelay: "0.4s" }}>●</span>
+              <div style={{ alignSelf: "flex-start", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: "12px 12px 12px 4px", padding: "10px 18px", display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <span className="typing-dot" style={{ animationDelay: "0s" }}>●</span>
+                  <span className="typing-dot" style={{ animationDelay: "0.2s" }}>●</span>
+                  <span className="typing-dot" style={{ animationDelay: "0.4s" }}>●</span>
+                  <span style={{ fontFamily: "Rajdhani", fontSize: 13, color: "var(--accent)", marginLeft: 8 }}>
+                    KI bearbeitet... ({elapsedTime}s)
+                  </span>
+                </div>
+                {elapsedTime > 15 && (
+                  <span style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "Rajdhani" }}>
+                    Große Seiten dauern 30–60 Sekunden
+                  </span>
+                )}
               </div>
             )}
             <div ref={messagesEndRef} />

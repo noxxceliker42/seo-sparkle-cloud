@@ -123,6 +123,38 @@ function StudioEditorPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [hasUnsavedChanges]);
 
+  const pollEditorJob = useCallback(async (editId: string) => {
+    const maxAttempts = 60; // 60 × 2s = 120s max
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      await new Promise((r) => setTimeout(r, 2000));
+      attempts++;
+      setElapsedTime(attempts * 2);
+
+      const { data, error } = await supabase
+        .from("editor_jobs")
+        .select("status, changes, html_output, error_message, tokens_used")
+        .eq("edit_id", editId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Poll error:", error);
+        continue;
+      }
+
+      if (data?.status === "completed" && data?.html_output) {
+        return data;
+      }
+
+      if (data?.status === "error") {
+        throw new Error(data.error_message || "Bearbeitung fehlgeschlagen");
+      }
+    }
+
+    throw new Error("Zeitüberschreitung (120s) — bitte erneut versuchen");
+  }, []);
+
   const handleSend = useCallback(async () => {
     const command = input.trim();
     if (!command || isProcessingRef.current) return;
@@ -130,6 +162,7 @@ function StudioEditorPage() {
     isProcessingRef.current = true;
     setIsProcessing(true);
     setInput("");
+    setElapsedTime(0);
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -140,21 +173,9 @@ function StudioEditorPage() {
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
-      if (!accessToken) throw new Error("Nicht eingeloggt");
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/n8n-proxy`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          signal: AbortSignal.timeout(180000),
-          body: JSON.stringify({
+      const { data: proxyData, error: proxyError } = await supabase
+        .functions.invoke("n8n-proxy", {
+          body: {
             webhookType: "studio-editor",
             payload: {
               currentHtml,
@@ -169,19 +190,21 @@ function StudioEditorPage() {
                 changeSummary: m.changeSummary || "",
               })),
             },
-          }),
-        }
-      );
+          },
+        });
 
-      if (!response.ok) throw new Error(`Fehler: ${response.status}`);
-      const data = await response.json();
-      if (!data.success) throw new Error(data.error || "Bearbeitung fehlgeschlagen");
+      if (proxyError) throw proxyError;
 
-      const newHtml = data.html;
-      setCurrentHtml(newHtml);
+      const editId = proxyData?.editId;
+      if (!editId) throw new Error("Keine editId erhalten");
+
+      // Poll editor_jobs table
+      const result = await pollEditorJob(editId);
+
+      setCurrentHtml(result.html_output!);
       setHistory((prev) => {
         const newHistory = prev.slice(0, historyIndex + 1);
-        newHistory.push(newHtml);
+        newHistory.push(result.html_output!);
         return newHistory;
       });
       setHistoryIndex((prev) => prev + 1);
@@ -191,8 +214,8 @@ function StudioEditorPage() {
         id: crypto.randomUUID(),
         role: "assistant",
         content: "Änderung angewendet ✅",
-        changeSummary: data.changes || "",
-        tokensUsed: data.tokensUsed || 0,
+        changeSummary: result.changes || "",
+        tokensUsed: result.tokens_used || 0,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, aiMsg]);
@@ -210,7 +233,7 @@ function StudioEditorPage() {
       isProcessingRef.current = false;
       setIsProcessing(false);
     }
-  }, [input, currentHtml, page, messages, historyIndex]);
+  }, [input, currentHtml, page, messages, historyIndex, pollEditorJob]);
 
   const handleUndo = useCallback(() => {
     if (historyIndex > 0) {

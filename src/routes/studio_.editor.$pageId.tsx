@@ -69,11 +69,17 @@ function StudioEditorPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from("seo_pages")
-        .select(`id, keyword, page_type, html_output, body_content, css_block, status, qa_score, firm_id, firms ( name, branche )`)
+        .select("id, keyword, page_type, html_output, body_content, css_block, status, qa_score, firm_id")
         .eq("id", pageId)
-        .single();
-      if (error || !data) {
-        toast.error("Seite konnte nicht geladen werden");
+        .maybeSingle();
+      if (error) {
+        console.error("Editor Query Error:", error);
+        toast.error("Seite konnte nicht geladen werden: " + error.message);
+        setLoading(false);
+        return;
+      }
+      if (!data) {
+        toast.error("Seite nicht gefunden");
         setLoading(false);
         return;
       }

@@ -58,6 +58,7 @@ function StudioEditorPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const [previewWidth, setPreviewWidth] = useState("100%");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const isProcessingRef = useRef(false);

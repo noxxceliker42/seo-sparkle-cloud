@@ -455,9 +455,9 @@ function StudioEditorPage() {
                     KI bearbeitet... ({elapsedTime}s)
                   </span>
                 </div>
-                {elapsedTime > 15 && (
+                {elapsedTime > 10 && (
                   <span style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "Rajdhani" }}>
-                    Große Seiten dauern 30–60 Sekunden
+                    Große Seiten dauern 30–90 Sekunden
                   </span>
                 )}
               </div>

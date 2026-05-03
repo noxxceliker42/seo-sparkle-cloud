@@ -29,6 +29,7 @@ import { Route as EditorPageIdRouteImport } from './routes/editor.$pageId'
 import { Route as ClusterNeuRouteImport } from './routes/cluster.neu'
 import { Route as ClusterIdRouteImport } from './routes/cluster.$id'
 import { Route as ClusterGermanyIdRouteImport } from './routes/cluster-germany.$id'
+import { Route as StudioEditorPageIdRouteImport } from './routes/studio_.editor.$pageId'
 
 const StudioRoute = StudioRouteImport.update({
   id: '/studio',
@@ -130,6 +131,11 @@ const ClusterGermanyIdRoute = ClusterGermanyIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => ClusterGermanyRoute,
 } as any)
+const StudioEditorPageIdRoute = StudioEditorPageIdRouteImport.update({
+  id: '/studio_/editor/$pageId',
+  path: '/studio/editor/$pageId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/preview/$pageId': typeof PreviewPageIdRoute
   '/cluster-germany/': typeof ClusterGermanyIndexRoute
   '/cluster/': typeof ClusterIndexRoute
+  '/studio/editor/$pageId': typeof StudioEditorPageIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -172,6 +179,7 @@ export interface FileRoutesByTo {
   '/preview/$pageId': typeof PreviewPageIdRoute
   '/cluster-germany': typeof ClusterGermanyIndexRoute
   '/cluster': typeof ClusterIndexRoute
+  '/studio/editor/$pageId': typeof StudioEditorPageIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -195,6 +203,7 @@ export interface FileRoutesById {
   '/preview/$pageId': typeof PreviewPageIdRoute
   '/cluster-germany/': typeof ClusterGermanyIndexRoute
   '/cluster/': typeof ClusterIndexRoute
+  '/studio_/editor/$pageId': typeof StudioEditorPageIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -219,6 +228,7 @@ export interface FileRouteTypes {
     | '/preview/$pageId'
     | '/cluster-germany/'
     | '/cluster/'
+    | '/studio/editor/$pageId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -239,6 +249,7 @@ export interface FileRouteTypes {
     | '/preview/$pageId'
     | '/cluster-germany'
     | '/cluster'
+    | '/studio/editor/$pageId'
   id:
     | '__root__'
     | '/'
@@ -261,6 +272,7 @@ export interface FileRouteTypes {
     | '/preview/$pageId'
     | '/cluster-germany/'
     | '/cluster/'
+    | '/studio_/editor/$pageId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -279,6 +291,7 @@ export interface RootRouteChildren {
   StudioRoute: typeof StudioRoute
   EditorPageIdRoute: typeof EditorPageIdRoute
   PreviewPageIdRoute: typeof PreviewPageIdRoute
+  StudioEditorPageIdRoute: typeof StudioEditorPageIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -423,6 +436,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClusterGermanyIdRouteImport
       parentRoute: typeof ClusterGermanyRoute
     }
+    '/studio_/editor/$pageId': {
+      id: '/studio_/editor/$pageId'
+      path: '/studio/editor/$pageId'
+      fullPath: '/studio/editor/$pageId'
+      preLoaderRoute: typeof StudioEditorPageIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -471,6 +491,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioRoute: StudioRoute,
   EditorPageIdRoute: EditorPageIdRoute,
   PreviewPageIdRoute: PreviewPageIdRoute,
+  StudioEditorPageIdRoute: StudioEditorPageIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

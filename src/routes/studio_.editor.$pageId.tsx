@@ -136,8 +136,6 @@ function StudioEditorPage() {
           pageContext: {
             keyword: page?.keyword || "",
             pageType: page?.page_type || "",
-            firm: page?.firms?.name || "",
-            branche: page?.firms?.branche || "",
           },
           chatHistory: messages.slice(-4),
         },

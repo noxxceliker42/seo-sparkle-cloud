@@ -43,11 +43,20 @@ function PreviewPage() {
   }
 
   return (
-    <iframe
-      srcDoc={html}
-      className="w-full h-screen border-0"
-      title="SEO Page Preview"
-      sandbox="allow-same-origin"
-    />
+    <div className="relative w-full h-screen">
+      <Link
+        to="/studio/editor/$pageId"
+        params={{ pageId }}
+        className="absolute top-3 right-3 z-10 bg-primary text-primary-foreground px-3 py-1.5 rounded-md text-sm font-medium shadow-lg hover:opacity-90 transition-opacity"
+      >
+        ✏️ Im Editor öffnen
+      </Link>
+      <iframe
+        srcDoc={html}
+        className="w-full h-full border-0"
+        title="SEO Page Preview"
+        sandbox="allow-same-origin"
+      />
+    </div>
   );
 }

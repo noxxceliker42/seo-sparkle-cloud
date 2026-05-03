@@ -124,7 +124,7 @@ function StudioEditorPage() {
   }, [hasUnsavedChanges]);
 
   const pollEditorJob = useCallback(async (editId: string) => {
-    const maxAttempts = 60; // 60 × 2s = 120s max
+    const maxAttempts = 200; // 200 × 2s = 400s max
     let attempts = 0;
 
     while (attempts < maxAttempts) {
@@ -152,7 +152,7 @@ function StudioEditorPage() {
       }
     }
 
-    throw new Error("Zeitüberschreitung (120s) — bitte erneut versuchen");
+    throw new Error("Zeitüberschreitung (400s) — bitte erneut versuchen");
   }, []);
 
   const handleSend = useCallback(async () => {

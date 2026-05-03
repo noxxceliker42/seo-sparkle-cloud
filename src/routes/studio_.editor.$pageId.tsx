@@ -347,7 +347,7 @@ function StudioEditorPage() {
             <div style={{ position: "absolute", inset: 0, background: "rgba(5,8,16,0.6)", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
                 <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--accent)" }} />
-                <span style={{ fontFamily: "Rajdhani", color: "var(--accent)", fontSize: 14 }}>Änderung wird angewendet...</span>
+                <span style={{ fontFamily: "Rajdhani", color: "var(--accent)", fontSize: 14 }}>KI bearbeitet... ({elapsedTime}s)</span>
               </div>
             </div>
           )}

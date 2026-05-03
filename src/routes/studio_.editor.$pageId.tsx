@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Save, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export const Route = createFileRoute("/studio_/editor/$pageId")({
+export const Route = createFileRoute("/studio/editor/$pageId")({
   component: StudioEditorPage,
   head: () => ({
     meta: [{ title: "Seiten-Editor – SEO-OS v3.1" }],

@@ -415,11 +415,18 @@ function DashboardPage() {
                       )}
                       <Button variant="ghost" size="icon" onClick={() => setDetailPage(page)} title="Öffnen"><ExternalLink className="h-4 w-4" /></Button>
                       {page.html_output && (
-                        <Button asChild variant="outline" size="sm" title="Seite bearbeiten">
-                          <Link to="/editor/$pageId" params={{ pageId: page.id }}>
-                            <Pencil className="h-4 w-4" /> Bearbeiten
-                          </Link>
-                        </Button>
+                        <>
+                          <Button asChild variant="outline" size="sm" title="Seite bearbeiten">
+                            <Link to="/editor/$pageId" params={{ pageId: page.id }}>
+                              <Pencil className="h-4 w-4" /> Bearbeiten
+                            </Link>
+                          </Button>
+                          <Button asChild variant="outline" size="sm" title="Chat-Editor">
+                            <Link to="/studio/editor/$pageId" params={{ pageId: page.id }}>
+                              ✏️ Editor
+                            </Link>
+                          </Button>
+                        </>
                       )}
                       <Button variant="ghost" size="icon" onClick={() => exportHtml(page)} title="HTML exportieren"><Download className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(page.id)} title="Löschen"><Trash2 className="h-4 w-4 text-destructive" /></Button>

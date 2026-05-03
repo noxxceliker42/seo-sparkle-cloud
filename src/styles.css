@@ -512,3 +512,14 @@
 .led-go    { color: var(--mc-green);  animation: mc-pulse 2s ease-in-out infinite; }
 .led-hold  { color: var(--mc-yellow); animation: mc-pulse 1.5s ease-in-out infinite; }
 .led-abort { color: var(--mc-red);    animation: mc-blink 0.6s ease-in-out infinite; }
+
+/* Studio Editor — Typing indicator */
+@keyframes typingPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+.typing-dot {
+  color: var(--accent);
+  font-size: 14px;
+  animation: typingPulse 1.2s infinite;
+}

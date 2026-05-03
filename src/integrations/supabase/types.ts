@@ -597,6 +597,42 @@ export type Database = {
           },
         ]
       }
+      editor_jobs: {
+        Row: {
+          changes: string | null
+          completed_at: string | null
+          created_at: string | null
+          edit_id: string
+          error_message: string | null
+          html_output: string | null
+          id: string
+          status: string | null
+          tokens_used: number | null
+        }
+        Insert: {
+          changes?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          edit_id: string
+          error_message?: string | null
+          html_output?: string | null
+          id?: string
+          status?: string | null
+          tokens_used?: number | null
+        }
+        Update: {
+          changes?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          edit_id?: string
+          error_message?: string | null
+          html_output?: string | null
+          id?: string
+          status?: string | null
+          tokens_used?: number | null
+        }
+        Relationships: []
+      }
       firm_style_profiles: {
         Row: {
           camera_style: string | null

@@ -197,12 +197,13 @@ ${caseStudy}
 
   // Bild-Strategie
   const imageStrategy = String(data.imageStrategy || "nanobanana").toLowerCase();
-  const imageStrategyBlock = imageStrategy === "nanobanana"
+  const hasImagePlaceholders = data.imagePlaceholders === true;
+  const imageStrategyBlock = (hasImagePlaceholders || imageStrategy === "nanobanana")
     ? `
 ══════════════════════════════════════
-BILD-STRATEGIE: NANOBANANA-PLATZHALTER (PFLICHT)
+BILD-STRATEGIE: PLATZHALTER
 ══════════════════════════════════════
-Für JEDE Sektion die ein Bild benötigt MUSS exakt dieser Platzhalter verwendet werden:
+Bild-Platzhalter mit data-nb-* Attributen einbauen.
 
 Hero Section (PFLICHT auf jeder Seite):
 <img
@@ -229,6 +230,8 @@ Für H2-Sektionen (nur wenn Bild Mehrwert bringt):
   class="nb-image-slot"
   loading="lazy"
 >
+
+Max 5 Platzhalter. class="nb-image-slot" auf jedem <img>.
 
 VERBOTEN:
 - src mit echten URLs oder Pfaden

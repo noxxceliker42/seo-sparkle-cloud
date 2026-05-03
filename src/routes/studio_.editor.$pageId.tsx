@@ -31,7 +31,6 @@ interface PageData {
   status: string | null;
   qa_score: number | null;
   firm_id: string | null;
-  firms: { name: string; branche: string | null } | null;
 }
 
 const EXAMPLE_CHIPS = [

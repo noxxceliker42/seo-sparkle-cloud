@@ -140,20 +140,42 @@ function StudioEditorPage() {
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      const { data, error } = await supabase.functions.invoke("studio-editor", {
-        body: {
-          currentHtml: currentHtml,
-          userCommand: command,
-          pageContext: {
-            keyword: page?.keyword || "",
-            pageType: page?.page_type || "",
-          },
-          chatHistory: messages.slice(-4),
-        },
-      });
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error("Nicht eingeloggt");
 
-      if (error) throw error;
-      if (!data.success) throw new Error(data.error || "Unbekannter Fehler");
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/n8n-proxy`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          signal: AbortSignal.timeout(180000),
+          body: JSON.stringify({
+            webhookType: "studio-editor",
+            payload: {
+              currentHtml,
+              userCommand: command,
+              pageContext: {
+                keyword: page?.keyword || "",
+                pageType: page?.page_type || "",
+              },
+              chatHistory: messages.slice(-4).map((m) => ({
+                role: m.role,
+                content: m.content,
+                changeSummary: m.changeSummary || "",
+              })),
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error(`Fehler: ${response.status}`);
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || "Bearbeitung fehlgeschlagen");
 
       const newHtml = data.html;
       setCurrentHtml(newHtml);

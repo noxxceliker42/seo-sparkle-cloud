@@ -925,6 +925,9 @@ function ClusterPageCard({ page, cluster, firm, scope, isGenerating, isFetchingS
                 <Button size="sm" variant="outline" className="flex-1 text-[11px] h-7 gap-1" onClick={() => window.open(`/preview/${page.seo_page_id}`, "_blank")}>
                   <Eye className="h-3 w-3" /> Vorschau
                 </Button>
+                <Button size="sm" variant="outline" className="text-[11px] h-7 gap-1" onClick={() => window.open(`/studio/editor/${page.seo_page_id}`, "_blank")}>
+                  ✏️ Editor
+                </Button>
                 {status !== "live" && (
                   <Button size="sm" variant="default" className="text-[11px] h-7 gap-1" onClick={onSetLive}>
                     <Rocket className="h-3 w-3" /> Live
